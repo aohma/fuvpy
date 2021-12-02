@@ -15,7 +15,6 @@ import pandas as pd
 import xarray as xr
 import glob
 import vaex
-import matplotlib.pyplot as plt
 from datetime import datetime
 
 from scipy.io import idl
@@ -576,14 +575,16 @@ def makeFUVshModelNew(imgs,Nsh,Msh,inImg='dgimg',dampingVal=0,stop=0.01,degree=2
     return imgs
 
 def runrun():
-    path = '/Users/aohma/BCSS-DAG Dropbox/Anders Ohma/data/wic/'
+    inpath = '/mnt/0b3b8cce-3469-42cb-b694-60a7ca36e03a/IMAGE_FUV/wic/'
+    outpath = '/mnt/5fa6bccc-fa9d-4efc-9ddc-756f65699a0a/aohma/fuv/wic/'
     df = pd.DataFrame()
-    df['wicfile'] = glob.glob(path + '*.idl')
-    df['date']=pd.to_datetime(df.loc[:,'wicfile'].str.replace(path + 'wic','').str.replace('.idl',''),format='%Y%j%H%M')
+    df['wicfile'] = glob.glob(inpath + '*.idl')
+    print(df)
+    df['date']=pd.to_datetime(df.loc[:,'wicfile'].str.replace(inpath + 'wic','').str.replace('.idl',''),format='%Y%j%H%M')
     df = df.set_index('date')
     df = df.sort_index()
     
-    onset = pd.read_pickle('/Users/aohma/BCSS-DAG Dropbox/Anders Ohma/python/git/DAG/data/processed/merged_substormlist.pd')
+    onset = pd.read_pickle('merged_substormlist.pd')
     frey = onset.loc['2000-03-01':'2006-01-01',:]
     frey['date'] = frey.index#.floor('min')
     
@@ -624,7 +625,7 @@ def runrun():
             wic = pd.merge_asof(wic,pd.concat([rtimeb,rtimef]),on='date',direction='nearest',tolerance=pd.Timedelta('40s')).copy()
             wic = wic.dropna()
             vaex_df = vaex.from_pandas(wic)
-            vaex_df.export_hdf5(path+'wic'+f.onset[0].strftime('%Y%m%d%H%M%S')+'.hdf5')
+            vaex_df.export_hdf5(outpath+'wic'+f.onset[0].strftime('%Y%m%d%H%M%S')+'.hdf5')
             
     return
 
