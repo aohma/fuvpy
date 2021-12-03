@@ -608,11 +608,12 @@ def runrun():
     # ds = pd.concat(ds)  
     for f in files[287:]:
         if not f.empty:
-            wic = readFUVimage(f['wicfile'].values,dzalim=75)
             if f['mlat'][0]>0:
-                wic = makeFUVdayglowModelC(wic,transform='log',hemisphere='north')
+                wic = readFUVimage(f['wicfile'].values,dzalim=75,hemisphere='north')
             else:
-                wic = makeFUVdayglowModelC(wic,transform='log',hemisphere='south')
+                wic = readFUVimage(f['wicfile'].values,dzalim=75,hemisphere='south')
+                
+            wic = makeFUVdayglowModelC(wic,transform='log')
             wic = makeFUVshModelNew(wic,4,4)
             wic = wic.to_dataframe().reset_index()[['date','row','col','mlat','mlt','img','dgimg','dgweight','shimg','shweight']]
             wic = wic.rename(columns={'row':'irow','col':'icol'})
