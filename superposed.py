@@ -123,6 +123,8 @@ def readFUVimage(filenames, dzalim = 80, minlat = 0, hemisphere = None, reflatWI
             img=img.assign({'hemisphere': 'north'})
             img['mlt']  = xr.where(img['mlat'] < 0,np.nan,img['mlt'])
             img['mlat'] = xr.where(img['mlat'] < 0,np.nan,img['mlat'])
+        else:
+            img=img.assign({'hemisphere': 'na'})
 
         img['mlat'] = np.abs(img['mlat'])
         img['mlt']  = xr.where(img['mlat'] < minlat,np.nan,img['mlt'])
@@ -604,10 +606,13 @@ def runrun():
         
         files.append(temp)
     # ds = pd.concat(ds)  
-    for f in files:
+    for f in files[287:]:
         if not f.empty:
             wic = readFUVimage(f['wicfile'].values,dzalim=75)
-            wic = makeFUVdayglowModelC(wic,transform='log')
+            if f['mlat'][0]>0:
+                wic = makeFUVdayglowModelC(wic,transform='log',hemisphere='north')
+            else:
+                wic = makeFUVdayglowModelC(wic,transform='log',hemisphere='south')
             wic = makeFUVshModelNew(wic,4,4)
             wic = wic.to_dataframe().reset_index()[['date','row','col','mlat','mlt','img','dgimg','dgweight','shimg','shweight']]
             wic = wic.rename(columns={'row':'irow','col':'icol'})
