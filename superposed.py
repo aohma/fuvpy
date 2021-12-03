@@ -606,7 +606,7 @@ def runrun():
         
         files.append(temp)
     # ds = pd.concat(ds)  
-    for f in files[287:]:
+    for f in files:
         if not f.empty:
             if f['mlat'][0]>0:
                 wic = readFUVimage(f['wicfile'].values,dzalim=75,hemisphere='north')
