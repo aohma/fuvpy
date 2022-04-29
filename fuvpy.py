@@ -297,7 +297,7 @@ def getFUVrayleigh(imgs,inImg='image'):
     imgs[inImg+'R'].attrs = {'long_name': 'Intensity', 'units': 'kR'}
     return imgs
 
-def makeFUVdayglowModel(imgs,inImg='img',transform=None,sOrder=3,dampingVal=0,stop=1e-3,minlat=0,dzalim=80,sKnots=None,tKnotSep=None,tOrder=2):
+def makeFUVdayglowModel(imgs,inImg='img',transform=None,sOrder=3,dampingVal=0,tukeyVal=5,stop=1e-3,minlat=0,dzalim=80,sKnots=None,tKnotSep=None,tOrder=2):
     '''
     Function to model the FUV dayglow and subtract it from the input image
 
@@ -312,6 +312,11 @@ def makeFUVdayglowModel(imgs,inImg='img',transform=None,sOrder=3,dampingVal=0,st
     dampingVal : float, optional
         Damping (Tikhonov regularization).
         The default is 0 (no damping).
+    tukeyVal : float, optional
+        Determines to what degree outliers are down-weighted.
+        Iterative reweights is (1-(residuals/(tukeyVal*rmse))^2)^2
+        Larger tukeyVal means less down-weight
+        Default is 5
     stop : float, optional
         When to stop the iteration. The default is 0.001.
     minlat : float, optional
@@ -420,7 +425,7 @@ def makeFUVdayglowModel(imgs,inImg='img',transform=None,sOrder=3,dampingVal=0,st
         residuals = dm.flatten()[ind] - d.flatten()[ind]
         rmse = np.sqrt(np.average(residuals**2,weights=w[ind]))
 
-        iw = ((residuals)/(8*rmse))**2
+        iw = ((residuals)/(tukeyVal*rmse))**2
         iw[iw>1] = 1
         w[ind] = (1-iw)**2
 
@@ -547,12 +552,12 @@ def showFUVdayglowModel(img,minlat=0,pathOutput=None,**kwargs):
         plt.clf()
         plt.close(fig)
     #plt.show()
-    
+
 def showFUVimg(img,inImg='img',pax=None,crange = None, bgcolor = None, **kwargs):
     '''
     Show a FUV image in polar coordinates coordinates.
     Wrapper to polplot's showImg
-    
+
     Parameters
     ----------
     img : xarray.Dataset
@@ -574,12 +579,12 @@ def showFUVimg(img,inImg='img',pax=None,crange = None, bgcolor = None, **kwargs)
     if pax is None:
         fig, ax = plt.subplots()
         pax = pp(ax)
-    
+
     mlat = img['mlat'].values.copy()
     mlt = img['mlt'].values.copy()
     image = img[inImg].values.copy()
-    pax.showImg(mlat,mlt,image,crange=crange,bgcolor=bgcolor,**kwargs)
-    
+    pax.plotimg(mlat,mlt,image,crange=crange,bgcolor=bgcolor,**kwargs)
+
 def showFUVimgProjection(img,inImg='img',ax=None,mltLeft=18.,mltRight=6, minlat=60,maxlat=80,crange=None, **kwargs):
     '''
     Show a section of a FUV image projected in mlt-mlat coordinates
@@ -679,7 +684,7 @@ def plotOCBtimeseries(ds,boundary='ocb'):
 
     # Add first row to end for plotting
     ds = xr.concat([ds,ds.isel(mlt=0)],dim='mlt')
-    
+
     # Date
     date = ds.date
     n_d = len(date)
@@ -697,90 +702,10 @@ def plotOCBtimeseries(ds,boundary='ocb'):
     cbar.ax.tick_params(size=0)
     cbarlabel = n_d*['']
     cbarlabel[::n_d//10+1] = dateStr[::n_d//10+1]
-    
+
 
     cbar.set_ticklabels(cbarlabel)
     plt.tight_layout()
-
-# def calculateflux_depreciated(boundaries,mlatres=1,K=0,M0=8,N=20,height = 130.):
-#     '''
-#     Function to estimate the amount of open flux inside the given boundaries.
-#     Parameters
-#     ----------
-#     boundaries : pandas.DataFrame
-#         Dataframe with the open-closed boundaries identified using findBoundaries.
-#     Returns
-#     -------
-#     df : pandas.Dataframe
-#         DataFrame with the amount of open flux at each datetime
-#     '''
-
-#     # Dates of the OCBs and the average date
-#     dates = boundaries.index.get_level_values('date').unique()
-
-#     # Set up equal area grid
-#     mlatgridl,mltgridl,mltres = equal_area_grid(dr=mlatres,K=K,M0=M0,N=N)
-#     mlatgridc = mlatgridl+mlatres/2
-#     mltgridc  = mltgridl +mltres/2
-#     minlat = mlatgridl[0]
-
-#     openflux = []
-#     eqflux = []
-#     for t in range(len(dates)):
-#         # Convert the grid to geo
-#         A = apexpy.Apex(dates[t])
-#         glatgridc,glongridc = A.convert(mlatgridc, mltgridc, 'mlt', 'geo', height=height,datetime=dates[t])
-
-#         # Calculate the amount of magnetic flux in each gridcell
-#         Bn,Be,Bd = igrf(dates[t],glatgridc,glongridc,height,geodetic=True) # must be validated.
-#         basevectors = A.basevectors_apex(glatgridc, glongridc, height, coords = 'geo')
-#         d3 = basevectors[8] # d3 is east,north,up
-#         Be3 = d3[0,:]*Be + d3[1,:]*Bn + d3[2,:]*(-Bd) # Eq 76 in Laundal and Richmond (2017).
-#         sinIm = 2*np.sin(np.deg2rad(mlatgridc))/np.sqrt(4 - 3*np.cos(np.deg2rad(mlatgridc))**2)
-#         R = geod2geoc(glatgridc,height,0,0)[1]
-#         dflux = (R*1.e3)**2 * np.cos(np.deg2rad(mlatgridc)) * np.abs(sinIm) * Be3*1e-9*np.deg2rad(mlatres)*np.deg2rad(15*mltres)
-
-#         # Convert the grid from polar to cartesian
-#         r = (90. - np.abs(mlatgridc))/(90. - minlat)
-#         a = (mltgridc - 6.)/12.*np.pi
-#         xgridc =  r*np.cos(a)
-#         ygridc =  r*np.sin(a)
-
-#         # Create an OCB polygon
-#         boundary = boundaries.loc[dates[t]].copy()
-#         r = (90. - np.abs(boundary['ocb'].values))/(90. - minlat)
-#         a = (boundary.index.values - 6.)/12.*np.pi
-#         boundary['x'] =  r*np.cos(a)
-#         boundary['y'] =  r*np.sin(a)
-#         poly = path.Path(boundary[['x','y']].values)
-
-#         # Identify gridcell with center inside the OCB polygon
-#         inocb = poly.contains_points(np.concatenate((xgridc[:,None],ygridc[:,None]),axis=1))
-
-#         # Summarize
-#         openflux.append(np.sum(dflux[inocb])*1e-6)
-
-#         # Create a polygon for the equatorial boundary
-#         boundary = boundaries.loc[dates[t]].copy()
-#         r = (90. - np.abs(boundary['eqb'].values))/(90. - minlat)
-#         a = (boundary.index.values - 6.)/12.*np.pi
-#         boundary['x'] =  r*np.cos(a)
-#         boundary['y'] =  r*np.sin(a)
-#         poly = path.Path(boundary[['x','y']].values)
-
-#         # Identify gridcell with center inside the OCB polygon
-#         inocb = poly.contains_points(np.concatenate((xgridc[:,None],ygridc[:,None]),axis=1))
-
-#         # Summarize
-#         eqflux.append(np.sum(dflux[inocb])*1e-6)
-
-#     df = pd.DataFrame()
-#     df['openflux'] = openflux
-#     df['auroralflux'] = np.array(eqflux) - np.array(openflux)
-#     df.index = dates
-#     df = df.replace(0,np.nan)
-
-#     return df
 
 def calcFlux(ds,height=130,R=6371.2):
     '''
@@ -800,7 +725,7 @@ def calcFlux(ds,height=130,R=6371.2):
     ds : xarray.Dataset
         Copy(?) of the Dataset with calculated flux
     '''
-    
+
     # Date for IGRF values
     dateIGRF = ds.date[len(ds.date)//2].values
 
@@ -824,10 +749,10 @@ def calcFlux(ds,height=130,R=6371.2):
     for t in range(len(ds.date)):
         date = pd.to_datetime(ds.date[t].values)
         mlt = ds.mlt.values
-        
+
         # OCB coordinates
         ocb = ds.isel(date=t)['ocb'].values
-        
+
         # Convert boundary to geo
         A = apexpy.Apex(date)
         gdlat,glon = A.convert(ocb, mlt, 'mlt', 'geo', height=height,datetime=date)
@@ -845,10 +770,10 @@ def calcFlux(ds,height=130,R=6371.2):
             oFlux.append(np.nan)
         else:
             oFlux.append(np.sum(dflux.flatten()[inocb])*1e-6)
-        
+
         # EQB coordinates
         eqb = ds.isel(date=t)['eqb'].values
-        
+
         # Convert boundary to geo
         gdlat,glon = A.convert(eqb, mlt, 'mlt', 'geo', height=height,datetime=date)
         glat = 90 - lompe.ppigrf.ppigrf.geod2geoc(gdlat,height,0,0)[0]
@@ -865,11 +790,11 @@ def calcFlux(ds,height=130,R=6371.2):
             aFlux.append(np.nan)
         else:
             aFlux.append(np.sum(dflux.flatten()[inocb])*1e-6)
-        
+
     ds=ds.assign({'openFlux':('date',np.array(oFlux)),'auroralFlux':('date',np.array(aFlux)-np.array(oFlux))})
     return ds
 
-def makeFUVshModel(imgs,Nsh,Msh,order=3,dampingVal=0,stop=1e-3,knotSep=None):
+def makeFUVshModel(imgs,Nsh,Msh,order=3,dampingVal=0,tukeyVal=5,stop=1e-3,knotSep=None):
     '''
     Function to model the FUV residual background and subtract it from the input image
 
@@ -886,11 +811,16 @@ def makeFUVshModel(imgs,Nsh,Msh,order=3,dampingVal=0,stop=1e-3,knotSep=None):
     dampingVal : TYPE, optional
         Damping to reduce the influence of the time-dependent part of the model.
         The default is 0 (no damping).
+    tukeyVal : float, optional
+        Determines to what degree outliers are down-weighted.
+        Iterative reweights is (1-(residuals/(tukeyVal*rmse))^2)^2
+        Larger tukeyVal means less down-weight
+        Default is 5
     stop : float, optional
         When to stop the iteration. The default is 0.001.
     knotSep : int, optional
         Approximate separation of temporal knots in minutes. The default is None (only knots at endpoints)
-    
+
     Returns
     -------
     imgs : xarray.Dataset
@@ -989,7 +919,7 @@ def makeFUVshModel(imgs,Nsh,Msh,order=3,dampingVal=0,stop=1e-3,knotSep=None):
         residuals = dm.flatten()[ind] - d.flatten()[ind]
         rmse = np.sqrt(np.average(residuals**2,weights=w[ind]))
 
-        iw = ((residuals)/(8*rmse))**2
+        iw = ((residuals)/(tukeyVal*rmse))**2
         iw[iw>1] = 1
         w[ind] = (1-iw)**2
 
@@ -1036,17 +966,17 @@ def findBoundaries(imgs,inImg='shimg',mltRes=24,limFactors=None,order=3,dampingV
     xarray.Dataset
         A Dataset containing the identified boundaries.
     '''
-    
+
     # Expand date dimension if missing
     if len(imgs.sizes)==2: imgs = imgs.expand_dims('date')
 
     if limFactors is None: limFactors = np.linspace(0.5,1.5,5)
     edges = np.linspace(0,24,mltRes+1)
-    
+
     # Circle in which all boundaries are assumed to be located
     colatMax = np.concatenate((np.linspace(40,30,mltRes+1)[1:-1:2],np.linspace(30,40,mltRes+1)[1:-1:2]))
 
-    
+
     colatAll = 90-abs(imgs['mlat'].values.copy().flatten())
     dAll = imgs[inImg].values.copy().flatten()
     wdgAll = imgs['shweight'].values.copy().flatten()
@@ -1088,13 +1018,13 @@ def findBoundaries(imgs,inImg='shimg',mltRes=24,limFactors=None,order=3,dampingV
                 eqb.extend(len(limFactors)*[np.nan])
             else:
                 # Prepare the model
-                
+
                 # Number of control points
                 n_cp = len(knots)-order-1
 
                 # Temporal design matix
                 G = BSpline(knots, np.eye(n_cp), order)(colatSec[iii])
-                
+
                 damping = dampingVal*np.ones(G.shape[1])
                 RR = np.diag(damping)
 
@@ -1116,7 +1046,7 @@ def findBoundaries(imgs,inImg='shimg',mltRes=24,limFactors=None,order=3,dampingV
                     w = weights
                     if m is not None:
                         diff = np.sqrt(np.mean((m - mNew)**2))/(1+np.sqrt(np.mean(mNew**2)))
-                    
+
                     m = mNew
 
                 ev = np.linspace(0,40,401)
@@ -1196,7 +1126,7 @@ def makeBoundaryModel(ds,stop=1e-3,dampingValE=2e0,dampingValP=2e1,n_termsE=2,n_
     '''
     Function to make a spatiotemporal Fourier model of auroral boundaries.
     INCLUDE L-CURVE script
-    
+
     Parameters
     ----------
     ds : xarray.Dataset
@@ -1217,7 +1147,7 @@ def makeBoundaryModel(ds,stop=1e-3,dampingValE=2e0,dampingValP=2e1,n_termsE=2,n_
         Order of the temporal B-spline. Default is 3
     knotSep : int, optional
         Approximate knot separation in minutes. Default is 10.
-        
+
     Returns
     -------
     xarray.Dataset
@@ -1229,10 +1159,10 @@ def makeBoundaryModel(ds,stop=1e-3,dampingValE=2e0,dampingValP=2e1,n_termsE=2,n_
     mlt = np.tile(ds.mlt.values,len(ds.lim))
     n_t = len(ds.date)
     n_mlt = len(mlt)
-    
+
     #%% Eq boundary model
     theta_eb = np.deg2rad(90-ds['eqb'].stack(z=('lim','mlt')).values)
-    
+
     # Temporal knots
     if knotSep==None:
         knots = np.linspace(time[0], time[-1], 2)
@@ -1245,7 +1175,7 @@ def makeBoundaryModel(ds,stop=1e-3,dampingValE=2e0,dampingValP=2e1,n_termsE=2,n_
 
     # Temporal design matix
     M = BSpline(knots, np.eye(n_cp), order)(time)
-        
+
     # Data kernel
     G=[]
     for i in range(n_mlt):
@@ -1259,22 +1189,22 @@ def makeBoundaryModel(ds,stop=1e-3,dampingValE=2e0,dampingValP=2e1,n_termsE=2,n_
         G_t = np.zeros((n_mlt, n_G*n_cp))
         for j in range(n_cp):
             G_t[:, np.arange(j, n_G*n_cp, n_cp)] = G*M[i, j]
-        
+
         if i == 0:
             G_s = G_t
         else:
             G_s = np.vstack((G_s, G_t))
-    
+
     # Data
     d_s = np.log(theta_eb.flatten())
     ind = np.isfinite(d_s)
-    
+
     # Temporal Damping
     damping = dampingValE*np.ones(G_s.shape[1])
     damping[:3*n_cp]=10*damping[:3*n_cp]
-        
+
     R = np.diag(damping)
-    
+
     # Iteratively estimation of model parameters
     diff = 10000
     w = np.ones(d_s[ind].shape)
@@ -1284,16 +1214,16 @@ def makeBoundaryModel(ds,stop=1e-3,dampingValE=2e0,dampingValP=2e1,n_termsE=2,n_
         print('Iteration:',iteration)
         ms = np.linalg.inv((G_s[ind,:]*w[:,None]).T@(G_s[ind,:]*w[:,None])+R)@(G_s[ind,:]*w[:,None]).T@(d_s[ind]*w)
         ms = ms.reshape((n_G, n_cp)).T
-        
+
         mNew    = M@ms
         mtau=[]
         for i, tt in enumerate(time):
             mtau.append(G@mNew[i, :])
         mtau=np.array(mtau).squeeze()
-        
+
         residuals = mtau.flatten()[ind] - d_s[ind]
         rmse = np.sqrt(np.average(residuals**2,weights=w))
-        
+
         # Change to Tukey?
         weights = 1.5*rmse/np.abs(residuals)
         weights[weights > 1] = 1.
@@ -1301,10 +1231,10 @@ def makeBoundaryModel(ds,stop=1e-3,dampingValE=2e0,dampingValP=2e1,n_termsE=2,n_
         if m is not None:
             diff = np.sqrt(np.mean((mNew - m)**2))/(1+np.sqrt(np.mean(mNew**2)))
             print('Relative change model norm', diff)
-        
+
         m = mNew
         iteration += 1
-        
+
     # Data kernel evaluation
     mlt_eval      = np.linspace(0,24,24*10+1)
     G=[]
@@ -1315,32 +1245,32 @@ def makeBoundaryModel(ds,stop=1e-3,dampingValE=2e0,dampingValP=2e1,n_termsE=2,n_
         G.append(terms)
     G = np.array(G)
     n_G = np.shape(G)[1]
-    
+
     # Model boundary in primed space
     tau1=[]
     for i, tt in enumerate(time):
         tau1.append(G@m[i, :])
     tau1=np.array(tau1).squeeze()
-    
+
     # Transform to unprimed
     tau_eb = np.exp(tau1)
-    
+
     ## DERIVATIVE
-    
+
     # df/dt in primed space
     dt =(knots[order+1:-1]-knots[1:-order-1])
     dms_dt = (ms[1:,:] - ms[:-1,:]) * order / dt[:,None]
-    knots_dt=knots[1:-1]   
+    knots_dt=knots[1:-1]
     n_cp_dt=len(knots_dt)-(order-1)-1
 
     M_dt = BSpline(knots_dt, np.eye(n_cp_dt), order-1)(time)
-    dm_dt      = M_dt@dms_dt   
-    
+    dm_dt      = M_dt@dms_dt
+
     dtau1_dt=[]
     for i, tt in enumerate(time):
         dtau1_dt.append(G@dm_dt[i, :])
     dtau1_dt=np.array(dtau1_dt).squeeze()
-    
+
     # df/d(phi) in primed space
     G_dphi=[]
     for i in range(len(mlt_eval)):
@@ -1353,28 +1283,28 @@ def makeBoundaryModel(ds,stop=1e-3,dampingValE=2e0,dampingValP=2e1,n_termsE=2,n_
     for i, tt in enumerate(time):
         dtau1_dphi.append(G_dphi@m[i, :])
     dtau1_dphi=np.array(dtau1_dphi).squeeze()
-    
+
     # Transform derivatives to unprimed
     dtau_dt_eb = np.exp(tau1)*(dtau1_dt)
     dtau_dphi_eb = np.exp(tau1)*(dtau1_dphi)
-    
+
     R_I = 6500e3
     dphi_dt = -( dtau_dt_eb*dtau_dphi_eb)/(np.sin(tau_eb)**2+(dtau_dphi_eb)**2)
     dtheta_dt = dtau_dt_eb*np.sin(tau_eb)**2/(np.sin(tau_eb)**2+(dtau_dphi_eb)**2)
-    
+
     # Boundary velocity
     u_phi = R_I*np.sin(tau_eb)*dphi_dt/60
     u_theta = R_I*dtheta_dt/60
-    
-    
+
+
     #%% Poleward boundary model
     theta_pb = np.deg2rad(90 - ds['ocb'].stack(z=('lim','mlt')).values)
-   
+
     theta_pb1 = theta_pb/np.exp(mtau)
 
     # Temporal design matix
     M = BSpline(knots, np.eye(n_cp), order)(time)
-    
+
     # Data kernel
     G=[]
     for i in range(n_mlt):
@@ -1386,24 +1316,24 @@ def makeBoundaryModel(ds,stop=1e-3,dampingValE=2e0,dampingValP=2e1,n_termsE=2,n_
     n_G = np.shape(G)[1]
     for i in range(n_t):
         G_t = np.zeros((n_mlt, n_G*n_cp))
-        
+
         for j in range(n_cp):
             G_t[:, np.arange(j, n_G*n_cp, n_cp)] = G*M[i, j]
-        
+
         if i == 0:
             G_s = G_t
         else:
             G_s = np.vstack((G_s, G_t))
-    
+
     # Data
     d_s = (np.log(theta_pb1)-np.log(1-theta_pb1)).flatten()
     ind = np.isfinite(d_s)
-    
+
     # Temporal Damping
     damping = dampingValP*np.ones(G_s.shape[1])
-    damping[:3*n_cp]=2*damping[:3*n_cp]   
+    damping[:3*n_cp]=2*damping[:3*n_cp]
     R = np.diag(damping)
-    
+
     # Iteratively estimation of model parameters
     diff = 10000
     w = np.ones(d_s[ind].shape)
@@ -1415,12 +1345,12 @@ def makeBoundaryModel(ds,stop=1e-3,dampingValE=2e0,dampingValP=2e1,n_termsE=2,n_
         ms = ms.reshape((n_G, n_cp)).T
         # Retrieve B-spline smooth model paramters (coarse)
         mNew    = M@ms
-        
+
         mtau2=[]
         for i, tt in enumerate(time):
             mtau2.append(G@mNew[i, :])
         mtau2=np.array(mtau2).squeeze()
-        
+
         residuals = mtau2.flatten()[ind] - d_s[ind]
         rmse = np.sqrt(np.average(residuals**2,weights=w))
         weights = 1.5*rmse/np.abs(residuals)
@@ -1429,10 +1359,10 @@ def makeBoundaryModel(ds,stop=1e-3,dampingValE=2e0,dampingValP=2e1,n_termsE=2,n_
         if m is not None:
             diff = np.sqrt(np.mean((mNew - m)**2))/(1+np.sqrt(np.mean(mNew**2)))
             print('Relative change model norm', diff)
-        
+
         m = mNew
         iteration += 1
-    
+
     # Data kernel evaluation
     G=[]
     for i in range(len(mlt_eval)):
@@ -1442,33 +1372,33 @@ def makeBoundaryModel(ds,stop=1e-3,dampingValE=2e0,dampingValP=2e1,n_termsE=2,n_
         G.append(terms)
     G = np.array(G)
     n_G = np.shape(G)[1]
-    
+
     # Model boundary in double primed space
     tau2=[]
     for i, tt in enumerate(time):
         tau2.append(G@m[i, :])
     tau2=np.array(tau2).squeeze()
-    
+
     # Transform to unprimed
     tau1 = 1/(1+np.exp(-1*tau2))
     tau_pb  = tau_eb*tau1
 
-    
+
     # df/dt in double primed space
     dt =(knots[order+1:-1]-knots[1:-order-1])
     dms_dt = (ms[1:,:] - ms[:-1,:]) * order / dt[:,None]
-    knots_dt=knots[1:-1]   
+    knots_dt=knots[1:-1]
     n_cp_dt=len(knots_dt)-(order-1)-1
-    
+
     # Temporal design matix
     M = BSpline(knots_dt, np.eye(n_cp_dt), order-1)(time)
-    dm_dt = M_dt@dms_dt   
-    
+    dm_dt = M_dt@dms_dt
+
     dtau2_dt=[]
     for i, tt in enumerate(time):
         dtau2_dt.append(G@dm_dt[i, :])
-    dtau2_dt=np.array(dtau2_dt).squeeze()  
-     
+    dtau2_dt=np.array(dtau2_dt).squeeze()
+
     # df/d(phi) in double primed coordinates
     G_dt=[]
     for i in range(len(mlt_eval)):
@@ -1485,19 +1415,19 @@ def makeBoundaryModel(ds,stop=1e-3,dampingValE=2e0,dampingValP=2e1,n_termsE=2,n_
     # Transform derivatives to primed
     dtau1_dt = (np.exp(-tau2)/(np.exp(-tau2)+1)**2)*(dtau2_dt)
     dtau1_dphi = (np.exp(-tau2)/(np.exp(-tau2)+1)**2)*(dtau2_dphi)
-    
+
     # Transform derivatives to unprimed
     dtau_dt = tau_eb*dtau1_dt  + dtau_dt_eb*tau1
     dtau_dphi = tau_eb*dtau1_dphi + dtau_dphi_eb*tau1
-    
+
     # Transform from "wrapped" ionosphere to spherical ionosphere
     dphi_dt = -( dtau_dt*dtau_dphi)/(np.sin(tau_pb)**2+(dtau_dphi)**2)
     dtheta_dt = dtau_dt*np.sin(tau_pb)**2/(np.sin(tau_pb)**2+(dtau_dphi)**2)
-    
+
     # Boundary velocity
     v_phi = R_I*np.sin(tau_pb)*dphi_dt/60
     v_theta = R_I*dtheta_dt/60
-    
+
 
     # Make Dataset with modelled boundary locations and velocities
     ds2 = xr.Dataset(
