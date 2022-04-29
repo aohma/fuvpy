@@ -137,6 +137,16 @@ def readFUVimage(filenames, dzalim = 80, minlat = 0, hemisphere = None, reflatWI
     if (imgs['id']=='WIC')&reflatWIC:
         imgs=_reflatWIC(imgs)
 
+    # Add attributes
+    imgs['img'].attrs = {'long_name': 'Original image'}
+    imgs['mlat'].attrs = {'long_name': 'Magnetic latitude', 'units': 'deg'}
+    imgs['mlon'].attrs = {'long_name': 'Magnetic longitude', 'units': 'deg'}
+    imgs['mlt'].attrs = {'long_name': 'Magnetic local time', 'units': 'hrs'}
+    imgs['glat'].attrs = {'long_name': 'Geographic latitude', 'units': 'deg'}
+    imgs['glon'].attrs = {'long_name': 'Geographic longitude', 'units': 'deg'}
+    imgs['sza'].attrs = {'long_name': 'Solar zenith angle', 'units': 'deg'}
+    imgs['dza'].attrs = {'long_name': 'Viewing angle', 'units': 'deg'}
+
     return imgs
 
 def _timestampFUVimage(timestamp):
@@ -271,7 +281,7 @@ def getIMAGEcmap():
     return mcolors.LinearSegmentedColormap('CustomMap', cdict)
 
 
-def getFUVrayleigh(imgs,inImg='image'):
+def getFUVrayleigh(imgs,inImg='img'):
     '''
     Convect counts to Rayleigh
     Parameters
@@ -294,7 +304,7 @@ def getFUVrayleigh(imgs,inImg='image'):
     elif imgs['id']=='SI13':
         imgs[inImg+'R'] = imgs[inImg]/15.3
 
-    imgs[inImg+'R'].attrs = {'long_name': 'Intensity', 'units': 'kR'}
+    imgs[inImg+'R'].attrs = {'long_name': imgs[inImg].attrs['long_name'], 'units': 'kR'}
     return imgs
 
 def makeFUVdayglowModel(imgs,inImg='img',transform=None,sOrder=3,dampingVal=0,tukeyVal=5,stop=1e-3,minlat=0,dzalim=80,sKnots=None,tKnotSep=None,tOrder=2):
@@ -448,6 +458,11 @@ def makeFUVdayglowModel(imgs,inImg='img',transform=None,sOrder=3,dampingVal=0,tu
     imgs['dgmodel'] = xr.where(~ind,np.nan,imgs['dgmodel'])
     imgs['dgimg'] = xr.where(~ind,np.nan,imgs['dgimg'])
     imgs['dgweight'] = xr.where(~ind,np.nan,imgs['dgweight'])
+
+    # Add attributes
+    imgs['dgmodel'].attrs = {'long_name': 'Dayglow model'}
+    imgs['dgimg'].attrs = {'long_name': 'Dayglow corrected image'}
+    imgs['dgweight'].attrs = {'long_name': 'Dayglow model weights'}
 
     return imgs
 
@@ -934,6 +949,11 @@ def makeFUVshModel(imgs,Nsh,Msh,order=3,dampingVal=0,tukeyVal=5,stop=1e-3,knotSe
     imgs['shimg'] = imgs['dgimg']-imgs['shmodel']
     imgs['shweight'] = (['date','row','col'],(w).reshape((n_t,len(imgs.row),len(imgs.col))))
 
+    # Add attributes
+    imgs['shmodel'].attrs = {'long_name': 'Spherical harmonics model'}
+    imgs['shimg'].attrs = {'long_name': 'Spherical harmonics corrected image'}
+    imgs['shweight'].attrs = {'long_name': 'Spherical harmonics model weights'}
+
     return imgs
 
 def findBoundaries(imgs,inImg='shimg',mltRes=24,limFactors=None,order=3,dampingVal=0):
@@ -1120,7 +1140,13 @@ def findBoundaries(imgs,inImg='shimg',mltRes=24,limFactors=None,order=3,dampingV
 
         blistTime.append(xr.concat(blistSec,dim='mlt'))
 
-    return xr.concat(blistTime,dim='date')
+    ds = xr.concat(blistTime,dim='date')
+
+    # Add attributes
+    ds['mlt'].attrs = {'long_name': 'Magnetic local time','unit':'hrs'}
+    ds['ocb'].attrs = {'long_name': 'Open-closed boundary','unit':'deg'}
+    ds['eqb'].attrs = {'long_name': 'Equatorward boundary','unit':'deg'}
+    return ds
 
 def makeBoundaryModel(ds,stop=1e-3,dampingValE=2e0,dampingValP=2e1,n_termsE=2,n_termsP=5,order = 3,knotSep = 10):
     '''
@@ -1444,4 +1470,13 @@ def makeBoundaryModel(ds,stop=1e-3,dampingValE=2e0,dampingValP=2e1,n_termsE=2,n_
         mlt = mlt_eval
     ),
     )
+
+    # Add attributes
+    ds2['mlt'].attrs = {'long_name': 'Magnetic local time','unit':'hrs'}
+    ds2['ocb'].attrs = {'long_name': 'Open-closed boundary','unit':'deg'}
+    ds2['eqb'].attrs = {'long_name': 'Equatorward boundary','unit':'deg'}
+    ds2['v_phi'].attrs = {'long_name': '$V_\\phi$','unit':'m/s'}
+    ds2['v_theta'].attrs = {'long_name': '$V_\\theta$','unit':'m/s'}
+    ds2['u_phi'].attrs = {'long_name': '$U_\\phi$','unit':'m/s'}
+    ds2['u_theta'].attrs = {'long_name': '$U_\\theta$','unit':'m/s'}
     return ds2

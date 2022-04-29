@@ -7,17 +7,17 @@ Created on Tue Apr 26 21:18:55 2022
 """
 import glob
 
-import fuvpy.fuvpy as fuv
+import fuvpy as fuv
 
 
-events = glob.glob('/Users/aohma/BCSS-DAG Dropbox/Anders Ohma/data/fuv200012/north/*')
-events.sort()
+# events = glob.glob('/Users/aohma/BCSS-DAG Dropbox/Anders Ohma/data/fuv200012/north/*')
+# events.sort()
 
-for e in events[2:3]:
-    wicfiles = glob.glob(e+'/*.idl')   
-    wic = fuv.readFUVimage(wicfiles)
-    wic = fuv.makeFUVdayglowModel(wic,transform='log')
-    wic = fuv.makeFUVshModel(wic,4,4)
+# for e in events[2:3]:
+#     wicfiles = glob.glob(e+'/*.idl')   
+#     wic = fuv.readFUVimage(wicfiles)
+#     wic = fuv.makeFUVdayglowModel(wic,transform='log')
+#     wic = fuv.makeFUVshModel(wic,4,4)
     
  
     # wic.to_netcdf('/Users/aohma/BCSS-DAG Dropbox/Anders Ohma/data/fuv200012/wic_'+e[63:]+'.nc')
@@ -69,3 +69,9 @@ for e in events[2:3]:
 #     wic['shweight'] = wic['dgweight']
     
 #     wic.to_netcdf('/Volumes/Seagate Backup Plus Drive/fuv/s12/nc/s12_'+e[53:]+'.nc')
+
+
+wicfiles = glob.glob('/Users/aohma/BCSS-DAG Dropbox/Anders Ohma/python/git/fuvpy/data/wicFiles/*.idl')   
+wic = fuv.readFUVimage(wicfiles)
+wic = fuv.makeFUVdayglowModel(wic,transform='log')
+wic = fuv.makeFUVshModel(wic,4,4)
