@@ -72,6 +72,6 @@ import fuvpy as fuv
 
 
 wicfiles = glob.glob('/Users/aohma/BCSS-DAG Dropbox/Anders Ohma/python/git/fuvpy/data/wicFiles/*.idl')   
-wic = fuv.readFUVimage(wicfiles)
-wic = fuv.makeFUVdayglowModel(wic,transform='log')
-wic = fuv.makeFUVshModel(wic,4,4)
+wic = fuv.readImg(wicfiles)
+wic = fuv.makeDGmodel(wic,transform='log')
+wic = fuv.makeSHmodel(wic,4,4)

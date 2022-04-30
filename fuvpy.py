@@ -30,7 +30,7 @@ from polplot import pp
 
 
 
-def readFUVimage(filenames, dzalim = 80, minlat = 0, hemisphere = None, reflatWIC=True):
+def readImg(filenames, dzalim = 80, minlat = 0, hemisphere = None, reflatWIC=True):
     '''
     Load FUV images into a xarray.Dataset
 
@@ -88,7 +88,7 @@ def readFUVimage(filenames, dzalim = 80, minlat = 0, hemisphere = None, reflatWI
         'dza': (['row','col'],imageinfo['dza'][0]),
         'sza': (['row','col'],imageinfo['sza'][0])
         })
-        img = img.expand_dims(date=[pd.to_datetime(_timestampFUVimage(imageinfo['time'][0]))])
+        img = img.expand_dims(date=[pd.to_datetime(_timestampImg(imageinfo['time'][0]))])
 
         # Replace fill values with np.nan
         img['mlat'] = xr.where(img['mlat']==-1e+31,np.nan,img['mlat'])
@@ -131,7 +131,7 @@ def readFUVimage(filenames, dzalim = 80, minlat = 0, hemisphere = None, reflatWI
     imgs = imgs.assign({'id':  imageinfo['inst_id'][0].strip().decode('utf8')})
 
     # Add a boolerian field to flag bad pixels in the detector
-    imgs = _badPixelsFUVimage(imgs)
+    imgs = _badPixels(imgs)
 
     # Reapply WIC's flat field
     if (imgs['id']=='WIC')&reflatWIC:
@@ -149,7 +149,7 @@ def readFUVimage(filenames, dzalim = 80, minlat = 0, hemisphere = None, reflatWI
 
     return imgs
 
-def _timestampFUVimage(timestamp):
+def _timestampImg(timestamp):
     """ returns datetime object for timestamp = imageinfo['TIME'][0] """
 
     hh = int(timestamp[1]/1000/60/60)
@@ -172,7 +172,7 @@ def _timestampFUVimage(timestamp):
 
     return time
 
-def _badPixelsFUVimage(imgs):
+def _badPixels(imgs):
     '''
     Add a data field with index of problematic pixels in the different detectors.
     The exact number will depent on the datetime, so this static approach is an approximation.
@@ -281,7 +281,7 @@ def getIMAGEcmap():
     return mcolors.LinearSegmentedColormap('CustomMap', cdict)
 
 
-def getFUVrayleigh(imgs,inImg='img'):
+def getRayleigh(imgs,inImg='img'):
     '''
     Convect counts to Rayleigh
     Parameters
@@ -307,7 +307,7 @@ def getFUVrayleigh(imgs,inImg='img'):
     imgs[inImg+'R'].attrs = {'long_name': imgs[inImg].attrs['long_name'], 'units': 'kR'}
     return imgs
 
-def makeFUVdayglowModel(imgs,inImg='img',transform=None,sOrder=3,dampingVal=0,tukeyVal=5,stop=1e-3,minlat=0,dzalim=80,sKnots=None,tKnotSep=None,tOrder=2):
+def makeDGmodel(imgs,inImg='img',transform=None,sOrder=3,dampingVal=0,tukeyVal=5,stop=1e-3,minlat=0,dzalim=80,sKnots=None,tKnotSep=None,tOrder=2):
     '''
     Function to model the FUV dayglow and subtract it from the input image
 
@@ -466,7 +466,7 @@ def makeFUVdayglowModel(imgs,inImg='img',transform=None,sOrder=3,dampingVal=0,tu
 
     return imgs
 
-def showFUVdayglowModel(img,minlat=0,pathOutput=None,**kwargs):
+def showDGmodel(img,minlat=0,pathOutput=None,**kwargs):
     '''
     Show the dayglow model for a timestep.
     Ex: showFUVdayglowModel(wic.isel(date=15))
@@ -530,7 +530,7 @@ def showFUVdayglowModel(img,minlat=0,pathOutput=None,**kwargs):
     ax2 = plt.subplot(gs2[0])
     ax2c = plt.subplot(gs2[1])
     pax2 = pp(ax2)
-    showFUVimg(img,'img',pax=pax2,crange=[0,cmax1],**kwargs)
+    showImg(img,'img',pax=pax2,crange=[0,cmax1],**kwargs)
     ax2c.axis('off')
     plt.colorbar(pax2.ax.collections[0],orientation='horizontal',ax=ax2c,fraction=1,
                  extend='max')
@@ -540,7 +540,7 @@ def showFUVdayglowModel(img,minlat=0,pathOutput=None,**kwargs):
     ax3 = plt.subplot(gs3[0])
     ax3c = plt.subplot(gs3[1])
     pax3 = pp(ax3)
-    showFUVimg(img,'dgmodel',pax=pax3,crange=[0,cmax1],**kwargs)
+    showImg(img,'dgmodel',pax=pax3,crange=[0,cmax1],**kwargs)
     ax3c.axis('off')
     plt.colorbar(pax3.ax.collections[0],orientation='horizontal',ax=ax3c,fraction=1,
                  extend='max')
@@ -550,10 +550,10 @@ def showFUVdayglowModel(img,minlat=0,pathOutput=None,**kwargs):
     ax4 = plt.subplot(gs4[0])
     ax4c = plt.subplot(gs4[1])
     pax4 = pp(ax4)
-    showFUVimg(img,'dgimg',pax=pax4,crange=[-cmax2,cmax2],cmap='seismic')
+    showImg(img,'dgimg',pax=pax4,crange=[-cmax2,cmax2],cmap='seismic')
     ax4c.axis('off')
     plt.colorbar(pax4.ax.collections[0],orientation='horizontal',ax=ax4c,fraction=1,
-                 extend='max')
+                 extend='both')
 
     ax1.set_title(img['id'].values.tolist() + ': ' + img['date'].dt.strftime('%Y-%m-%d %H:%M:%S').values.tolist())
     ax2.set_title('Original image')
@@ -568,7 +568,7 @@ def showFUVdayglowModel(img,minlat=0,pathOutput=None,**kwargs):
         plt.close(fig)
     #plt.show()
 
-def showFUVimg(img,inImg='img',pax=None,crange = None, bgcolor = None, **kwargs):
+def showImg(img,inImg='img',pax=None,crange = None, bgcolor = None, **kwargs):
     '''
     Show a FUV image in polar coordinates coordinates.
     Wrapper to polplot's showImg
@@ -600,7 +600,7 @@ def showFUVimg(img,inImg='img',pax=None,crange = None, bgcolor = None, **kwargs)
     image = img[inImg].values.copy()
     pax.plotimg(mlat,mlt,image,crange=crange,bgcolor=bgcolor,**kwargs)
 
-def showFUVimgProjection(img,inImg='img',ax=None,mltLeft=18.,mltRight=6, minlat=60,maxlat=80,crange=None, **kwargs):
+def showImgProj(img,inImg='img',ax=None,mltLeft=18.,mltRight=6, minlat=60,maxlat=80,crange=None, **kwargs):
     '''
     Show a section of a FUV image projected in mlt-mlat coordinates
     Ex: showFUVimageProjection(wic.isel(date=15)['mlat'].values,wic.isel(date=15)['mlt'].values,
@@ -679,7 +679,7 @@ def showFUVimgProjection(img,inImg='img',ax=None,mltLeft=18.,mltRight=6, minlat=
 
     return coll
 
-def plotOCBtimeseries(ds,boundary='ocb'):
+def ppBoundaries(ds,boundary='ocb'):
     '''
     Polar plot showing the temporal evolution of the OCB.
     Parameters
@@ -809,7 +809,7 @@ def calcFlux(ds,height=130,R=6371.2):
     ds=ds.assign({'openFlux':('date',np.array(oFlux)),'auroralFlux':('date',np.array(aFlux)-np.array(oFlux))})
     return ds
 
-def makeFUVshModel(imgs,Nsh,Msh,order=3,dampingVal=0,tukeyVal=5,stop=1e-3,knotSep=None):
+def makeSHmodel(imgs,Nsh,Msh,order=3,dampingVal=0,tukeyVal=5,stop=1e-3,knotSep=None):
     '''
     Function to model the FUV residual background and subtract it from the input image
 
