@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 
 from scipy.io import idl
-from scipy.interpolate import BSpline
+from scipy.interpolate import BSpline,griddata
 from scipy.linalg import lstsq
 
 import matplotlib.pyplot as plt
@@ -27,8 +27,7 @@ import lompe
 from fuvpy.utils import sh
 from lompe.utils.sunlight import subsol
 from polplot import pp
-
-
+import ppigrf
 
 def readImg(filenames, dzalim = 80, minlat = 0, hemisphere = None, reflat=True):
     '''
@@ -858,7 +857,7 @@ def ppBoundaries(ds,boundary='ocb',pax=None):
     cbar.set_ticklabels(cbarlabel)
     plt.tight_layout()
 
-def calcFlux(ds,height=130,R=6371.2):
+def calcFluxCS(ds,height=130,R=6371.2):
     '''
     Function to estimate the amount of open flux inside the given boundaries.
     Parameters
@@ -943,6 +942,100 @@ def calcFlux(ds,height=130,R=6371.2):
             aFlux.append(np.sum(dflux.flatten()[inocb])*1e-6)
 
     ds=ds.assign({'openFlux':('date',np.array(oFlux)),'auroralFlux':('date',np.array(aFlux)-np.array(oFlux))})
+    return ds
+
+def calcFlux(ds,height=130,R=6371.2):
+    '''
+    Function to estimate the amount of open flux inside the given boundaries.
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        Dataset with the boundaries.
+        Coordinates must be 'date' and 'mlt'
+        Data variable must be 'ocb' and 'eqb'
+    height : float, optional
+        Assumed height of the given boundary
+    R : float, optional
+        Radius of Earth
+    Returns
+    -------
+    ds : xarray.Dataset
+        Copy(?) of the Dataset with calculated flux
+    '''
+    
+    
+    # Calc km/gdlat
+    lat = np.arange(29.5,90,1)
+    theta,R = ppigrf.ppigrf.geod2geoc(lat,height,0,0)[0:2]
+    km_per_lat = np.sqrt(np.diff(R*np.cos(np.deg2rad(theta)))**2+np.diff(R*np.sin(np.deg2rad(theta)))**2) 
+    
+    # Grid in geodetic
+    grid_lat,grid_lon = np.meshgrid(np.arange(30,90,1),np.arange(0,360,1))
+        
+    # Upward magnetic flux in grid
+    dateIGRF = ds.date[len(ds.date)//2].values # Date for IGRF values
+    Be, Bn, Bu = ppigrf.igrf(grid_lon,grid_lat,height,dateIGRF)
+    Bu = abs(Bu.squeeze())
+    
+    # Transform grid to cartesian
+    theta = np.cumsum(km_per_lat[::-1])[::-1]
+    grid_x = theta[None,:]*np.cos(np.deg2rad(grid_lon))
+    grid_y = theta[None,:]*np.sin(np.deg2rad(grid_lon))
+    
+    xi,yi = np.meshgrid(np.arange(-10000,10001,25),np.arange(-10000,10001,25))
+    xi=xi.flatten()
+    yi=yi.flatten()
+    Bui = griddata((grid_x.flatten(),grid_y.flatten()),Bu.flatten(),(xi,yi))
+    dflux = (1e-9*Bui)*(25e3)**2
+
+    oFlux=[]
+    aFlux=[]
+    for t in range(len(ds.date)):
+        date = pd.to_datetime(ds.date[t].values)
+        mlt = ds.mlt.values
+
+        # OCB coordinates
+        ocb = ds.isel(date=t)['ocb'].values
+
+        # Convert boundary to geo
+        A = apexpy.Apex(date)
+        gdlat,glon = A.convert(ocb, mlt, 'mlt', 'geo', height=height,datetime=date)
+
+        # Create an OCB polygon
+        x,y=np.interp(gdlat,np.arange(30,90,1),theta)*np.cos(np.deg2rad(glon)),np.interp(gdlat,np.arange(30,90,1),theta)*np.sin(np.deg2rad(glon))
+        poly = path.Path(np.stack((x,y),axis=1))
+
+        # Identify gridcell with center inside the OCB polygon
+        inocb = poly.contains_points(np.stack((xi,yi),axis=1))
+
+        # Summarize
+        if np.isnan(x).any(): # Boundary exceeds the grid
+            oFlux.append(np.nan)
+        else:
+            oFlux.append(np.sum(dflux.flatten()[inocb])*1e-6)
+
+        # EQB coordinates
+        eqb = ds.isel(date=t)['eqb'].values
+
+        # Convert boundary to geo
+        gdlat,glon = A.convert(eqb, mlt, 'mlt', 'geo', height=height,datetime=date)
+
+        # Create an OCB polygon
+        x,y=np.interp(gdlat,np.arange(30,90,1),theta)*np.cos(np.deg2rad(glon)),np.interp(gdlat,np.arange(30,90,1),theta)*np.sin(np.deg2rad(glon))
+        poly = path.Path(np.stack((x,y),axis=1))
+
+        # Identify gridcell with center inside the OCB polygon
+        inocb = poly.contains_points(np.stack((xi,yi),axis=1))
+        
+        # Summarize
+        if np.isnan(x).any(): # Boundary exceeds the grid
+            aFlux.append(np.nan)
+        else:
+            aFlux.append(np.sum(dflux.flatten()[inocb])*1e-6)
+
+    ds=ds.assign({'openFlux':('date',np.array(oFlux)),'auroralFlux':('date',np.array(aFlux)-np.array(oFlux))})
+    ds['openFlux'].attrs = {'long_name':'Open flux','unit':'MWb'}
+    ds['auroralFlux'].attrs = {'long_name':'Auroral flux','unit':'MWb'}
     return ds
 
 def makeSHmodel(imgs,Nsh,Msh,order=3,dampingVal=0,tukeyVal=5,stop=1e-3,knotSep=None):

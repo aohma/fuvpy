@@ -177,23 +177,43 @@ def pplot(imgs,inImg,col_wrap = None,row=False,add_cbar = True,robust=False,cbar
             cbar.set_label('{}'.format(wic[inImg].attrs['long_name']))
         else:
             cbar.set_label(inImg)
-    # gs0.tight_layout(fig)
 
 wicfiles = glob.glob('/Users/aohma/BCSS-DAG Dropbox/Anders Ohma/python/git/fuvpy/data/wicFiles/*.idl')   
 wic = fuv.readImg(wicfiles)
 wic = fuv.makeDGmodel(wic,transform='log')
 wic = fuv.makeSHmodel(wic,4,4)
-pplot(wic.isel(date=slice(2,6)),'img',robust=True,cbar_kwargs={'extend':'both'})
-pplot(wic.isel(date=slice(2,6)),'img',row=True)
-pplot(wic.isel(date=slice(2,6)),'img',col_wrap=2)
 
-pplot(wic.isel(date=slice(2,6)),'img',cbar_kwargs={'orientation':'horizontal'})
-pplot(wic.isel(date=slice(2,6)),'img',row=True,cbar_kwargs={'orientation':'horizontal'})
-pplot(wic.isel(date=slice(2,6)),'img',col_wrap=2,cbar_kwargs={'orientation':'horizontal','extend':'max'})
+bi = fuv.findBoundaries(wic)
+bm = fuv.makeBoundaryModel(bi,dampingValE=0.001,dampingValP=0.001)
 
-pplot(wic.isel(date=slice(2,6)),'img',add_cbar = False)
-pplot(wic.isel(date=slice(2,6)),'img',row=True,add_cbar = False)
-pplot(wic.isel(date=slice(2,6)),'img',col_wrap=2,add_cbar = False)
+fi1 = fuv.calcFlux(bi.sel(lim=1))
+fm1 = fuv.calcFlux(bm)
+fi2 = fuv.calcFlux2(bi.sel(lim=1))
+fm2 = fuv.calcFlux2(bm)
+
+plt.figure()
+# fi1['openFlux'].plot()
+# fm1['openFlux'].plot()
+fi2['openFlux'].plot()
+fm2['openFlux'].plot()
+
+plt.figure()
+# fi1['auroralFlux'].plot()
+# fm1['auroralFlux'].plot()
+fi2['auroralFlux'].plot()
+fm2['auroralFlux'].plot()
+
+# pplot(wic.isel(date=slice(2,6)),'img',robust=True,cbar_kwargs={'extend':'both'})
+# pplot(wic.isel(date=slice(2,6)),'img',row=True)
+# pplot(wic.isel(date=slice(2,6)),'img',col_wrap=2)
+
+# pplot(wic.isel(date=slice(2,6)),'img',cbar_kwargs={'orientation':'horizontal'})
+# pplot(wic.isel(date=slice(2,6)),'img',row=True,cbar_kwargs={'orientation':'horizontal'})
+# pplot(wic.isel(date=slice(2,6)),'img',col_wrap=2,cbar_kwargs={'orientation':'horizontal','extend':'max'})
+
+# pplot(wic.isel(date=slice(2,6)),'img',add_cbar = False)
+# pplot(wic.isel(date=slice(2,6)),'img',row=True,add_cbar = False)
+# pplot(wic.isel(date=slice(2,6)),'img',col_wrap=2,add_cbar = False)
 
 
 
