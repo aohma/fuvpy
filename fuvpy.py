@@ -30,7 +30,7 @@ from polplot import pp
 
 
 
-def readImg(filenames, dzalim = 80, minlat = 0, hemisphere = None, reflatWIC=True):
+def readImg(filenames, dzalim = 80, minlat = 0, hemisphere = None, reflat=True):
     '''
     Load FUV images into a xarray.Dataset
 
@@ -45,7 +45,7 @@ def readImg(filenames, dzalim = 80, minlat = 0, hemisphere = None, reflatWIC=Tru
     hemisphere : str, optional
         Which hemisphere to include. 'north','south' and None.
         Default is None (automatically detected).
-    reflatWIC: bool, optional
+    reflat: bool, optional
         Reapply WIC's flatfield or keep original flatfield.
         Default is True (reapply).
 
@@ -134,7 +134,7 @@ def readImg(filenames, dzalim = 80, minlat = 0, hemisphere = None, reflatWIC=Tru
     imgs = _badPixels(imgs)
 
     # Reapply WIC's flat field
-    if (imgs['id']=='WIC')&reflatWIC:
+    if (imgs['id']=='WIC')&reflat:
         imgs=_reflatWIC(imgs)
 
     # Add attributes
@@ -530,7 +530,7 @@ def showDGmodel(img,minlat=0,pathOutput=None,**kwargs):
     ax2 = plt.subplot(gs2[0])
     ax2c = plt.subplot(gs2[1])
     pax2 = pp(ax2)
-    showImg(img,'img',pax=pax2,crange=[0,cmax1],**kwargs)
+    plotimg(img,'img',pax=pax2,crange=[0,cmax1],**kwargs)
     ax2c.axis('off')
     plt.colorbar(pax2.ax.collections[0],orientation='horizontal',ax=ax2c,fraction=1,
                  extend='max')
@@ -540,7 +540,7 @@ def showDGmodel(img,minlat=0,pathOutput=None,**kwargs):
     ax3 = plt.subplot(gs3[0])
     ax3c = plt.subplot(gs3[1])
     pax3 = pp(ax3)
-    showImg(img,'dgmodel',pax=pax3,crange=[0,cmax1],**kwargs)
+    plotimg(img,'dgmodel',pax=pax3,crange=[0,cmax1],**kwargs)
     ax3c.axis('off')
     plt.colorbar(pax3.ax.collections[0],orientation='horizontal',ax=ax3c,fraction=1,
                  extend='max')
@@ -550,7 +550,7 @@ def showDGmodel(img,minlat=0,pathOutput=None,**kwargs):
     ax4 = plt.subplot(gs4[0])
     ax4c = plt.subplot(gs4[1])
     pax4 = pp(ax4)
-    showImg(img,'dgimg',pax=pax4,crange=[-cmax2,cmax2],cmap='seismic')
+    plotimg(img,'dgimg',pax=pax4,crange=[-cmax2,cmax2],cmap='seismic')
     ax4c.axis('off')
     plt.colorbar(pax4.ax.collections[0],orientation='horizontal',ax=ax4c,fraction=1,
                  extend='both')
@@ -568,10 +568,10 @@ def showDGmodel(img,minlat=0,pathOutput=None,**kwargs):
         plt.close(fig)
     #plt.show()
 
-def showImg(img,inImg='img',pax=None,crange = None, bgcolor = None, **kwargs):
+def plotimg(img,inImg='img',pax=None,crange = None, bgcolor = None, **kwargs):
     '''
     Show a FUV image in polar coordinates coordinates.
-    Wrapper to polplot's showImg
+    Wrapper to polplot's plotimg
 
     Parameters
     ----------
@@ -589,7 +589,8 @@ def showImg(img,inImg='img',pax=None,crange = None, bgcolor = None, **kwargs):
         kwargs to Polycollection().
     Returns
     -------
-    None.
+    coll
+        The displayed Polycollection.
     '''
     if pax is None:
         fig, ax = plt.subplots()
@@ -598,13 +599,147 @@ def showImg(img,inImg='img',pax=None,crange = None, bgcolor = None, **kwargs):
     mlat = img['mlat'].values.copy()
     mlt = img['mlt'].values.copy()
     image = img[inImg].values.copy()
-    pax.plotimg(mlat,mlt,image,crange=crange,bgcolor=bgcolor,**kwargs)
+    coll = pax.plotimg(mlat,mlt,image,crange=crange,bgcolor=bgcolor,**kwargs)
+    return coll
 
-def showImgProj(img,inImg='img',ax=None,mltLeft=18.,mltRight=6, minlat=60,maxlat=80,crange=None, **kwargs):
+def pplot(imgs,inImg,col_wrap = None,tb=False,add_cbar = True,crange=None,robust=False,cbar_kwargs={},pp_kwargs={},**kwargs):
+    '''
+    Show images/data in polar coordinates coordinates.
+    The images are by default plotted size-byside.
+    The functionality resembles xarray 2d plot
+
+    Parameters
+    ----------
+    imgs : xarray.Dataset
+        Image dataset.
+    inImg : str
+        Name of the image/data to be show.
+    col_wrap : int, optional
+        If provided, the number of images before staring a new row. Ignored if tb=True.
+    tb : bool, optional
+        Plot images top-to-bottom. Default is False
+    add_cbar : bool, optional
+        Whether to include colorbar in the figure. Default is True
+    crange : tuple, optional
+        Minimum and maximum range of the colormap, given as (vmin,vmax).
+        If not provided, crange is inferred from data and other keyword arguments (default).
+    robust : bool, optional
+        If True and crange is absent, the colormap range is
+        computed with 2nd and 98th percentiles instead of the extreme values.
+    cbar_kwargs : dict, optional
+        Dictionary of keyword arguments to pass to the colorbar
+        (see :meth:`matplotlib:matplotlib.figure.Figure.colorbar`).
+    pp_kwargs : dict, optional
+        Dictionary of keyword arguments to pass to pp
+    **kwargs :
+        kwargs to Polycollection().
+    Returns
+    -------
+    None.
+    '''
+    n_imgs = len(imgs.date)
+
+    # Set minlat
+    if 'minlat' in pp_kwargs:
+        minlat = pp_kwargs['minlat']
+        pp_kwargs.pop('minlat')
+    else:
+        minlat = 50
+
+    # Set crange if not given
+    if crange is None and robust:
+        crange=np.quantile(imgs[inImg].values[imgs['mlat'].values>minlat],[0.02,0.98])
+    else:
+        crange=np.quantile(imgs[inImg].values[imgs['mlat'].values>minlat],[0,1])
+
+    # Set cbar orientation
+    if 'orientation' in cbar_kwargs:
+        cbar_orientation = cbar_kwargs['orientation']
+        cbar_kwargs.pop('orientation')
+    else:
+        cbar_orientation = 'vertical'
+
+    # Set up fig size and axes
+    cb_size = 0.5
+    if tb:
+        n_rows = n_imgs
+        n_cols=1
+        f_height = 4*n_imgs
+        f_width = 4
+        ii = np.arange(n_imgs)[:,None]
+
+        if add_cbar:
+            if cbar_orientation=='horizontal':
+                f_height += cb_size
+            elif cbar_orientation=='verical':
+                f_width += cb_size
+    elif col_wrap:
+        n_rows = (n_imgs-1)//col_wrap+1
+        n_cols = col_wrap
+        f_height = 4*n_rows
+        f_width = 4*n_cols
+        ii = np.pad(np.arange(n_imgs),(0,n_rows*n_cols-n_imgs),'constant',constant_values=-1).reshape(n_rows,n_cols)
+
+        if add_cbar:
+            if cbar_orientation=='horizontal':
+                f_height += cb_size
+            elif cbar_orientation=='verical':
+                f_width += cb_size
+    else:
+        n_rows = 1
+        n_cols=n_imgs
+        f_height = 4
+        f_width = 4*n_imgs
+        ii = np.arange(n_imgs)[None,:]
+
+        if add_cbar:
+            if cbar_orientation=='horizontal':
+                f_height += cb_size
+            elif cbar_orientation=='verical':
+                f_width += cb_size
+
+    fig = plt.figure(figsize=(f_width,f_height))
+
+    if add_cbar:
+        if cbar_orientation=='horizontal':
+            gs0 = gridspec.GridSpec(nrows=2,ncols=1,height_ratios=[n_rows*4,cb_size],hspace=0.01)
+        else:
+            gs0 = gridspec.GridSpec(nrows=1,ncols=2,width_ratios=[n_cols*4,cb_size],wspace=0.01)
+    else:
+        gs0 = gridspec.GridSpec(nrows=2,ncols=1,height_ratios=[1,0])
+
+    # IMAGES
+    gs = gridspec.GridSpecFromSubplotSpec(nrows=n_rows,ncols=n_cols,subplot_spec=gs0[0],hspace=0.06,wspace=0.01)
+
+    for i in range(n_imgs):
+        i_row = np.where(ii==i)[0][0]
+        i_col = np.where(ii==i)[1][0]
+        pax = pp(plt.subplot(gs[i_row,i_col]),minlat=minlat,**pp_kwargs)
+
+        mlat = imgs.isel(date=i)['mlat'].values.copy()
+        mlt = imgs.isel(date=i)['mlt'].values.copy()
+        image = imgs.isel(date=i)[inImg].values.copy()
+        pax.plotimg(mlat,mlt,image,crange=crange,**kwargs)
+        pax.ax.set_title(imgs['id'].values.tolist() + ': ' +
+             imgs.isel(date=i)['date'].dt.strftime('%Y-%m-%d %H:%M:%S').values.tolist())
+
+    if add_cbar:
+        cax = plt.subplot(gs0[1])
+        cax.axis('off')
+        cbar = plt.colorbar(pax.ax.collections[0],orientation=cbar_orientation,ax=cax,fraction=1,**cbar_kwargs)
+
+        # cbar name
+        if len(imgs[inImg].attrs)==2:
+            cbar.set_label('{} ({})'.format(imgs[inImg].attrs['long_name'],imgs[inImg].attrs['units']))
+        elif len(imgs[inImg].attrs)==1:
+            cbar.set_label('{}'.format(imgs[inImg].attrs['long_name']))
+        else:
+            cbar.set_label(inImg)
+
+def plotimgProj(img,inImg='img',ax=None,mltLeft=18.,mltRight=6, minlat=50,maxlat=80,crange=None, **kwargs):
     '''
     Show a section of a FUV image projected in mlt-mlat coordinates
-    Ex: showFUVimageProjection(wic.isel(date=15)['mlat'].values,wic.isel(date=15)['mlt'].values,
-    wic.isel(date=20)['cimage'].values,crange=(0,1500),cmap='plasma')
+    Ex: plotimgProj(.isel(date=15),'img',crange=(0,1500),cmap='plasma')
     Parameters
     ----------
     img : xarray.Dataset
@@ -618,8 +753,8 @@ def showImgProj(img,inImg='img',ax=None,mltLeft=18.,mltRight=6, minlat=60,maxlat
     mltRight : float, optional
         Right ("Upper") MLT limit. The default is 6.
     minlat : float, optional
-        Minimum latitude. The default is 60.
-    maxlat : TYPE, optional
+        Minimum latitude. The default is 50.
+    maxlat : float, optional
         Maximum latitude. The default is 80.
     crange : tuple/list, optional
         Color range, given as (lower,upper). The default is None (matplotlib default).
@@ -627,7 +762,8 @@ def showImgProj(img,inImg='img',ax=None,mltLeft=18.,mltRight=6, minlat=60,maxlat
         kwargs to Polycollection().
     Returns
     -------
-    None.
+    coll
+        The displayed Polycollection
     '''
 
     if ax is None: fig, ax = plt.subplots()
@@ -679,7 +815,7 @@ def showImgProj(img,inImg='img',ax=None,mltLeft=18.,mltRight=6, minlat=60,maxlat
 
     return coll
 
-def ppBoundaries(ds,boundary='ocb'):
+def ppBoundaries(ds,boundary='ocb',pax=None):
     '''
     Polar plot showing the temporal evolution of the OCB.
     Parameters
@@ -693,9 +829,9 @@ def ppBoundaries(ds,boundary='ocb'):
     -------
     None
     '''
-
-    fig,ax = plt.subplots()
-    pax = pp(ax)
+    if pax is None:
+        fig,ax = plt.subplots()
+        pax = pp(ax)
 
     # Add first row to end for plotting
     ds = xr.concat([ds,ds.isel(mlt=0)],dim='mlt')
@@ -713,7 +849,7 @@ def ppBoundaries(ds,boundary='ocb'):
     norm = mcolors.Normalize(vmin=0,vmax=n_d)
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
     sm.set_array([])
-    cbar = plt.colorbar(sm,ticks=np.arange(0,n_d,1),boundaries=np.arange(-0.5,n_d,1))
+    cbar = plt.colorbar(sm,ticks=np.arange(0,n_d,1),boundaries=np.arange(-0.5,n_d,1),ax=pax.ax)
     cbar.ax.tick_params(size=0)
     cbarlabel = n_d*['']
     cbarlabel[::n_d//10+1] = dateStr[::n_d//10+1]
