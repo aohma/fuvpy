@@ -1037,7 +1037,7 @@ def calcFlux(ds,height=130):
     ds['auroralFlux'].attrs = {'long_name':'Auroral flux','unit':'MWb'}
     return ds
 
-def makeSHmodel(imgs,Nsh,Msh,order=3,dampingVal=0,tukeyVal=5,stop=1e-3,knotSep=None):
+def makeSHmodel(imgs,Nsh,Msh,order=2,dampingVal=0,tukeyVal=5,stop=1e-3,knotSep=None):
     '''
     Function to model the FUV residual background and subtract it from the input image
 
@@ -1050,7 +1050,7 @@ def makeSHmodel(imgs,Nsh,Msh,order=3,dampingVal=0,tukeyVal=5,stop=1e-3,knotSep=N
     Msh : int
         Degree of the SH
     order: int, optional
-        Order of the temporal spline fit. The default is 3.
+        Order of the temporal spline fit. The default is 2.
     dampingVal : TYPE, optional
         Damping to reduce the influence of the time-dependent part of the model.
         The default is 0 (no damping).
