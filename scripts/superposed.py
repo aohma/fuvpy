@@ -63,9 +63,9 @@ def makeSubstormFiles(inpath,outpath,hemisphere='both'):
         temp['mlat'] = frey.mlat[i]
         temp['mlt'] = frey.mlt[i]
         
-        if hemisphere == 'north' and temp['mlat']>0:
+        if hemisphere == 'north' and temp['mlat'][0]>0:
             files.append(temp)
-        elif hemisphere == 'south' and temp['mlat']<0:
+        elif hemisphere == 'south' and temp['mlat'][0]<0:
             files.append(temp)
         elif hemisphere =='both':
             files.append(temp)
