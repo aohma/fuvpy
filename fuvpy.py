@@ -23,9 +23,8 @@ import matplotlib.path as path
 from matplotlib.collections import PolyCollection
 
 import apexpy
-import lompe
 from fuvpy.utils import sh
-from lompe.utils.sunlight import subsol
+from fuvpy.utils.sunlight import subsol
 from polplot import pp
 import ppigrf
 
@@ -857,7 +856,96 @@ def ppBoundaries(ds,boundary='ocb',pax=None):
     cbar.set_ticklabels(cbarlabel)
     plt.tight_layout()
 
-def calcFluxCS(ds,height=130,R=6371.2):
+# def calcFluxCS(ds,height=130,R=6371.2):
+#     '''
+#     Function to estimate the amount of open flux inside the given boundaries.
+#     Uses CubedSphere-grid to do areas. 
+    
+#     Parameters
+#     ----------
+#     ds : xarray.Dataset
+#         Dataset with the boundaries.
+#         Coordinates must be 'date' and 'mlt'
+#         Data variable must be 'ocb' and 'eqb'
+#     height : float, optional
+#         Assumed height of the given boundary
+#     R : float, optional
+#         Radius of Earth
+#     Returns
+#     -------
+#     ds : xarray.Dataset
+#         Copy(?) of the Dataset with calculated flux
+#     '''
+
+#     # Date for IGRF values
+#     dateIGRF = ds.date[len(ds.date)//2].values
+
+#     # Set up projection:
+#     position = (-72, 80) # lon, lat
+#     orientation = (0, 1) # east, north
+#     projection = lompe.cs.CSprojection(position, orientation)
+
+#     # Set up grid:
+#     L, W, Lres, Wres= 1e20, 1e20, 50.e3, 50.e3 # dimensions and resolution of grid
+#     csgrid  = lompe.cs.CSgrid(projection, L, W, Lres, Wres, R = (R+height)*1e3)
+
+#     # Radial magnetic flux in grid
+#     dateIGRF = ds.date[len(ds.date)//2].values # Date for IGRF values
+#     Br, Btheta, Bphi = lompe.ppigrf.igrf_gc(R+height, 90-csgrid.lat, csgrid.lon, dateIGRF)
+#     Br = -Br.squeeze()
+#     dflux = csgrid.A*Br*1e-9
+
+#     oFlux=[]
+#     aFlux=[]
+#     for t in range(len(ds.date)):
+#         date = pd.to_datetime(ds.date[t].values)
+#         mlt = ds.mlt.values
+
+#         # OCB coordinates
+#         ocb = ds.isel(date=t)['ocb'].values
+
+#         # Convert boundary to geo
+#         A = apexpy.Apex(date)
+#         gdlat,glon = A.convert(ocb, mlt, 'mlt', 'geo', height=height,datetime=date)
+#         glat = 90 - lompe.ppigrf.ppigrf.geod2geoc(gdlat,height,0,0)[0]
+
+#         # Create an OCB polygon
+#         x,y=projection.geo2cube(glon, glat)
+#         poly = path.Path(np.stack((x,y),axis=1))
+
+#         # Identify gridcell with center inside the OCB polygon
+#         inocb = poly.contains_points(np.stack((csgrid.xi.flatten(),csgrid.eta.flatten()),axis=1))
+
+#         # Summarize
+#         if np.isnan(x).any(): # Boundary exceeds the grid
+#             oFlux.append(np.nan)
+#         else:
+#             oFlux.append(np.sum(dflux.flatten()[inocb])*1e-6)
+
+#         # EQB coordinates
+#         eqb = ds.isel(date=t)['eqb'].values
+
+#         # Convert boundary to geo
+#         gdlat,glon = A.convert(eqb, mlt, 'mlt', 'geo', height=height,datetime=date)
+#         glat = 90 - lompe.ppigrf.ppigrf.geod2geoc(gdlat,height,0,0)[0]
+
+#         # Create an OCB polygon
+#         x,y=projection.geo2cube(glon, glat)
+#         poly = path.Path(np.stack((x,y),axis=1))
+
+#         # Identify gridcell with center inside the OCB polygon
+#         inocb = poly.contains_points(np.stack((csgrid.xi.flatten(),csgrid.eta.flatten()),axis=1))
+
+#         # Summarize
+#         if np.isnan(x).any(): # Boundary exceeds the grid
+#             aFlux.append(np.nan)
+#         else:
+#             aFlux.append(np.sum(dflux.flatten()[inocb])*1e-6)
+
+#     ds=ds.assign({'openFlux':('date',np.array(oFlux)),'auroralFlux':('date',np.array(aFlux)-np.array(oFlux))})
+#     return ds
+
+def calcFlux(ds,height=130):
     '''
     Function to estimate the amount of open flux inside the given boundaries.
     Parameters
@@ -868,95 +956,6 @@ def calcFluxCS(ds,height=130,R=6371.2):
         Data variable must be 'ocb' and 'eqb'
     height : float, optional
         Assumed height of the given boundary
-    R : float, optional
-        Radius of Earth
-    Returns
-    -------
-    ds : xarray.Dataset
-        Copy(?) of the Dataset with calculated flux
-    '''
-
-    # Date for IGRF values
-    dateIGRF = ds.date[len(ds.date)//2].values
-
-    # Set up projection:
-    position = (-72, 80) # lon, lat
-    orientation = (0, 1) # east, north
-    projection = lompe.cs.CSprojection(position, orientation)
-
-    # Set up grid:
-    L, W, Lres, Wres= 1e20, 1e20, 50.e3, 50.e3 # dimensions and resolution of grid
-    csgrid  = lompe.cs.CSgrid(projection, L, W, Lres, Wres, R = (R+height)*1e3)
-
-    # Radial magnetic flux in grid
-    dateIGRF = ds.date[len(ds.date)//2].values # Date for IGRF values
-    Br, Btheta, Bphi = lompe.ppigrf.igrf_gc(R+height, 90-csgrid.lat, csgrid.lon, dateIGRF)
-    Br = -Br.squeeze()
-    dflux = csgrid.A*Br*1e-9
-
-    oFlux=[]
-    aFlux=[]
-    for t in range(len(ds.date)):
-        date = pd.to_datetime(ds.date[t].values)
-        mlt = ds.mlt.values
-
-        # OCB coordinates
-        ocb = ds.isel(date=t)['ocb'].values
-
-        # Convert boundary to geo
-        A = apexpy.Apex(date)
-        gdlat,glon = A.convert(ocb, mlt, 'mlt', 'geo', height=height,datetime=date)
-        glat = 90 - lompe.ppigrf.ppigrf.geod2geoc(gdlat,height,0,0)[0]
-
-        # Create an OCB polygon
-        x,y=projection.geo2cube(glon, glat)
-        poly = path.Path(np.stack((x,y),axis=1))
-
-        # Identify gridcell with center inside the OCB polygon
-        inocb = poly.contains_points(np.stack((csgrid.xi.flatten(),csgrid.eta.flatten()),axis=1))
-
-        # Summarize
-        if np.isnan(x).any(): # Boundary exceeds the grid
-            oFlux.append(np.nan)
-        else:
-            oFlux.append(np.sum(dflux.flatten()[inocb])*1e-6)
-
-        # EQB coordinates
-        eqb = ds.isel(date=t)['eqb'].values
-
-        # Convert boundary to geo
-        gdlat,glon = A.convert(eqb, mlt, 'mlt', 'geo', height=height,datetime=date)
-        glat = 90 - lompe.ppigrf.ppigrf.geod2geoc(gdlat,height,0,0)[0]
-
-        # Create an OCB polygon
-        x,y=projection.geo2cube(glon, glat)
-        poly = path.Path(np.stack((x,y),axis=1))
-
-        # Identify gridcell with center inside the OCB polygon
-        inocb = poly.contains_points(np.stack((csgrid.xi.flatten(),csgrid.eta.flatten()),axis=1))
-
-        # Summarize
-        if np.isnan(x).any(): # Boundary exceeds the grid
-            aFlux.append(np.nan)
-        else:
-            aFlux.append(np.sum(dflux.flatten()[inocb])*1e-6)
-
-    ds=ds.assign({'openFlux':('date',np.array(oFlux)),'auroralFlux':('date',np.array(aFlux)-np.array(oFlux))})
-    return ds
-
-def calcFlux(ds,height=130,R=6371.2):
-    '''
-    Function to estimate the amount of open flux inside the given boundaries.
-    Parameters
-    ----------
-    ds : xarray.Dataset
-        Dataset with the boundaries.
-        Coordinates must be 'date' and 'mlt'
-        Data variable must be 'ocb' and 'eqb'
-    height : float, optional
-        Assumed height of the given boundary
-    R : float, optional
-        Radius of Earth
     Returns
     -------
     ds : xarray.Dataset
