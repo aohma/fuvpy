@@ -160,9 +160,9 @@ def clicked(image_axis, mlt_axis, mlat_axis, mlt, mlat):
 
 class Visualise():
     def __init__(self, fig, axes, caxes, MLTax=False, MLATax=False, cax_association=False):
-        if not isinstance(axes, list):
+        if not isinstance(axes, (list, np.ndarray)):
             axes= [axes]
-        if not isinstance(caxes, list):
+        if not isinstance(caxes, (list, np.ndarray)):
             caxes= [caxes]
         axes= np.asarray(axes)
         caxes= np.asarray(caxes)
