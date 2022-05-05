@@ -159,7 +159,13 @@ def clicked(image_axis, mlt_axis, mlat_axis, mlt, mlat):
     plt.draw()
 
 class Visualise():
-    def __init__(self, axes, caxes, MLTax=False, MLATax=False, cax_association=False):
+    def __init__(self, fig, axes, caxes, MLTax=False, MLATax=False, cax_association=False):
+        if not isinstance(axes, list):
+            axes= [axes]
+        if not isinstance(caxes, list):
+            caxes= [caxes]
+        axes= np.asarray(axes)
+        caxes= np.asarray(caxes)
         onclick_wrapper=functools.partial(self.onclick, axes, MLTax, MLATax, caxes)
         cid = fig.canvas.mpl_connect('button_press_event', onclick_wrapper)
         if not cax_association:
@@ -174,6 +180,7 @@ class Visualise():
         self.MLTax= MLTax
         self.MLATax=MLATax
         self.cbars= [False]*len(np.unique(cax_association))
+        self.figure= fig
     def show_image(self, file, axis, cax_label='Counts', crange=False, cmap='jet', cbar_orientation='horizontal', in_put='img'):
         if file.endswith('.idl'):
             axis.image_dat= fuv.readImg(file).isel(date = 0).rename({in_put:'data'})
@@ -198,7 +205,7 @@ class Visualise():
             crange= (0, maxi)
             # im= axis.showFUVimage(image,'image',crange=crange, cmap=cmap, zorder=1)
             im= axis.plotimg(image.mlat.values, image.mlt.values, image.data.values, crange=crange, cmap=cmap, zorder=1)
-            cbar=fig.colorbar(im, cax=cax, orientation= cbar_orientation)
+            cbar=self.figure.colorbar(im, cax=cax, orientation= cbar_orientation)
             self.cbars[axis.cax_number]=cbar
         else:
             clims=[]
@@ -218,7 +225,7 @@ class Visualise():
             im= axis.plotimg(image.mlat.values, image.mlt.values, image.data.values, crange=crange, cmap=cbar.cmap, zorder=1)
             if new_cbar:
                 self.caxes[axis.cax_number].clear()
-                cbar= fig.colorbar(im, orientation=cbar.orientation, cax=cax)
+                cbar= self.figure.colorbar(im, orientation=cbar.orientation, cax=cax)
                 self.cbars[axis.cax_number]=cbar
                 cbar.set_label(cbar.ax.get_title())
                 for ax in self.axes:
