@@ -22,11 +22,23 @@ import matplotlib.colors as mcolors
 import matplotlib.path as path
 from matplotlib.collections import PolyCollection
 
-import apexpy
 from fuvpy.utils import sh
 from fuvpy.utils.sunlight import subsol
-from polplot import pp
-import ppigrf
+
+# Optional dependencies
+try:
+    import ppigrf
+    import apexpy
+except:
+    print('ppigrf and/or apexpy not found. fuvpy.calcFlux will not work.'+
+          'To install ppigrf: git clone https://github.com/klaundal/ppigrf.git'+
+          'To install apexpy: pip install apexpy')    
+
+try:
+    from polplot import pp
+except:
+    print('polplot not found. Polar plotting functions will not work.'+
+          'To install polplot: git clode https://github.com/klaundal/polplot.git')
 
 def readImg(filenames, dzalim = 80, minlat = 0, hemisphere = None, reflat=True):
     '''

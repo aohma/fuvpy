@@ -9,12 +9,15 @@ Created on Thu Nov 25 13:27:45 2021
 """
 
 ## ALL PATHS MUST BE CHANGED ON WORKSTATION!!!
-
+import numpy as np
 import pandas as pd
+import xarray as xr
 import glob
 import vaex
 
 import fuvpy as fuv
+
+from polplot import grids
 
 
 def makeSubstormFiles(inpath,outpath,hemisphere='both'):
@@ -104,24 +107,117 @@ def makeSubstormFiles(inpath,outpath,hemisphere='both'):
 # Field to include:
 # ind,date,row,col,mlat,mlt,hemisphere,img,dgimg,shimg,onset,rind 
 
+def addBinnumberValidation(vdf):
+    grid,mltres=grids.sdarngrid(dlat = 2, dlon = 2, latmin = 58, return_mltres = False)
+    mlat = vdf.mlat.values
+    mlt = vdf.mlt.values
+    binNumber = grids.bin_number(grid,mlat,mlt)
+    vdf['binNumber'] = binNumber
+    return vdf
 
-# def calcSuperposed(inpath,outpath):
-#       Read vaex_df from hdfs
-#       vaex_df = vaex.open('inpath/wic*.hdf5')
-# df_names_all
-#       Do superposed statistics (mean,approx median, std, skew)
-#       Do on MLT,MLAT statistics
-        # mean = vaex_df.mean(binby=['mlat','mlt'],limits=[[50, 90], [0, 24]], shape=(40, 24*5)))
-        # median = vaex_df.median_approx(binby=['mlat','mlt'],limits=[[50, 90], [0, 24]], shape=(40, 24*5)))
+def addBinnumber(vdf):
+    '''
+    vaex compatible version of grids.bin_number, which 
+
+    Parameters
+    ----------
+    vdf : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    vdf : TYPE
+        DESCRIPTION.
+
+    '''
+    
+    grid,mltres=grids.sdarngrid(dlat = 2, dlon = 2, latmin = 58, return_mltres = False)
+    
+    llat = np.unique(grid[0]) # latitude circles
+    assert np.allclose(np.sort(llat) - llat, 0) # should be in sorted order automatically. If not, the algorithm will not work
+    dlat = np.diff(llat)[0] # latitude step
+    latbins = np.hstack(( llat, llat[-1] + dlat )) # make latitude bin edges
+    vdf['latbinNumber'] = vdf.mlat.digitize(latbins) - 1 # find the latitude index for each data point
+
+    # number of longitude bins in each latitude ring:
+    nlons = np.array([len(np.unique(grid[1][grid[0] == lat])) for lat in llat])
+
+    vdf['latbinNumber'] = vdf.func.where(vdf['latbinNumber']<0,len(nlons)+vdf['latbinNumber'],vdf['latbinNumber'])
+
+    vdf2 = vaex.from_arrays(nlons=nlons,ind = np.arange(len(nlons)))
+    vdf=vdf.join(vdf2,left_on='latbinNumber',right_on='ind')
+    # normalize all longitude bins to the equatorward ring:
+    _lon = 15*vdf.mlt * vdf['nlons'] / nlons[0]
+    
+    # make longitude bin edges for the equatorward ring:
+    llon = np.unique(grid[1][grid[0] == llat[0]])
+    dlon = np.diff(llon)[0]
+    lonbins = np.hstack((llon, llon[-1] + dlon)) # make longitude bin edges
+    vdf['lonbinNumber'] = _lon.digitize(lonbins) - 1 # find the longitude bin
+    
+    # map from 2D bin numbers to 1D by adding the number of bins in each row equatorward:
+    
+    vdf3 = vaex.from_arrays(nlonsCS=np.cumsum(np.hstack((0, nlons))),ind2 = np.arange(len(np.cumsum(np.hstack((0, nlons))))))    
+    vdf=vdf.join(vdf3,left_on='latbinNumber',right_on='ind2')
+    vdf['binNumber'] = vdf['lonbinNumber'] + vdf['nlonsCS']
+    
+    #Set the bin number of outside grid observations to -1
+    vdf['binNumber'] = vdf.func.where(vdf['mlat']<grid[0,0],-1,vdf['binNumber'])
+    
+    return vdf
+
+def calcSuperposed(vdf):
+    vdf['rmlat'] = vdf['mlat']-vdf['omlat']
+    vdf['rmlt'] = vdf['mlt']-vdf['omlt']
+    # df_names_all
+    # Do superposed statistics (mean,approx median, std, skew)
+    # Do on MLT,MLAT statistics
+    mean = vdf.mean('shimg',binby=['rmlat','rmlt','irel'],limits=[[-20, 20], [-12, 12],[-15.5,30.5]], shape=(40, 24*5,46))
+    median = vdf.median_approx('shimg',binby=['rmlat','rmlt','irel'],limits=[[-20, 20], [-12, 12],[-15.5,30.5]], shape=(40, 24*5,46))
+    std = vdf.std('shimg',binby=['rmlat','rmlt','irel'],limits=[[-20, 20], [-12, 12],[-15.5,30.5]], shape=(40, 24*5,46))
+    count = vdf.count('shimg',binby=['rmlat','rmlt','irel'],limits=[[-20, 20], [-12, 12],[-15.5,30.5]], shape=(40, 24*5,46))
         # std = vaex_df.std(binby=['mlat','mlt'],limits=[[50, 90], [0, 24]], shape=(40, 24*5)))
         # skew = vaex_df.skew(binby=['mlat','mlt'],limits=[[50, 90], [0, 24]], shape=(40, 24*5)))
+    
+    ds = xr.Dataset(
+    data_vars=dict(
+        mean=(['mlat','mlt','irel'], mean),
+        median=(['mlat','mlt','irel'], median),
+        std=(['mlat','mlt','irel'], std),
+        count=(['mlat','mlt','irel'], count),
+        ),
+    coords=dict(
+        mlat = np.linspace(-19.5,19.5,40),
+        mlt = np.linspace(-11.9,11.9,24*5),
+        irel = np.linspace(-15,30,46)
+    ),
+    )
+    
+    if 'binNumber' in vdf.column_names:
+        n_bins = vdf['binNumber'].max()+1
+        mean = vdf.mean('shimg',binby=['binNumber','irel'],limits=[[0, n_bins],[-15.5,30.5]], shape=(n_bins,46))
+        median = vdf.median_approx('shimg',binby=['binNumber','irel'],limits=[[0, n_bins],[-15.5,30.5]], shape=(n_bins,46))
+        std = vdf.std('shimg',binby=['binNumber','irel'],limits=[[0, n_bins],[-15.5,30.5]], shape=(n_bins,46))
+        count = vdf.count('shimg',binby=['binNumber','irel'],limits=[[0, n_bins],[-15.5,30.5]], shape=(n_bins,46))
+            # std = vaex_df.std(binby=['mlat','mlt'],limits=[[50, 90], [0, 24]], shape=(40, 24*5)))
+            # skew = vaex_df.skew(binby=['mlat','mlt'],limits=[[50, 90], [0, 24]], shape=(40, 24*5)))
+        
+        ds2 = xr.Dataset(
+        data_vars=dict(
+            mean=(['binNumber','irel'], mean),
+            median=(['binNumber','irel'], median),
+            std=(['binNumber','irel'], std),
+            count=(['binNumber','irel'], count),
+            ),
+        coords=dict(
+            mlat = np.arange(n_bins),
+            irel = np.linspace(-15,30,46)
+        ),
+        )
+    
+    
+    return ds,ds2
 
-
-#       Do on predefined equal area grid
-#       store as new file to transfer from Workstation
-
-# Only do NH?
-
-
-
+    #       Do on predefined equal area grid
+    #       store as new file to transfer from Workstation
 

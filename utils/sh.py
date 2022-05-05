@@ -1,12 +1,11 @@
 """ tools that are useful for spherical harmonic analysis
 
     SHkeys       -- class to contain n and m - the indices of the spherical harmonic terms
-    nterms       -- function which calculates the number of terms in a 
-                    real expansion of a poloidal (internal + external) and toroidal expansion 
+    nterms       -- function which calculates the number of terms in a
+                    real expansion of a poloidal (internal + external) and toroidal expansion
     get_legendre -- calculate associated legendre functions - with option for Schmidt semi-normalization
 """
 import numpy as np
-import apexpy
 #from pyamps.mlt_utils import mlon_to_mlt
 d2r = np.pi/180
 
@@ -94,10 +93,10 @@ class SHkeys(object):
             keys.append(key)
             if key[1] != 0:
                 keys.append((key[0], -key[1]))
-        
+
         self.keys = tuple(keys)
         self.make_arrays()
-        
+
         return self
 
 
@@ -132,7 +131,7 @@ def nterms(NT = 0, MT = 0, NVi = 0, MVi = 0, NVe = 0, MVe = 0):
 
 
 def get_legendre(nmax, mmax, theta, schmidtnormalize = True, negative_m = False, minlat = 0, keys = None):
-    """ calculate associated Legendre functions 
+    """ calculate associated Legendre functions
 
         nmax             -- maximum total wavenumber
         mmax             -- maximum zonal wavenumber
@@ -145,14 +144,14 @@ def get_legendre(nmax, mmax, theta, schmidtnormalize = True, negative_m = False,
 
         returns:
           P, dP -- dicts of legendre functions, and derivatives, with wavenumber tuple as keys
-        
+
         or, if keys != None:
-          PdP   -- array of size N, 2*M, where M is the number of terms. The first half of the 
+          PdP   -- array of size N, 2*M, where M is the number of terms. The first half of the
                    columns are P, and the second half are dP
 
 
         algorithm from "Spacecraft Attitude Determination and Control" by James Richard Wertz
-        
+
         could be unstable for large nmax...
 
         KML 2016-04-22
@@ -222,8 +221,8 @@ def get_legendre(nmax, mmax, theta, schmidtnormalize = True, negative_m = False,
         return P, dP
     else:
         Pmat  = np.hstack(tuple(P[key] for key in keys))
-        dPmat = np.hstack(tuple(dP[key] for key in keys)) 
-    
+        dPmat = np.hstack(tuple(dP[key] for key in keys))
+
         return np.hstack((Pmat, dPmat))
 
 
@@ -241,7 +240,7 @@ def getfield(dates, glat, glon, r, coeffs, sp_order = 1):
                  these are arrays with shape (N, M), where N is time and M is position
 
     """
-    
+
     if len(coeffs) == 2:
         g, h = coeffs
     else:
@@ -278,7 +277,7 @@ def getfield(dates, glat, glon, r, coeffs, sp_order = 1):
         r    = r[0]
 
 
-    
+
 
 
     # get maximum N and maximum M:
@@ -289,135 +288,41 @@ def getfield(dates, glat, glon, r, coeffs, sp_order = 1):
     # get the legendre functions
     P, dP = get_legendre(N, M, 90 - glat, schmidtnormalize = True)
 
-    
+
     # Append coefficients at desired times (skip if index is already in coefficient data frame):
-    index = list(g.index) + list(dates)   
+    index = list(g.index) + list(dates)
     g = g.reindex(index).sort_index().groupby(index).first() # reindex and skip duplicates
     h = h.reindex(index).sort_index().groupby(index).first() # reindex and skip duplicates
 
     # interpolate and collect the coefficients at desired times:
     g = g.interpolate(method = 'time').ix[dates]
     h = h.interpolate(method = 'time').ix[dates]
-    
+
     if np.any(pd.isnull(g)) or np.any(pd.isnull(h)):
         raise Exception('Invalid values in coefficients - interpolation outside range?')
 
     # compute cosmlon and sinmlon:
     cosmlon = {k[1]:np.cos(k[1]*glon*d2r) for k in g.keys()}
     sinmlon = {k[1]:np.sin(k[1]*glon*d2r) for k in g.keys()}
-    
+
     # compute the field values (key = (n, m))
     # down
-    Z =  -np.array(reduce(lambda x, y: x + y, 
+    Z =  -np.array(reduce(lambda x, y: x + y,
                        (  P[key] * (REFRE/r)**(key[0] + 2) * (key[0] + 1) *
-                        (  g[key].values[:, np.newaxis] * cosmlon[key[1]] 
+                        (  g[key].values[:, np.newaxis] * cosmlon[key[1]]
                          + h[key].values[:, np.newaxis] * sinmlon[key[1]])
                         for key in g.keys())))
     # north
-    X =  np.array(reduce(lambda x, y: x + y, 
+    X =  np.array(reduce(lambda x, y: x + y,
                        (  dP[key] * (REFRE/r)**(key[0] + 1) *
-                        (  g[key].values[:, np.newaxis] * cosmlon[key[1]] 
+                        (  g[key].values[:, np.newaxis] * cosmlon[key[1]]
                          + h[key].values[:, np.newaxis] * sinmlon[key[1]])
                         for key in g.keys())))*REFRE/r
     # east
-    Y =  np.array(reduce(lambda x, y: x + y, 
+    Y =  np.array(reduce(lambda x, y: x + y,
                        (   P[key] * (REFRE/r)**(key[0] + 1) *
-                        (  g[key].values[:, np.newaxis] * sinmlon[key[1]] * key[1] 
+                        (  g[key].values[:, np.newaxis] * sinmlon[key[1]] * key[1]
                          - h[key].values[:, np.newaxis] * cosmlon[key[1]] * key[1])
                         for key in g.keys()))) / np.cos(glat*d2r) * REFRE/r
 
     return X, Y, Z
-
-# def get_toroidal_G(lat, lon, height, times, refh, shkeys, RE = 6371.2 * 1e3, epoch = 2015):
-#     """ construct G matrix for spherical harmonic expansion of the toroidal potential Psi. Use
-#         equation 5 of Matsuo et al. 2015 which releates the partial derivatives of Psi to the modified
-#         apex components of the magnetic field. This requires the use of modified apex basevectors
-
-#         lat, lon are geodetic lat and lon
-#         height geodeitic height
-#         refh apex reference height
-#         times is needet to calculate MLT
-#         RE reference radius in SH expansion
-#         shkeys is an SHkeys object 
-
-#         Example usage:
-#         d = np.hstack(Bd1, Bd2) # stack modified apex components of B 
-#         G = get_toroidal_G(...)  # get G matrix
-#         m = lstsq(G, d)[0] # the model vector can then be used with 
-#                            # with the G matrix of get_j_parallel_G()
-#                            # j = get_j_parallel_G(...).dot(m)
-
-#         (KML november 2019)
-
-#         NOT TESTED!
-#     """
-
-#     apex = apexpy.Apex(refh = refh, date = epoch)
-#     f1, f2, f3, g1, g2, g3, d1, d2, d3, e1, e2, e3 = apex.basevectors_apex(lat, lon, height, coords = 'geo')
-#     mlat, mlon = apex.geo2apex(lat, lon, height)
-#     mlt = mlon_to_mlt(mlon, times, epoch).reshape((-1, 1))
-#     sinIm = 2 * np.sin(mlat * d2r) / np.sqrt(4 - 3 * np.cos(mlat * d2r)**2)
-#     sinIm = sinIm.reshape((-1, 1))
-#     mlat  = mlat.reshape((-1, 1))
-
-#     d1xe1dotk = np.cross(d1.T, e1.T).T[2].reshape((-1, 1))
-#     d1xe2dotk = np.cross(d1.T, e2.T).T[2].reshape((-1, 1))
-#     d2xe1dotk = np.cross(d2.T, e1.T).T[2].reshape((-1, 1))
-#     d2xe2dotk = np.cross(d2.T, e2.T).T[2].reshape((-1, 1))
-
-#     sinkeys = [key for key in shkeys if key[1] != 0]
-#     coskeys = shkeys
-
-#     cosPdP = get_legendre(shkeys.Nmax, shkeys.Mmax, 90 - lat.flatten(), schmidtnormalize = True, keys = coskeys)
-#     sinPdP = get_legendre(shkeys.Nmax, shkeys.Mmax, 90 - lat.flatten(), schmidtnormalize = True, keys = sinkeys)
-#     P_cos, dP_cos = np.split(cosPdP, 2, axis = 1)
-#     P_sin, dP_sin = np.split(sinPdP, 2, axis = 1)
-#     m_cos = shkeys.m
-#     m_sin = np.array([key[1] for key in sinkeys]).reshape((1, -1))
-
-#     cosmphi  =  np.cos(m_cos * mlt * np.pi / 12)
-#     sinmphi  =  np.sin(m_sin * mlt * np.pi / 12)
-#     dcosmphi = -np.sin(m_cos * mlt * np.pi / 12)
-#     dsinmphi =  np.cos(m_sin * mlt * np.pi / 12)
-
-#     dT_dlon  = np.hstack(( P_cos * dcosmphi * m_cos,  P_sin * dsinmphi * m_sin))
-#     dT_dlat  = np.hstack((dP_cos *  cosmphi        , dP_sin *  sinmphi        ))
-
-#     G = np.vstack((d1xe1dotk / RE / np.cos(mlat * d2r) * dT_dlon - d2xe1dotk / RE / sinIm * dT_dlat,
-#                    d1xe2dotk / RE / np.cos(mlat * d2r) * dT_dlon - d2xe2dotk / RE / sinIm * dT_dlat))
-
-
-#     return G
-
-
-# def get_j_parallel_G(mlat, mlt, shkeys, RE = 6371.2 * 1e3, height = 110 * 1e3):
-#     """ calculate G matrix to calculate radial/FA current using 
-#         the toroidal magnetic field description 
-#         mlat, mlt are points where current should be evaluated
-
-#         NOT TESTED 
-#     """
-#     MU0 = np.pi * 4 * 1e-7
-#     mlat = mlat.reshape((-1, 1))
-#     mlt  = mlt.reshape((-1, 1))
-
-#     sinkeys = [key for key in shkeys if key[1] != 0]
-#     coskeys = shkeys
-
-#     cosPdP = get_legendre(shkeys.Nmax, shkeys.Mmax, 90 - mlat.flatten(), schmidtnormalize = True, keys = coskeys)
-#     sinPdP = get_legendre(shkeys.Nmax, shkeys.Mmax, 90 - mlat.flatten(), schmidtnormalize = True, keys = sinkeys)
-#     P_cos, dP_cos = np.split(cosPdP, 2, axis = 1)
-#     P_sin, dP_sin = np.split(sinPdP, 2, axis = 1)
-#     m_cos = shkeys.m
-#     m_sin = np.array([key[1] for key in sinkeys]).reshape((1, -1))
-#     n_cos = shkeys.n
-#     n_sin = np.array([key[0] for key in sinkeys]).reshape((1, -1))
-
-#     cosmphi  =  np.cos(m_cos * mlt * np.pi / 12)
-#     sinmphi  =  np.sin(m_sin * mlt * np.pi / 12)
-
-#     G = -np.hstack((n_cos * (n_cos + 1) * P_cos * cosmphi,
-#                    (n_sin * (n_sin + 1) * P_sin * sinmphi))) * MU0 / (RE + height)
-
-
-#     return G
