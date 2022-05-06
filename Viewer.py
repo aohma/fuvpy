@@ -8,13 +8,11 @@ Created on Wed May  4 10:22:03 2022
 
 """ Imports """
 import matplotlib.pyplot as plt
-from polplot_simon.polplot import Polarplot as polar
-# from pysymmetry.visualization.polarsubplot_update import Polarsubplot as polar
+from polplot.polplot import Polarplot as polar
 import fuvpy.fuvpy as fuv
 from glob import glob
 import numpy as np
 import functools
-from matplotlib.widgets import Button
 import pandas as pd
 import os
 
@@ -181,7 +179,7 @@ class Visualise():
         self.MLATax=MLATax
         self.cbars= [False]*len(np.unique(cax_association))
         self.figure= fig
-    def show_image(self, file, axis, cax_label='Counts', crange=False, cmap='jet', cbar_orientation='horizontal', in_put='img'):
+    def show_image(self, file, axis, crange=False, cmap=False, cbar_orientation=False, in_put='img'):
         if file.endswith('.idl'):
             axis.image_dat= fuv.readImg(file).isel(date = 0).rename({in_put:'data'})
         else:
@@ -195,6 +193,8 @@ class Visualise():
                 for p in profile1+ profile2+ lines+window: p.remove()
             except NameError:
                 pass
+            except ValueError:
+                pass
         mlt= axis.image_dat.mlt
         image= axis.image_dat.where(eval(axis.mltlims)&(axis.image_dat.mlat>=(axis.minlat)))
         maxi= np.nanmax(axis.image_dat.data)
@@ -202,32 +202,55 @@ class Visualise():
         cbar= self.cbars[axis.cax_number]
         cax= self.caxes[axis.cax_number]
         if not cbar:
-            crange= (0, maxi)
-            # im= axis.showFUVimage(image,'image',crange=crange, cmap=cmap, zorder=1)
+            if not cmap:
+                cmap='jet'
+            if not crange:
+                crange= (0, maxi)
+            if not cbar_orientation:
+                cbar_orientation='horizontal'
+            for ax in self.axes:
+                if ax.cax_number==axis.cax_number and ax!=axis:
+                    if ax.image and crange!= ax.image.get_clim():
+                        ax.image.set_clim(crange)
+                    if ax.image and cmap!= ax.image.get_cmap().name:
+                        ax.image.set_cmap(cmap)
             im= axis.plotimg(image.mlat.values, image.mlt.values, image.data.values, crange=crange, cmap=cmap, zorder=1)
             cbar=self.figure.colorbar(im, cax=cax, orientation= cbar_orientation)
             self.cbars[axis.cax_number]=cbar
         else:
-            clims=[]
-            for ax in self.axes:
-                if ax.image:
-                    clims+=[*ax.image.get_clim()]
-            if cbar.orientation=='horizontal':
-                crange=self.caxes[axis.cax_number].get_xlim()
-            elif cbar.orientation=='vertical':
-                crange=self.caxes[axis.cax_number].get_ylim()
-            maxi=max([maxi, *clims])
-            new_cbar=False
-            if maxi!=crange[-1]:
+            if not crange:
+                clims=[]
+                for ax in self.axes:
+                    if ax.image:
+                        clims+=[*ax.image.get_clim()]
+                if cbar.orientation=='horizontal':
+                    crange=self.caxes[axis.cax_number].get_xlim()
+                elif cbar.orientation=='vertical':
+                    crange=self.caxes[axis.cax_number].get_ylim()
+                maxi=max([maxi, *clims])
+                new_cbar=False
+                if maxi!=crange[-1]:
+                    new_cbar=True
+                crange=(0, maxi)
+            if not cmap:
+                cmap=cbar.cmap
+            elif cmap!=cbar.cmap.name:
                 new_cbar=True
-            crange=(0, maxi)
-            # im= axis.showFUVimage(image,'image',crange=crange, cmap=cbar.cmap, zorder=1)
-            im= axis.plotimg(image.mlat.values, image.mlt.values, image.data.values, crange=crange, cmap=cbar.cmap, zorder=1)
-            if new_cbar:
+            if not cbar_orientation:
+                cbar_orientation= cbar.orientation
+            for ax in self.axes:
+                if ax.cax_number==axis.cax_number and ax!=axis:
+                    if crange!= ax.image.get_clim():
+                        ax.image.set_clim(crange)
+                    if cmap!= ax.image.get_cmap().name:
+                        ax.image.set_cmap(cmap)
+            im= axis.plotimg(image.mlat.values, image.mlt.values, image.data.values, crange=crange, cmap=cmap, zorder=1)
+            if new_cbar or not cmap:
+                label= cbar.ax.get_title()
                 self.caxes[axis.cax_number].clear()
-                cbar= self.figure.colorbar(im, orientation=cbar.orientation, cax=cax)
+                cbar= self.figure.colorbar(im, orientation=cbar_orientation, cax=cax)
                 self.cbars[axis.cax_number]=cbar
-                cbar.set_label(cbar.ax.get_title())
+                cbar.set_label(label)
                 for ax in self.axes:
                     if ax.cax_number== axis.cax_number and ax.image:
                         ax.image.set_clim(crange)
@@ -276,7 +299,7 @@ class Visualise():
         
 if __name__=='__main__':
     file='/home/simon/BCSS-DAG Dropbox/Data/Conjungate_Onset_Study_Images/Southern_Vis/vis2000149231700.idl'
-    file='test.ncdf'
+    # file='test.ncdf'
     file2= '/home/simon/BCSS-DAG Dropbox/Data/Conjungate_Onset_Study_Images/Southern_Vis/vis2000152234355.idl'
     fig= plt.figure(figsize=(20,10))
     gs= fig.add_gridspec(2, 4, height_ratios=[1, .1])
@@ -286,6 +309,6 @@ if __name__=='__main__':
     MLATax= fig.add_subplot(gs[0, 3])
     cax= fig.add_subplot(gs[1, 1])
     cax2= fig.add_subplot(gs[1,0])
-    vis=Visualise(np.asarray([ax, ax2]), np.asarray([cax, cax2]), MLTax, MLATax, cax_association=[0, 1])
+    vis=Visualise(fig, np.asarray([ax, ax2]), np.asarray([cax, cax2]), MLTax, MLATax, cax_association=[0, 1])
     vis.show_image(file, ax, cmap='viridis_r', in_put='sza')
     vis.show_image(file2, ax2)
