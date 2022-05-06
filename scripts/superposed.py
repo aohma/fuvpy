@@ -131,7 +131,7 @@ def addBinnumber(vdf):
 
     '''
     
-    grid,mltres=grids.sdarngrid(dlat = 2, dlon = 2, latmin = 58, return_mltres = False)
+    grid,mltres=grids.sdarngrid(dlat = 2, dlon = 2, latmin = 58)
     
     llat = np.unique(grid[0]) # latitude circles
     assert np.allclose(np.sort(llat) - llat, 0) # should be in sorted order automatically. If not, the algorithm will not work
@@ -166,9 +166,71 @@ def addBinnumber(vdf):
     
     return vdf
 
+def addBinnumber2(vdf):
+    '''
+    vaex compatible version of grids.bin_number, which 
+    
+    This is slower than addBinNumber(), but should handle nans without crashing.
+    Implement Jone fix in addBinnumber and discard this function?
+    
+
+    Parameters
+    ----------
+    vdf : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    vdf : TYPE
+        DESCRIPTION.
+
+    '''
+    
+    grid,mltres=grids.sdarngrid(dlat = 2, dlon = 2, latmin = 58)
+    
+    # vdf['binNumber']=0*vdf.mlat -1
+    vdf['rownr'] = vaex.vrange(0, len(vdf))
+    
+    llat = np.unique(grid[0]) # latitude circles
+    assert np.allclose(np.sort(llat) - llat, 0) # should be in sorted order automatically. If not, the algorithm will not work
+    dlat = np.diff(llat)[0] # latitude step
+    latbins = np.hstack(( llat, llat[-1] + dlat )) # make latitude bin edges
+    
+    
+    ii = (vdf['mlat']>=latbins[0])&(vdf['mlat']<=latbins[-1])
+    
+    vdf_real = vdf[ii]
+    vdf_real['latbinNumber'] = vdf_real.mlat.digitize(latbins) - 1 # find the latitude index for each data point
+
+    # number of longitude bins in each latitude ring:
+    nlons = np.array([len(np.unique(grid[1][grid[0] == lat])) for lat in llat])
+
+    vdf2 = vaex.from_arrays(nlons=nlons,ind = np.arange(len(nlons)))
+    vdf_real=vdf_real.join(vdf2,left_on='latbinNumber',right_on='ind')
+    # normalize all longitude bins to the equatorward ring:
+    _mlt = vdf_real.mlt * vdf_real['nlons'] / nlons[0]
+    
+    # make longitude bin edges for the equatorward ring:
+    llon = np.unique(grid[1][grid[0] == llat[0]])
+    dlon = np.diff(llon)[0]
+    lonbins = np.hstack((llon, llon[-1] + dlon)) # make longitude bin edges
+    vdf_real['lonbinNumber'] = _mlt.digitize(lonbins) - 1 # find the longitude bin
+    
+    # map from 2D bin numbers to 1D by adding the number of bins in each row equatorward:
+    
+    vdf3 = vaex.from_arrays(nlonsCS=np.cumsum(np.hstack((0, nlons))),ind2 = np.arange(len(np.cumsum(np.hstack((0, nlons))))))    
+    vdf_real=vdf_real.join(vdf3,left_on='latbinNumber',right_on='ind2')
+    vdf_real['binNumber'] = vdf_real['lonbinNumber'] + vdf_real['nlonsCS']
+    vdf = vdf.join(vdf_real[['rownr','binNumber']],left_on='rownr',right_on='rownr')
+
+    vdf['binNumber'] = vdf.func.where(ii,vdf.binNumber,-1)
+    # vdf['binNumber'][vdf['binNumber'].isnan()]=-1
+    return vdf
+
 def calcSuperposed(vdf):
     vdf['rmlat'] = vdf['mlat']-vdf['omlat']
-    vdf['rmlt'] = vdf['mlt']-vdf['omlt']
+    # vdf['rmlt'] = vdf['mlt']-vdf['omlt']
+    vdf['rmlt'] = np.rad2deg(np.arctan2(np.sin(np.deg2rad(15*vdf['mlt'])),np.cos(np.deg2rad(15*vdf['mlt'])))-np.arctan2(np.sin(np.deg2rad(15*vdf['omlt'])),np.cos(np.deg2rad(15*vdf['omlt']))))/15
     # df_names_all
     # Do superposed statistics (mean,approx median, std, skew)
     # Do on MLT,MLAT statistics
@@ -181,14 +243,14 @@ def calcSuperposed(vdf):
     
     ds = xr.Dataset(
     data_vars=dict(
-        mean=(['mlat','mlt','irel'], mean),
-        median=(['mlat','mlt','irel'], median),
-        std=(['mlat','mlt','irel'], std),
-        count=(['mlat','mlt','irel'], count),
+        mean=(['rlat','rlt','irel'], mean),
+        median=(['rlat','rlt','irel'], median),
+        std=(['rlat','rlt','irel'], std),
+        count=(['rlat','rlt','irel'], count),
         ),
     coords=dict(
-        mlat = np.linspace(-19.5,19.5,40),
-        mlt = np.linspace(-11.9,11.9,24*5),
+        rlat = np.linspace(-19.5,19.5,40),
+        rlt = np.linspace(-11.9,11.9,24*5),
         irel = np.linspace(-15,30,46)
     ),
     )
