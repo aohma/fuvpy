@@ -47,12 +47,17 @@ from polplot import pp
 
 # HDD events
 
-# events = glob.glob('/Volumes/Seagate Backup Plus Drive/fuv/wic/idl/north/*')
-# events.sort()
+events = glob.glob('/Volumes/Seagate Backup Plus Drive/fuv/wic/idl/north/*')
+events.sort()
 
-# for e in events:
-#     wicfiles = glob.glob(e+'/*.idl')   
-#     wic = readFUVimage(wicfiles)
+ddate = []
+ddates = []
+for e in events:
+    wicfiles = glob.glob(e+'/*.idl')   
+    wic = fuv.readImg(wicfiles)
+    ddate.append(wic.date.diff(dim='date').mean().values/ np.timedelta64(1, 's'))
+    ddates.append(wic.date.diff(dim='date').values/ np.timedelta64(1, 's'))
+    
 #     wic = makeFUVdayglowModelC(wic,transform='log')
 #     wic = makeFUVshModelNew(wic,4,4)
     
@@ -178,30 +183,30 @@ def pplot(imgs,inImg,col_wrap = None,row=False,add_cbar = True,robust=False,cbar
         else:
             cbar.set_label(inImg)
 
-wicfiles = glob.glob('/Users/aohma/BCSS-DAG Dropbox/Anders Ohma/python/git/fuvpy/data/wicFiles/*.idl')   
-wic = fuv.readImg(wicfiles)
-wic = fuv.makeDGmodel(wic,transform='log')
-wic = fuv.makeSHmodel(wic,4,4)
+# wicfiles = glob.glob('/Users/aohma/BCSS-DAG Dropbox/Anders Ohma/python/git/fuvpy/data/wicFiles/*.idl')   
+# wic = fuv.readImg(wicfiles)
+# wic = fuv.makeDGmodel(wic,transform='log')
+# wic = fuv.makeSHmodel(wic,4,4)
 
-bi = fuv.findBoundaries(wic)
-bm = fuv.makeBoundaryModel(bi,dampingValE=0.001,dampingValP=0.001)
+# bi = fuv.findBoundaries(wic)
+# bm = fuv.makeBoundaryModel(bi,dampingValE=0.001,dampingValP=0.001)
 
-fi1 = fuv.calcFlux(bi.sel(lim=1))
-fm1 = fuv.calcFlux(bm)
-fi2 = fuv.calcFlux2(bi.sel(lim=1))
-fm2 = fuv.calcFlux2(bm)
+# fi1 = fuv.calcFlux(bi.sel(lim=1))
+# fm1 = fuv.calcFlux(bm)
+# fi2 = fuv.calcFlux2(bi.sel(lim=1))
+# fm2 = fuv.calcFlux2(bm)
 
-plt.figure()
-# fi1['openFlux'].plot()
-# fm1['openFlux'].plot()
-fi2['openFlux'].plot()
-fm2['openFlux'].plot()
+# plt.figure()
+# # fi1['openFlux'].plot()
+# # fm1['openFlux'].plot()
+# fi2['openFlux'].plot()
+# fm2['openFlux'].plot()
 
-plt.figure()
-# fi1['auroralFlux'].plot()
-# fm1['auroralFlux'].plot()
-fi2['auroralFlux'].plot()
-fm2['auroralFlux'].plot()
+# plt.figure()
+# # fi1['auroralFlux'].plot()
+# # fm1['auroralFlux'].plot()
+# fi2['auroralFlux'].plot()
+# fm2['auroralFlux'].plot()
 
 # pplot(wic.isel(date=slice(2,6)),'img',robust=True,cbar_kwargs={'extend':'both'})
 # pplot(wic.isel(date=slice(2,6)),'img',row=True)
