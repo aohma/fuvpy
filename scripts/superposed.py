@@ -171,7 +171,7 @@ def addBinnumber(grid,vdf):
     
     return vdf
 
-def addBinnumber2(vdf):
+def addBinnumber2(grid,vdf):
     '''
     vaex compatible version of grids.bin_number, which 
     
@@ -190,8 +190,7 @@ def addBinnumber2(vdf):
         DESCRIPTION.
 
     '''
-    
-    grid,mltres=grids.sdarngrid(dlat = 2, dlon = 2, latmin = 58)
+
     
     # vdf['binNumber']=0*vdf.mlat -1
     vdf['rownr'] = vaex.vrange(0, len(vdf))
