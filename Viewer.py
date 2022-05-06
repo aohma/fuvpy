@@ -218,6 +218,7 @@ class Visualise():
             cbar=self.figure.colorbar(im, cax=cax, orientation= cbar_orientation)
             self.cbars[axis.cax_number]=cbar
         else:
+            new_cbar=False
             if not crange:
                 clims=[]
                 for ax in self.axes:
@@ -228,7 +229,6 @@ class Visualise():
                 elif cbar.orientation=='vertical':
                     crange=self.caxes[axis.cax_number].get_ylim()
                 maxi=max([maxi, *clims])
-                new_cbar=False
                 if maxi!=crange[-1]:
                     new_cbar=True
                 crange=(0, maxi)
@@ -238,6 +238,8 @@ class Visualise():
                 new_cbar=True
             if not cbar_orientation:
                 cbar_orientation= cbar.orientation
+            elif cbar_orientation!=cbar.orientation:
+                new_cbar=True
             for ax in self.axes:
                 if ax.cax_number==axis.cax_number and ax!=axis:
                     if crange!= ax.image.get_clim():
@@ -245,9 +247,14 @@ class Visualise():
                     if cmap!= ax.image.get_cmap().name:
                         ax.image.set_cmap(cmap)
             im= axis.plotimg(image.mlat.values, image.mlt.values, image.data.values, crange=crange, cmap=cmap, zorder=1)
-            if new_cbar or not cmap:
-                label= cbar.ax.get_title()
+            if new_cbar:
+                if cbar.orientation=='horizontal':
+                    label= cbar.ax.get_xlabel()
+                elif cbar.orientation=='vertical':
+                    label= cbar.ax.get_ylabel()
                 self.caxes[axis.cax_number].clear()
+                self.caxes[axis.cax_number].get_xaxis().set_visible(True)
+                self.caxes[axis.cax_number].get_yaxis().set_visible(True)
                 cbar= self.figure.colorbar(im, orientation=cbar_orientation, cax=cax)
                 self.cbars[axis.cax_number]=cbar
                 cbar.set_label(label)
