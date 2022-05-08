@@ -325,7 +325,7 @@ def calcSuperposed(vdf):
 
 def makeSubstormFilesSubset(sel):
     frey = pd.read_pickle('../data/merged_substormlist.pd')
-    frey['filename'] = 'wic'+frey.index.strftime('%Y%m%d%H%M%S')+'.hdf5'
+    frey['filename'] = '/mnt/5fa6bccc-fa9d-4efc-9ddc-756f65699a0a/aohma/fuv/wic/wic'+frey.index.strftime('%Y%m%d%H%M%S')+'.hdf5'
     frey.index = frey.index.round('1min')
     frey = frey.loc['2000-03-01':'2006-01-01',:] # Remove UVI onsets
     frey = frey[frey['mlat']>0] # NH onsets
