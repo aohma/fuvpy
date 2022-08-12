@@ -108,6 +108,8 @@ def readImg(filenames, dzalim = 80, minlat = 0, hemisphere = None, reflat=True):
         img['glon'] = xr.where(img['glon']==-1e+31,np.nan,img['glon'])
         img['sza']  = xr.where(img['sza']==-1,np.nan,img['sza'])
         img['dza']  = xr.where(img['dza']==-1,np.nan,img['dza'])
+        img['img']  = xr.where(img['img']==0,np.nan,img['img'])
+
 
         # Set mlat/mlt to np.nan where when it is outside the requested range
         img['mlt']  = xr.where(img['dza'] > dzalim,np.nan,img['mlt'])
