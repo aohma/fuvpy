@@ -305,9 +305,11 @@ class Visualise():
         return
 
 if __name__=='__main__':
-    file='/home/simon/BCSS-DAG Dropbox/Data/Conjungate_Onset_Study_Images/Southern_Vis/vis2000149231700.idl'
-    # file='test.ncdf'
-    file2= '/home/simon/BCSS-DAG Dropbox/Data/Conjungate_Onset_Study_Images/Southern_Vis/vis2000152234355.idl'
+    import inspect
+    folder= '/'.join(inspect.getfile(fuv).split('/')[:-1])+'/data/wicFiles/'
+    file=folder+'wic20002410928.idl'
+    np.datetime64('2001-12-06T10:17:26')
+    file2=folder+'wic20002410930.idl'
     fig= plt.figure(figsize=(20,10))
     gs= fig.add_gridspec(2, 4, height_ratios=[1, .1])
     ax= polar(fig.add_subplot(gs[0, 1]), sector='18-6')
