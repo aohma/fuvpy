@@ -9,7 +9,7 @@ Created on Wed May  4 10:22:03 2022
 """ Imports """
 import matplotlib.pyplot as plt
 from polplot.polplot import Polarplot as polar
-import fuvpy.fuvpy as fuv
+import fuvpy as fuv
 from glob import glob
 import numpy as np
 import functools
@@ -37,7 +37,7 @@ class Make_MLT_ax():
                 theta+=2*np.pi
             display_coord = theta/(2*np.pi/24),r
             ax_coord= (float(i) for i in display_coord)
-            string= 'mlt={:.2f}, counts={:.2f}'.format(*ax_coord) 
+            string= 'mlt={:.2f}, counts={:.2f}'.format(*ax_coord)
             return (string)
         return format_coord
 def datetime_to_vistime(datetime):
@@ -107,17 +107,17 @@ def clicked(image_axis, mlt_axis, mlat_axis, mlt, mlat):
                                                            &((image.mlt>=(mlt-mlt_size/2))\
                                                            |(image.mlt<=(mlt+mlt_size/2)-24)))
         window= image_axis.plot([mlat+mlat_size/2]*2 + [mlat-mlat_size/2]*2+ [mlat+mlat_size/2],
-                                    [mlt-mlt_size/2, mlt+mlt_size/2, mlt+mlt_size/2, mlt-mlt_size/2, mlt-mlt_size/2], 
+                                    [mlt-mlt_size/2, mlt+mlt_size/2, mlt+mlt_size/2, mlt-mlt_size/2, mlt-mlt_size/2],
                                     color='orange')
         image= image.where(image.data!=0)
         ind= image.data== np.nanmax(image.data)
         mlt_= np.nanmax(image.where(ind).mlt.values)
         mlat_= np.nanmax(image.where(ind).mlat.values)
-        
+
         crange= image_axis.image.get_clim()
         profile1= [mlat_axis.scatter(image.mlat.values, image.data.values, c=image.data.values, cmap=cmap, vmin= crange[0], vmax=crange[1])]+\
                    mlat_axis.plot([mlat]*2, [np.nanmin(image.data), np.nanmax(image.data)], color='black')
-        profile1.extend(mlat_axis.plot([round(mlat_, 2)]*2, [np.nanmin(image.data), np.nanmax(image.data)], 
+        profile1.extend(mlat_axis.plot([round(mlat_, 2)]*2, [np.nanmin(image.data), np.nanmax(image.data)],
                                        color='black', linestyle='--'))
         try:
             mlat_axis.set_ylim(np.nanmin(image.data)-abs(np.nanmin(image.data))*.1,
@@ -134,11 +134,11 @@ def clicked(image_axis, mlt_axis, mlat_axis, mlt, mlat):
             mlt_axis.set_ylim(np.nanmin(image.data)-abs(np.nanmin(image.data))*0.1, np.nanmax(image.data)+abs(np.nanmax(image.data))*.1)
         except:
             pass
-    
+
         profile2= [mlt_axis.scatter(radians, image.data.values, c=image.data.values, cmap=cmap, vmin=crange[0], vmax=crange[1])]+\
                    mlt_axis.plot([mlt2radians(mlt)]*2, [np.nanmin(image.data), np.nanmax(image.data)], color='black')
-    
-        profile2.extend(mlt_axis.plot([mlt2radians(round(mlt_, 2))]*2, [np.nanmin(image.data), np.nanmax(image.data)], 
+
+        profile2.extend(mlt_axis.plot([mlt2radians(round(mlt_, 2))]*2, [np.nanmin(image.data), np.nanmax(image.data)],
                                   color='black', linestyle='--'))
         if mlt_lims[0]<0:
             labels= np.append(np.arange(24-mlt_size/4, round(mlt_lims[0]+24, 1)-mlt_size/4, -mlt_size/4)[::-1], np.arange(0, round(mlt_lims[1], 1)+mlt_size/4, mlt_size/4))
@@ -148,12 +148,12 @@ def clicked(image_axis, mlt_axis, mlat_axis, mlt, mlat):
             labels= np.round(np.arange(round(mlt_lims[0], 1), round(mlt_lims[1], 1)+mlt_size/4, mlt_size/4), 2)
         rads=mlt2radians(labels)
         mlt_axis.set_xticks(rads, labels)
-        
+
         lines= image_axis.plot([mlat]*100, np.append(np.linspace(0, 6, 50)[::-1], np.linspace(18, 24, 50)[::-1]), zorder=100, color='orange', alpha=.7) + \
                image_axis.plot(np.linspace(50, 90, 100), [mlt]*100, zorder=100, color='orange', alpha=.7)
 
 
-        
+
     plt.draw()
 
 class Visualise():
@@ -288,7 +288,7 @@ class Visualise():
                 crange=caxes[bools_cax][0].get_ylim()
             caxes[bools_cax][0].clear()
             if ix<sum(crange)/2:
-                for ax in axes: 
+                for ax in axes:
                     if ax.cax_number==cax_number:
                         ax.image.set_clim(round(ix, 0), crange[-1])
             if ix>=sum(crange)/2:
@@ -303,7 +303,7 @@ class Visualise():
                 pass
         plt.draw()
         return
-        
+
 if __name__=='__main__':
     file='/home/simon/BCSS-DAG Dropbox/Data/Conjungate_Onset_Study_Images/Southern_Vis/vis2000149231700.idl'
     # file='test.ncdf'

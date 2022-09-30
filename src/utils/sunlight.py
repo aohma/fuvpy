@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from datetime import datetime,timedelta
-from fuvpy.utils import dates,spherical
+from fuvpy.src.utils import dates,spherical
 
 
 """ function for computing subsolar point """
