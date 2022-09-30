@@ -67,13 +67,13 @@ from scipy.stats import binned_statistic
 #     wic.to_netcdf('/Volumes/Seagate Backup Plus Drive/fuv/wic/nc/wic_'+e[53:]+'.nc')
 
 
-# events = glob.glob('/Volumes/Seagate Backup Plus Drive/fuv/wic/idl/north/*')
-# events.sort()
+events = glob.glob('/Volumes/Seagate Backup Plus Drive/fuv/wic/idl/north/*')
+events.sort()
 
-# ddate = []
-# ddates = []
-# for e in events:
-#     wicfiles = glob.glob(e+'/*.idl')   
+ddate = []
+ddates = []
+for e in events:
+    wicfiles = glob.glob(e+'/*.idl')   
 #     wic = fuv.readImg(wicfiles)
 #     ddate.append(wic.date.diff(dim='date').mean().values/ np.timedelta64(1, 's'))
 #     ddates.append(wic.date.diff(dim='date').values/ np.timedelta64(1, 's'))
@@ -123,10 +123,10 @@ from scipy.stats import binned_statistic
 
 # Boundaries
 # events = sorted(glob.glob('/Users/aohma/BCSS-DAG Dropbox/Anders Ohma/data/fuv200012/nc/wic*'))
-events = sorted(glob.glob('/Volumes/Seagate Backup Plus Drive/fuv/wic/nc/wic*'))
+# events = sorted(glob.glob('/Volumes/Seagate Backup Plus Drive/fuv/wic/nc/wic*'))
 
-for e in events[:1]:
-    wic = xr.load_dataset(e)
+# for e in events[:1]:
+#     wic = xr.load_dataset(e)
     # bi = fuv.findBoundaries(wic,dampingVal=1e1)
     # bb = fuv.makeBoundaryModelBSpline(bi,tKnotSep=10,eL1=1e1,eL2=1e1,pL1=1e0,pL2=1e1)[0]
 

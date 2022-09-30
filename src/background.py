@@ -9,6 +9,8 @@ Created on Fri Sep 30 09:28:25 2022
 import numpy as np
 import xarray as xr
 
+from scipy.interpolate import BSpline
+
 from fuvpy.src.utils import sh
 from fuvpy.src.utils.sunlight import subsol
 

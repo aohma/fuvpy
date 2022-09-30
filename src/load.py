@@ -219,7 +219,7 @@ def _reflatWIC(wic,inImg='img',outImg='img'):
     imgs : xarray.Dataset
         Copy(?) of the FUV dataset with a new field containing the reflattened images.
     '''
-    path = Path(__file__).parent / './data/wic_flatfield_dbase.idl'
+    path = Path(__file__).parent / '../data/wic_flatfield_dbase.idl'
     flatfields = idl.readsav(path)['flatfields']
     if pd.to_datetime(wic['date'][0].values)<pd.to_datetime('2000-10-03 23:30'):
         flat = flatfields[:,0]
