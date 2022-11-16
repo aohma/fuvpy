@@ -23,32 +23,27 @@ from scipy.stats import binned_statistic
 from scipy.optimize import curve_fit
 
 
-def makeData():
-    wicfiles = glob.glob('/Users/aohma/BCSS-DAG Dropbox/Anders Ohma/projects/aurora_dayglow/fuv_2000-08-28-1st/idl/wic/*')
-    s12files = glob.glob('/Users/aohma/BCSS-DAG Dropbox/Anders Ohma/projects/aurora_dayglow/fuv_2000-08-28-1st/idl/s12/*')
-    s13files = glob.glob('/Users/aohma/BCSS-DAG Dropbox/Anders Ohma/projects/aurora_dayglow/fuv_2000-08-28-1st/idl/s13/*')
+def runEvent(inpath,outpath):
+    # NO ws SH: 0.01,0.3,0.3
+    wic = xr.load_dataset(inpath + 'wic.nc')
+    wic = fuv.makeBSmodel(wic,sKnots=[-3.5,-0.25,0,0.25,1.5,3.5],stop=0.01,tKnotSep=240,minlat=-90,tukeyVal=5,dzalim=75,dampingVal=0.03)
+    wic = fuv.makeSHmodel(wic,4,4,knotSep=240,stop=0.01,tukeyVal=5,dampingVal=1e-4)
+    
+    s12 = xr.load_dataset(inpath + 's12.nc')
+    s12 = fuv.makeBSmodel(s12,sKnots=[-3.5,-0.25,0,0.25,1.5,3.5],stop=0.01,tKnotSep=240,minlat=-90,tukeyVal=5,dzalim=75,dampingVal=1)
+    s12 = fuv.makeSHmodel(s12,4,4,knotSep=240,stop=0.01,tukeyVal=5,dampingVal=0.3)
+    
+    s13 = xr.load_dataset(inpath + 's13.nc')
+    s13 = fuv.makeBSmodel(s13,sKnots=[-3.5,-0.25,0,0.25,1.5,3.5],stop=0.01,tKnotSep=240,minlat=-90,tukeyVal=5,dzalim=75,dampingVal=1)
+    s13 = fuv.makeSHmodel(s13,4,4,knotSep=240,stop=0.01,tukeyVal=5,dampingVal=1e1)
+    
+    return wic,s12,s13
 
-    wic = fuv.readImg(wicfiles)
-    s12 = fuv.readImg(s12files)
-    s13 = fuv.readImg(s13files)
-    
-    wic = fuv.makeDGmodel(wic,transform='log',stop=1e-2,tKnotSep=240)
-    s12 = fuv.makeDGmodel(s12,stop=1e-2,tKnotSep=240)
-    s13 = fuv.makeDGmodel(s13,stop=1e-2,tKnotSep=240)
-    
-    wic = fuv.makeSHmodel(wic,4,4,stop=1e-2,knotSep=240)
-    s13 = fuv.makeSHmodel(s13,4,4,stop=1e-2,knotSep=240)
-    
-    wic.to_netcdf('/Users/aohma/BCSS-DAG Dropbox/Anders Ohma/projects/aurora_dayglow/fuv_2000-08-28-1st/wic.nc')
-    s12.to_netcdf('/Users/aohma/BCSS-DAG Dropbox/Anders Ohma/projects/aurora_dayglow/fuv_2000-08-28-1st/s12.nc')
-    s13.to_netcdf('/Users/aohma/BCSS-DAG Dropbox/Anders Ohma/projects/aurora_dayglow/fuv_2000-08-28-1st/s13.nc')    
- 
 def weightedBinning(fraction,d,dm,w,sKnots):
     bins = np.r_[sKnots[0],np.arange(0,sKnots[-1]+0.25,0.25)]
-    # bins = np.quantile(fraction,np.linspace(0,1,101))
-    # bins = np.r_[-1e10,bins,1e10]
     binnumber = np.digitize(fraction,bins)
     
+    # Binned RMSE
     rmse=np.full_like(d,np.nan)
     for i in range(1,len(bins)):
         ind = binnumber==i
@@ -58,39 +53,25 @@ def weightedBinning(fraction,d,dm,w,sKnots):
             rmse[ind]=np.sqrt(np.average((d[ind]-dm[ind])**2,weights=w[ind]))
     
     ind2 = np.isfinite(rmse)
-    # Fit using Bspline
     
-    # test with smoother knots
-    
-    # G= BSpline(sKnots, np.eye(n_scp), sOrder)(fraction)
-    # m =np.linalg.lstsq(G[ind2].T@G[ind2],G[ind2].T@np.log(rmse[ind2]**2),rcond=None)[0]
-    
-    # # test with linear 
-    # G = np.vstack((dm,np.ones_like(dm))).T
-    # m =np.linalg.lstsq(G[ind2].T@G[ind2],G[ind2].T@rmse[ind2],rcond=None)[0]
-    
-    # # test with linear 
-    # G = np.vstack((dm**2,np.ones_like(dm))).T
-    # m =np.linalg.lstsq(G[ind2].T@G[ind2],G[ind2].T@rmse[ind2]**2,rcond=None)[0]
-    
-    # Test, non-linear fit
+    # Linear fit with bounds
     def func(x,a,b):
         return a*x+b
     
     popt, pcov=curve_fit(func, dm[ind2]**2, rmse[ind2]**2, bounds=(0,np.inf))
-    # rmseFit=np.full_like(d,np.nan)
-    # rmseFit[ind2]=np.sqrt(popt)
     rmseFit = np.sqrt(func(dm**2,*popt))
     
     return rmseFit,rmse
     
     
-def makeFig1c(wic,s12,s13,idate,outpath):
+def makeFig1(wic,s12,s13,idate,outpath):
     ''' 
-    Plot a few WIC images
-    wic : Dataset with the images to be plotted
-    outpath : path to where the image is saved
-    
+    Figure displaying three FUV images
+    wic : xr.Dataset with wic images
+    s12 : xr.Dataset with s12 images
+    s13 : xr.Dataset with s13 images
+    idate : index of date to be plotted
+    outpath : path to where the figure is saved
     '''  
 
     fig,axs = plt.subplots(1,3,figsize=(9,3.5),constrained_layout = True)
@@ -108,16 +89,29 @@ def makeFig1c(wic,s12,s13,idate,outpath):
         plt.colorbar(pc[i],ax=axs[i],fraction=0.05,pad=0.01,location='bottom',extend='max',label=names[i]+' intensity [counts]')
         axs[i].text(0.05, 0.95, abc[i], fontsize=12, horizontalalignment='center', verticalalignment='center', transform=axs[i].transAxes,color='w')
         
-    
-    
-    # wic['img'].isel(date=idate).plot(vmin=0,vmax=12000,xticks=[],yticks=[],subplot_kws={'xlabel':''},cbar_kwargs={'label':'WIC intensity [counts]'})
-    plt.savefig(outpath + 'wicExample.png',bbox_inches='tight',dpi = 300)
+    plt.savefig(outpath + 'fuvEx.png',bbox_inches='tight',dpi = 300)
     plt.clf()
-    plt.close()    
+    plt.close()
     
-    # cmap
+def makeFig2(inpath,outpath,idate):
+    '''
+    Figure showing WIC flat-field correction
+
+    Parameters
+    ----------
+    inpath : str
+        Path to wic .idl file.
+    outpath : str
+        Path to where the figure is saved.
+    idate : int
+        index of date to be used.
+
+    Returns
+    -------
+    None.
+
+    '''
     
-def makeFig1b(inpath,outpath,idate):
     wicfiles = glob.glob(inpath)
     wicfiles.sort()
     wic = fuv.readImg(wicfiles[idate])
@@ -133,14 +127,18 @@ def makeFig1b(inpath,outpath,idate):
     plt.close()
 
 
-def makeFig2c(imgs,outpath,idate,inImg='img',transform=None,sOrder=3,dampingVal=0,tukeyVal=5,stop=1e-3,minlat=0,dzalim=80,sKnots=None,tKnotSep=None,tOrder=2,dzacorr = 0):
+def makeFig3(imgs,outpath,idate,inImg='img',sOrder=3,dampingVal=0,tukeyVal=5,stop=1e-3,minlat=0,dzalim=75,sKnots=None,tKnotSep=None,tOrder=2):
     '''
-    Function to model the FUV dayglow and subtract it from the input image
+    Figures showing the performance of the B-spline model
 
     Parameters
     ----------
     imgs : xarray.Dataset
         Dataset with the FUV images, imported by readFUVimage()
+    outpath : str
+        Path to where the figure is saved.
+    idate : int or list of int
+        Indices to be used when displaying the spatial B-splines
     inImg : str, optional
         Name of the input image to be used in the model. The default is 'img'.
     sOrder : int, optional
@@ -169,43 +167,30 @@ def makeFig2c(imgs,outpath,idate,inImg='img',transform=None,sOrder=3,dampingVal=
     Returns
     -------
     imgs : xarray.Dataset
-        A copy(?) of the image Dataset with three new fields:
+        A copy of the image Dataset with three new fields:
             - imgs['dgmodel'] is the dayglow model
             - imgs['dgimg'] is the dayglow-corrected image (dayglow subtracked from the input image)
             - imgs['dgweight'] is the weights after the final iteration
     '''
     imgs = imgs.copy()
     
-    
-    
-    
-    
-    # imgs['fraction'] = np.cos(np.deg2rad(imgs['sza']))/np.cos(np.deg2rad(imgs['dza']))
     # Add temporal dimension if missing
     if len(imgs.sizes)==2: imgs = imgs.expand_dims('date')
 
     # Reshape the data
     sza   = imgs['sza'].stack(z=('row','col')).values
     dza   = imgs['dza'].stack(z=('row','col')).values
-    if transform=='log':
-        d = np.log(imgs[inImg].stack(z=('row','col')).values+1)
-    elif transform=='asinh':
-        background_mean = np.nanmean(imgs[inImg].values[imgs['bad'].values&(imgs['sza'].values>100|np.isnan(imgs['sza'].values))])
-        background_std = np.nanstd(imgs[inImg].values[imgs['bad'].values&(imgs['sza'].values>100|np.isnan(imgs['sza'].values))])
-        d = np.arcsinh((imgs[inImg].stack(z=('row','col')).values-background_mean)/background_std)        
-    else:
-        d = imgs[inImg].stack(z=('row','col')).values
+    d = imgs[inImg].stack(z=('row','col')).values
     glat  = imgs['glat'].stack(z=('row','col')).values
     remove = imgs['bad'].stack(z=('row','col')).values
 
     # Spatial knots and viewing angle correction
     if imgs['id'] in ['WIC','SI12','SI13','UVI']:
-        # fraction = np.exp(dzacorr*(1. - 1/np.cos(np.deg2rad(dza))))/np.cos(np.deg2rad(dza))*np.cos(np.deg2rad(sza))
         fraction = np.cos(np.deg2rad(sza))/np.cos(np.deg2rad(dza))
-        if sKnots is None: sKnots = [-5,-3,-1,-0.2,-0.1,0,0.1,0.2,1,3,5]
+        if sKnots is None: sKnots = [-3.5,-0.25,0,0.25,1.5,3.5]
     elif imgs['id'] == 'VIS':
         fraction = np.cos(np.deg2rad(sza))
-        if sKnots is None: sKnots= [-1,-0.2,-0.1,0,0.333,0.667,1]
+        if sKnots is None: sKnots= [-1,-0.1,0,0.1,0.4,1]
     sKnots = np.r_[np.repeat(sKnots[0],sOrder),sKnots, np.repeat(sKnots[-1],sOrder)]
 
     # Minuets since first image
@@ -233,22 +218,19 @@ def makeFig2c(imgs,outpath,idate,inImg='img',transform=None,sOrder=3,dampingVal=
 
     G_g=[]
     G_s=[]
-    
-    # G_s2=[]
     for i in range(n_t):
         G= BSpline(sKnots, np.eye(n_scp), sOrder)(fraction[i,:]) # Spatial design matirx
         G_t = np.zeros((n_s, n_scp*n_tcp))
-        # G_t2 = np.zeros((n_s, n_scp*n_tcp))
+
         for j in range(n_tcp):
             G_t[:, np.arange(j, n_scp*n_tcp, n_tcp)] = G*M[i, j]
-        # for j in range(n_scp):
-        #     G_t2[:,j*n_tcp:(j+1)*n_tcp] = np.outer(G[:,j],M[i,:])
+
 
         G_g.append(G)
         G_s.append(G_t)
-        # G_s2.append(G_t2)
+
     G_s=np.vstack(G_s)
-    # G_s2=np.vstack(G_s2)
+
 
     # Data
     ind = (sza >= 0) & (dza <= dzalim) & (glat >= minlat) & (np.isfinite(d)) & remove[None,:] & (fraction>sKnots[0]) & (fraction<sKnots[-1])
@@ -264,9 +246,8 @@ def makeFig2c(imgs,outpath,idate,inImg='img',transform=None,sOrder=3,dampingVal=
     d_s = d.flatten()
     ind = ind.flatten()
     ws = ws.flatten()
-    # ws = np.ones_like(d_s)
     w = np.ones(d_s.shape)
-    # sigma = np.zeros(d_s.shape)
+
     # Damping
     damping = dampingVal*np.ones(G_s.shape[1])
     R = np.diag(damping)
@@ -301,110 +282,23 @@ def makeFig2c(imgs,outpath,idate,inImg='img',transform=None,sOrder=3,dampingVal=
             sigmaBinned = np.full_like(d_s,np.nan)
             sigma[ind],sigmaBinned[ind] = weightedBinning(fraction.flatten()[ind], d.flatten()[ind],dm.flatten()[ind], w[ind]*ws[ind],sKnots)
 
-        # # # Heteroskedasitic consistent covariance
-        # # V = ((G_s[ind,:]*w[ind,None]*residuals[:,None]).T@(G_s[ind,:]*w[ind,None]*residuals[:,None]))
-        # GTG = (G_s[ind,:]*w[ind,None]*ws[ind,None]).T@(G_s[ind,:]*w[ind,None]*ws[ind,None])
-        # C = np.linalg.inv(GTG) @ ((G_s[ind,:]*w[ind,None]*ws[ind,None]*residuals[:,None]).T@(G_s[ind,:]*w[ind,None]*ws[ind,None]*residuals[:,None]))@np.linalg.inv(GTG)
-        # out=np.std(np.random.multivariate_normal(m_s,C,100),axis=0)
-
-        # # # # var_m = M@ (abs(np.diag(C))).reshape((n_scp, n_tcp)).T
-        # # # var_m=[]
-        # # # for i in range(n_scp*n_tcp):
-        # # #     var_m.append(M@out.reshape((n_scp, n_tcp)).T)
-        # var_m    = M@out.reshape((n_scp, n_tcp)).T
-        # sigma = []
-        # for i, tt in enumerate(time):
-        #     sigma.append(abs(G_g[i]@var_m[i, :]))
-        # sigma=np.array(sigma).squeeze().flatten()
-        # sigma = np.where(np.isnan(sigma),0,sigma)
-
-        # m_r = np.random.multivariate_normal(m_s,C,100)
-        # # return m_s,m_r
-        # dm_r = []
-        # for j in range(len(m_r)):
-        #     dm_r.append([])
-        #     mTemp = M@m_r[j,:].reshape((n_scp, n_tcp)).T
-        #     for i, tt in enumerate(time):
-        #         dm_r[j].append(G_g[i]@mTemp[i, :])
-        #     dm_r[j]=np.array(dm_r[j]).squeeze()  
-        # return M,m_s,dm,dm_r,C
-        # list_m.append(m_s)
-        # list_G.append(G_s[ind,:]*w[ind,None]*ws[ind,None])
-        # list_C.append(C)
-        
-        # TEST CO
-        
-        
-        # TEST covar with no time dep, maybe?
-        # G0 = np.vstack(G_g)
-        # G0TG0 = (G0[ind,:]*w[ind,None]*ws[ind,None]).T@(G0[ind,:]*w[ind,None]*ws[ind,None])
-        # C0 = np.linalg.inv(G0TG0) @ ((G0[ind,:]*w[ind,None]*ws[ind,None]*residuals[:,None]).T@(G0[ind,:]*w[ind,None]*ws[ind,None]*residuals[:,None]))@np.linalg.inv(G0TG0)
-        # S0 = G0TG0*C0
-        # Gk = BSpline(sKnots, np.eye(n_scp), sOrder)(sKnots)[sOrder-1:-sOrder+1]
-        # Sd = np.array([np.sqrt(np.sum(Gk[i,:][None,:]*S0)) for i in range(n_scp)])
-        # return Sd
-        # GTG = np.vstack(G_g)[ind,:].T@np.vstack(G_g)[ind,:]
-        
-        # Covar with no time dependence:
-        # G0 = np.vstack(G_g)
-        # C = np.linalg.inv((G0[ind,:]*w[ind,None]).T@(G0[ind,:]*w[ind,None])) @ ((G0[ind,:]*w[ind,None]*residuals[:,None]).T@(G0[ind,:]*w[ind,None]*residuals[:,None]))@np.linalg.inv((G0[ind,:]*w[ind,None]).T@(G0[ind,:]*w[ind,None]))
-        # return C
-        
-        # C = np.linalg.inv((G_s[ind,:]*w[ind,None]).T@(G_s[ind,:]*w[ind,None])) @ ((G_s[ind,:]*w[ind,None]*residuals[:,None]).T@(G_s[ind,:]*w[ind,None]*residuals[:,None]))#@np.linalg.inv((G_s[ind,:]*w[ind,None]).T@(G_s[ind,:]*w[ind,None]))
-        # sigma[ind] = np.sqrt(((G_s[ind,:]*w[ind,None])@C*(G_s[ind,:]*w[ind,None])).sum(-1))
-        # sigma = np.where(np.isnan(sigma),0,sigma)
-        # ## Sigma from binning
-        # binned_statistic(x, values, statistic='mean'
-        # # return C,var_m,sigma.flatten()[ind],rmse,residuals
-        # # sqrt(diag(X.T X)^(-1)X.T diag(e_i^(2)) X(X.T X)^(-1)
-        # # return ((G_s[ind,:]*w[ind,None]*residuals[:,None]).T@(G_s[ind,:]*w[ind,None]*residuals[:,None]))
-        # print(np.nanmean(dm.flatten()[ind][fraction.flatten()[ind]<0]))
-        # print(np.average(residuals[fraction.flatten()[ind]<0]**2,weights=w[ind][fraction.flatten()[ind]<0]))
-        # print(np.nanmean(dm.flatten()[ind][fraction.flatten()[ind]>=0]))
-        # print(np.average(residuals[fraction.flatten()[ind]>=0]**2,weights=w[ind][fraction.flatten()[ind]>=0]))
-        
-        # mean1=(np.nanmean(dm.flatten()[ind][fraction.flatten()[ind]<0]))
-        # mse1=(np.average(residuals[fraction.flatten()[ind]<0]**2,weights=w[ind][fraction.flatten()[ind]<0]))
-        # mean2=(np.nanmean(dm.flatten()[ind][fraction.flatten()[ind]>=0]))
-        # mse2=(np.average(residuals[fraction.flatten()[ind]>=0]**2,weights=w[ind][fraction.flatten()[ind]>=0]))
-        
-        # if mse1>=mse2:
-        #     sigma = np.sqrt(mse1) + 0*dm.flatten()
-        # else:
-        #     sigma = np.sqrt(mse1 + (mse2-mse1)*(dm.flatten()-mean1)/(mean2-mean1))
-        # # sigma = rmse/np.nanmean(dm.flatten()[ind])*dm.flatten()
-
-        # iw = ((residuals)/(tukeyVal*rmse))**2
         w[ind] = (1 - np.minimum(1,(residuals/(tukeyVal*sigma[ind]))**2))**2
-        # iw = ((residuals)/(tukeyVal*sigma[ind]))**2
-        # iw[iw>1] = 1
-        # w[ind] = (1-iw)**2
         
-        if diff == 1e10:
+        if iteration == 0:
             dm0 =dm
             sigma0 = sigma
             sigma0B = sigmaBinned
-            diff = 1e9
 
         if m is not None:
             diff = np.sqrt(np.mean((mNew-m)**2))/(1+np.sqrt(np.mean(mNew**2)))
-            diff2 = np.sqrt(np.nanmean((dm.flatten()[ind]-dmOld.flatten()[ind])**2))/(1+np.sqrt(np.nanmean(dm.flatten()[ind]**2)))
             print('Relative change model norm',diff)
-            print('Relative change model',diff2)
         m = mNew
         iteration += 1
 
-    print(np.sqrt(np.average(m_s**2)))
-    print(np.sqrt(np.average((residuals/sigma[ind])**2,weights=w[ind])))
 
     # Add dayglow model and corrected image to the Dataset
-    if transform=='log':
-        imgs['dgmodel'] = (['date','row','col'],(np.exp(dm)).reshape((n_t,len(imgs.row),len(imgs.col))))
-    elif transform == 'asinh':
-        imgs['dgmodel'] = (['date','row','col'],(np.sinh(dm)*background_std +background_mean).reshape((n_t,len(imgs.row),len(imgs.col))))
-    else:
-        imgs['dgmodel'] = (['date','row','col'],(dm).reshape((n_t,len(imgs.row),len(imgs.col))))
-        imgs['dgmodel0'] = (['date','row','col'],(dm0).reshape((n_t,len(imgs.row),len(imgs.col))))
+    imgs['dgmodel'] = (['date','row','col'],(dm).reshape((n_t,len(imgs.row),len(imgs.col))))
+    imgs['dgmodel0'] = (['date','row','col'],(dm0).reshape((n_t,len(imgs.row),len(imgs.col))))
     imgs['dgimg'] = imgs[inImg]-imgs['dgmodel']
     imgs['dgweight'] = (['date','row','col'],(w).reshape((n_t,len(imgs.row),len(imgs.col))))
     imgs['dgsigma'] = (['date','row','col'],(sigma).reshape((n_t,len(imgs.row),len(imgs.col))))
@@ -548,17 +442,10 @@ def makeFig2c(imgs,outpath,idate,inImg='img',transform=None,sOrder=3,dampingVal=
     ei0 = np.interp(xi,xm[np.isfinite(e0)],e0[np.isfinite(e0)],left=np.nan,right=np.nan)
 
     axs[3].plot(xi,mi0,c='C0',linestyle='-',label='Initial $I_{bs}$')
-    # axs[3].plot(xi,ei0,c='C0',linestyle=':',label='$\\sigma_{bs}$ first iteration')
     
     axs[3].plot(xi,mi,c='C1',linestyle='-',label='Final $I_{bs}$')
     axs[3].plot(xi,ei,c='C3',linestyle=':',label='$\\sigma_{bs}$')
-    # axs[3].plot(x[np.isfinite(b)],b[np.isfinite(b)],c='C1',linewidth=0.6)
-    # axs[3].fill_between(x[np.isfinite(m)],m[np.isfinite(m)]-e[np.isfinite(m)],m[np.isfinite(m)]+e[np.isfinite(m)],facecolor='C1',edgecolor=None,alpha=0.4)
-    
-    # axs[3].plot(x[np.isfinite(b0)],b0[np.isfinite(b0)],c='C0',linewidth=0.6)
-    # axs[3].fill_between(x[np.isfinite(m0)],m0[np.isfinite(m0)]-e0[np.isfinite(m0)],m0[np.isfinite(m0)]+e0[np.isfinite(m0)],facecolor='C0',edgecolor=None,alpha=0.4)
-    axs[3].set_xlim([-3.5,3.5])
-    # axs[2].set_ylim([0,15499]) 
+    axs[3].set_xlim([-3.5,3.5]) 
     axs[3].set_xlabel('$\\cos (\\alpha_s) / \cos(\\alpha_d)$')
     axs[3].set_ylabel('$I_{bs}$ and $\\sigma_{bs}$ [counts]')
     axs[3].set_yscale('log')
@@ -566,12 +453,9 @@ def makeFig2c(imgs,outpath,idate,inImg='img',transform=None,sOrder=3,dampingVal=
 
     sc= axs[2].scatter(x,y,c=w,s=0.5,vmin=0, vmax=1)
     axs[2].plot(xi,mi,c='C1')
-    # axs[2].fill_between(x[np.isfinite(m)],m[np.isfinite(m)]-e[np.isfinite(m)],m[np.isfinite(m)]+e[np.isfinite(m)],color='r',alpha=0.2)
-    # axs[2].plot(x[np.isfinite(m)],e[np.isfinite(m)],c='C1')
     axs[2].set_xlim([-3.5,3.5])
     axs[2].set_xticklabels([])
     axs[2].set_ylabel('Intensity [counts]')
-    # cbaxes = inset_axes(axs[1], width="1%", height="30%", loc=2) 
     cbaxes = axs[2].inset_axes([.85,.3,.1,.03])    
     cb = plt.colorbar(sc,cax=cbaxes, ticks=[0,0.5,1.], orientation='horizontal')
     cb.set_label('Weight')
@@ -588,7 +472,7 @@ def makeFig2c(imgs,outpath,idate,inImg='img',transform=None,sOrder=3,dampingVal=
     return  imgs
 
 
-def makeFig3(wic,s12,s13,outpath):
+def makeFig4(wic,s12,s13,outpath):
     ''' 
     Plot dayglow model overview for all cameras
     wic (xarray.Dataset): Wic image to be plotted. 
@@ -740,7 +624,7 @@ def makeFig3(wic,s12,s13,outpath):
     plt.clf()
     plt.close()
 
-def makeFig4(wic,s12,s13,outpath):
+def makeFig5(wic,s12,s13,outpath):
 
     
     fig = plt.figure(figsize=(11,9))
@@ -1078,37 +962,20 @@ def makeSHmodelTest(imgs,Nsh,Msh,order=2,dampingVal=0,tukeyVal=5,stop=1e-3,minla
 
     return imgs
 
-def runEvent(inpath,outpath):
-    # NO ws SH: 0.01,0.3,0.3
-    wic = xr.load_dataset(inpath + 'wic.nc')
-    wic = makeFig2c(wic,outpath,[66,67,68],sKnots=[-3.5,-0.25,0,0.25,1.5,3.5],stop=0.01,tKnotSep=240,minlat=-90,tukeyVal=5,dzalim=75,dampingVal=0.03)
-    wic = makeSHmodelTest(wic,4,4,knotSep=240,stop=0.01,tukeyVal=5,dampingVal=1e-4)
-    
-    s12 = xr.load_dataset(inpath + 's12.nc')
-    s12 = makeFig2c(s12,outpath,[66,67,68],sKnots=[-3.5,-0.25,0,0.25,1.5,3.5],stop=0.01,tKnotSep=240,minlat=-90,tukeyVal=5,dzalim=75,dampingVal=1)
-    s12 = makeSHmodelTest(s12,4,4,knotSep=240,stop=0.01,tukeyVal=5,dampingVal=0.3)
-    
-    s13 = xr.load_dataset(inpath + 's13.nc')
-    s13 = makeFig2c(s13,outpath,[66,67,68],sKnots=[-3.5,-0.25,0,0.25,1.5,3.5],stop=0.01,tKnotSep=240,minlat=-90,tukeyVal=5,dzalim=75,dampingVal=1)
-    s13 = makeSHmodelTest(s13,4,4,knotSep=240,stop=0.01,tukeyVal=5,dampingVal=1e1)
-    
-    return wic,s12,s13
 
-
-
-def lcurve(imgs,model='BS'):
-    L0s = np.r_[0,np.geomspace(1e-5,1e2,7+1)]
+# def lcurve(imgs,model='BS'):
+#     L0s = np.r_[0,np.geomspace(1e-5,1e2,7+1)]
     
-    norms = []
-    for i in range(len(L0s)):
-        if model == 'BS':
-            _,temp=findNormsBS(imgs,sKnots=[-3.5,-0.25,0,0.25,1.5,3.5],stop=0.01,tKnotSep=150,minlat=-90,tukeyVal=5,dzalim=75,dampingVal=L0s[i])
-        elif model= 'SH':
-            _,temp=findNormsBS(imgs,sKnots=[-3.5,-0.25,0,0.25,1.5,3.5],stop=0.01,tKnotSep=150,minlat=-90,tukeyVal=5,dzalim=75,dampingVal=L0s[i])
-        norms.append(temp)
+#     norms = []
+#     for i in range(len(L0s)):
+#         if model == 'BS':
+#             _,temp=findNormsBS(imgs,sKnots=[-3.5,-0.25,0,0.25,1.5,3.5],stop=0.01,tKnotSep=150,minlat=-90,tukeyVal=5,dzalim=75,dampingVal=L0s[i])
+#         elif model == 'SH':
+#             _,temp=findNormsBS(imgs,sKnots=[-3.5,-0.25,0,0.25,1.5,3.5],stop=0.01,tKnotSep=150,minlat=-90,tukeyVal=5,dzalim=75,dampingVal=L0s[i])
+#         norms.append(temp)
     
-    plt.loglog(norm_r,norm_m,'.-')
-    return norm_m,norm_r
+#     plt.loglog(norm_r,norm_m,'.-')
+#     return norm_m,norm_r
 
 
     
