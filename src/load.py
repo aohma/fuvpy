@@ -183,6 +183,7 @@ def _badPixels(imgs):
     elif imgs['id'] == 'SI13': #
         ind = np.ones((128,128),dtype=bool)
         ind[:8,:] = False
+        ind[120:,:] = False
     elif imgs['id'] == 'VIS':
         ind = np.ones((256,256),dtype=bool)
         ind[:,:4]=False

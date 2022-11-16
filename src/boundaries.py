@@ -218,10 +218,41 @@ def findBoundaries(imgs,inImg='shimg',mltRes=24,limFactors=None,order=3,dampingV
     ds['eqb'].attrs = {'long_name': 'Equatorward boundary','unit':'deg'}
     return ds
 
-def makeBoundaryModel(ds,stop=1e-3,dampingValE=2e0,dampingValP=2e1,n_termsE=3,n_termsP=6,order = 3,knotSep = 10):
+def solveInverseIteratively(G_s,d_s,ind,time,R,M,G,n_G,n_cp,stop):
+    # Iteratively estimation of model parameters
+    diff = 10000
+    w = np.ones(d_s[ind].shape)
+    m = None
+    iteration = 0
+    while (diff > stop)&(iteration<100):
+        print('Iteration:',iteration)
+        ms = np.linalg.inv((G_s[ind,:]*w[:,None]).T@(G_s[ind,:]*w[:,None])+R)@(G_s[ind,:]*w[:,None]).T@(d_s[ind]*w)
+        ms = ms.reshape((n_G, n_cp)).T
+
+        mNew    = M@ms
+        mtau=[]
+        for i, tt in enumerate(time):
+            mtau.append(G@mNew[i, :])
+        mtau=np.array(mtau).squeeze()
+
+        residuals = mtau.flatten()[ind] - d_s[ind]
+        rmse = np.sqrt(np.average(residuals**2,weights=w))
+
+        # Change to Tukey?
+        weights = 1.5*rmse/np.abs(residuals)
+        weights[weights > 1] = 1.
+        w = weights
+        if m is not None:
+            diff = np.sqrt(np.mean((mNew - m)**2))/(1+np.sqrt(np.mean(mNew**2)))
+            print('Relative change model norm', diff)
+
+        m = mNew
+        iteration += 1
+    return ms,m,rmse,w
+
+def makeBoundaryModelF(ds,stop=1e-3,dampingValE=2e0,dampingValP=2e1,n_termsE=3,n_termsP=6,order = 3,knotSep = 10):
     '''
     Function to make a spatiotemporal Fourier model of auroral boundaries.
-    INCLUDE L-CURVE script
 
     Parameters
     ----------
@@ -314,44 +345,14 @@ def makeBoundaryModel(ds,stop=1e-3,dampingValE=2e0,dampingValP=2e1,n_termsE=3,n_
     for i in range(n_G): LTL[i*n_cp:(i+1)*n_cp,i*n_cp:(i+1)*n_cp] = L.T@L
     R = dampingValE*LTL + np.diag(damping)
     
-
-    
-
-    # Iteratively estimation of model parameters
-    diff = 10000
-    w = np.ones(d_s[ind].shape)
-    m = None
-    iteration = 0
-    while (diff > stop)&(iteration<100):
-        print('Iteration:',iteration)
-        ms = np.linalg.inv((G_s[ind,:]*w[:,None]).T@(G_s[ind,:]*w[:,None])+R)@(G_s[ind,:]*w[:,None]).T@(d_s[ind]*w)
-        ms = ms.reshape((n_G, n_cp)).T
-
-        mNew    = M@ms
-        mtau=[]
-        for i, tt in enumerate(time):
-            mtau.append(G@mNew[i, :])
-        mtau=np.array(mtau).squeeze()
-
-        residuals = mtau.flatten()[ind] - d_s[ind]
-        rmse = np.sqrt(np.average(residuals**2,weights=w))
-
-        # Change to Tukey?
-        weights = 1.5*rmse/np.abs(residuals)
-        weights[weights > 1] = 1.
-        w = weights
-        if m is not None:
-            diff = np.sqrt(np.mean((mNew - m)**2))/(1+np.sqrt(np.mean(mNew**2)))
-            print('Relative change model norm', diff)
-
-        m = mNew
-        iteration += 1
+    # Iteratively solve the full inverse problem
+    ms,m,rmse,w=solveInverseIteratively(G_s,d_s,ind,time,R,M,G,n_G,n_cp,stop)
 
 
-    # Model and residual norm
-    m_eb = m
-    norm_eb_m = np.sqrt(np.average((L@ms).flatten()**2))
-    norm_eb_r = rmse
+    # # Model and residual norm
+    # m_eb = m
+    # norm_eb_m = np.sqrt(np.average((L@ms).flatten()**2))
+    # norm_eb_r = rmse
 
     # Data kernel evaluation
     mlt_eval      = np.linspace(0,24,24*10+1)
@@ -411,7 +412,7 @@ def makeBoundaryModel(ds,stop=1e-3,dampingValE=2e0,dampingValP=2e1,n_termsE=3,n_
     #%% Poleward boundary model
     theta_pb = np.deg2rad(90 - ds['ocb'].stack(z=('lim','mlt')).values)
 
-    theta_pb1 = theta_pb/mtau
+    theta_pb1 = theta_pb/tau_eb[::10]
 
     # Temporal design matix
     M = BSpline(knots, np.eye(n_cp), order)(time)
@@ -455,39 +456,13 @@ def makeBoundaryModel(ds,stop=1e-3,dampingValE=2e0,dampingValP=2e1,n_termsE=3,n_
     for i in range(n_G): LTL[i*n_cp:(i+1)*n_cp,i*n_cp:(i+1)*n_cp] = L.T@L
     R = dampingValP*LTL+np.diag(damping)
 
-    # Iteratively estimation of model parameters
-    diff = 10000
-    w = np.ones(d_s[ind].shape)
-    m = None
-    iteration = 0
-    while diff > stop:
-        print('Iteration:',iteration)
-        ms = np.linalg.inv((G_s[ind,:]*w[:,None]).T@(G_s[ind,:]*w[:,None])+R)@(G_s[ind,:]*w[:,None]).T@(d_s[ind]*w)
-        ms = ms.reshape((n_G, n_cp)).T
-        # Retrieve B-spline smooth model paramters (coarse)
-        mNew    = M@ms
+    # Iteratively solve the full inverse problem
+    ms,m,rmse,w=solveInverseIteratively(G_s,d_s,ind,time,R,M,G,n_G,n_cp,stop)
 
-        mtau2=[]
-        for i, tt in enumerate(time):
-            mtau2.append(G@mNew[i, :])
-        mtau2=np.array(mtau2).squeeze()
-
-        residuals = mtau2.flatten()[ind] - d_s[ind]
-        rmse = np.sqrt(np.average(residuals**2,weights=w))
-        weights = 1.5*rmse/np.abs(residuals)
-        weights[weights > 1] = 1.
-        w = weights
-        if m is not None:
-            diff = np.sqrt(np.mean((mNew - m)**2))/(1+np.sqrt(np.mean(mNew**2)))
-            print('Relative change model norm', diff)
-
-        m = mNew
-        iteration += 1
-
-    # Model and residual norm
-    m_pb = m
-    norm_pb_m = np.sqrt(np.average((L@ms).flatten()**2))
-    norm_pb_r = rmse
+    # # Model and residual norm # ONLY VALID FOR 
+    # m_pb = m
+    # norm_pb_m = np.sqrt(np.average((L@ms).flatten()**2))
+    # norm_pb_r = rmse
 
     # Data kernel evaluation
     G=[]
@@ -579,13 +554,13 @@ def makeBoundaryModel(ds,stop=1e-3,dampingValE=2e0,dampingValP=2e1,n_termsE=3,n_
     ds2['v_theta'].attrs = {'long_name': '$V_\\theta$','unit':'m/s'}
     ds2['u_phi'].attrs = {'long_name': '$U_\\phi$','unit':'m/s'}
     ds2['u_theta'].attrs = {'long_name': '$U_\\theta$','unit':'m/s'}
-    return ds2,(norm_eb_m,norm_eb_r,norm_pb_m,norm_pb_r),(m_eb,m_pb)
+    return ds2
 
 
-def makeBoundaryModelBSpline(ds,stop=1e-3,eL1=0,eL2=0,pL1=0,pL2=0,tOrder = 3,tKnotSep = 10):
+def makeBoundaryModelBS(ds,stop=1e-3,eL1=0,eL2=0,pL1=0,pL2=0,tOrder = 3,tKnotSep = 10,estimateError=False,return_norms=False):
     '''
     Function to make a spatiotemporal model of auroral boundaries using periodic B-splines.
-    Note: The periodic B-splines are presently hard coded. Update this when scipy 1.10 is released!
+    Note: The periodic B-splines are presently hard coded. Update when scipy 1.10 is released!
 
 
     Parameters
@@ -681,41 +656,12 @@ def makeBoundaryModelBSpline(ds,stop=1e-3,eL1=0,eL2=0,pL1=0,pL2=0,tOrder = 3,tKn
     for i in range(n_G): L2TL2[i*n_tcp:(i+1)*n_tcp,i*n_tcp:(i+1)*n_tcp] = L2.T@L2
     R =eL1*LTL+eL2*L2TL2
     
-    # Iteratively estimation of model parameters
-    diff = 10000
-    w = np.ones(d_s[ind].shape)
-    m = None
-    iteration = 0
-    while (diff > stop)&(iteration<100):
-        print('Iteration:',iteration)
-        ms = np.linalg.inv((G_s[ind,:]*w[:,None]).T@(G_s[ind,:]*w[:,None])+R)@(G_s[ind,:]*w[:,None]).T@(d_s[ind]*w)
-        ms = ms.reshape((n_G, n_tcp)).T
-
-        mNew    = M@ms
-        mtau=[]
-        for i, tt in enumerate(time):
-            mtau.append(G@mNew[i, :])
-        mtau=np.array(mtau).squeeze()
-
-        residuals = mtau.flatten()[ind] - d_s[ind]
-        rmse = np.sqrt(np.average(residuals**2,weights=w))
-
-        # Change to Tukey?
-        weights = 1.5*rmse/np.abs(residuals)
-        weights[weights > 1] = 1.
-        w = weights
-        if m is not None:
-            diff = np.sqrt(np.mean((mNew - m)**2))/(1+np.sqrt(np.mean(mNew**2)))
-            print('Relative change model norm', diff)
-
-        m = mNew
-        iteration += 1
+    # Iteratively solve the full inverse problem
+    ms,m_eb,rmse,w=solveInverseIteratively(G_s,d_s,ind,time,R,M,G,n_G,n_tcp,stop)
 
 
-    # Model and residual norm
-    m_eb = m
-    norm_eb_m = np.sqrt(np.average((L@ms).flatten()**2))
-    norm_eb_r = rmse
+
+    # EVALUATION PER MIN?
 
     # Evaluation design matrix
     mlt_eval = np.arange(0,2*np.pi,2*np.pi/240)
@@ -724,7 +670,7 @@ def makeBoundaryModelBSpline(ds,stop=1e-3,eL1=0,eL2=0,pL1=0,pL2=0,tOrder = 3,tKn
 
     tau1=[]
     for i, tt in enumerate(time):
-        tau1.append(G@m[i, :])
+        tau1.append(G@m_eb[i, :])
     tau1=np.array(tau1).squeeze()
 
     # Transform to unprimed
@@ -775,12 +721,36 @@ def makeBoundaryModelBSpline(ds,stop=1e-3,eL1=0,eL2=0,pL1=0,pL2=0,tOrder = 3,tKn
     u_phi = R_I*np.sin(tau_eb)*dphi_dt/60
     u_theta = R_I*dtheta_dt/60
 
+    # if return_norms:
+    #     rmse_eb = rmse
+    #     norm_eb_m = np.sqrt(np.average((L@ms).flatten()**2))
+    #     norm_eb_r = np.sqrt(np.average(residuals**2,weights=w))
 
+    if estimateError=='cov':
+        # Cs =  1/(rmse**2)*np.linalg.inv((G_s[ind,:]*w[:,None]).T@(G_s[ind,:]*w[:,None]))   
+        Cs  = rmse**2*(np.linalg.inv((G_s[ind,:]*w[:,None]).T@(G_s[ind,:]*w[:,None])+R)@(G_s[ind,:]*w[:,None]).T)@(np.linalg.inv((G_s[ind,:]*w[:,None]).T@(G_s[ind,:]*w[:,None])+R)@(G_s[ind,:]*w[:,None]).T).T
+        # A = G @ Cs * G.t 
+        n_r = 1000
+        rms = np.random.multivariate_normal(ms.T.flatten(),Cs,n_r)
+        rtau = np.full((tau_eb.shape[0],tau_eb.shape[1],n_r),np.nan)
+        
+        for r in range(n_r):
+            rm = M@(rms[r,:].reshape((n_G, n_tcp)).T)
+            tau1=[]
+            for i, tt in enumerate(time):
+                tau1.append(G@rm[i, :])
+            tau1=np.array(tau1).squeeze()
+    
+            # Transform to unprimed
+            rtau[:,:,r]  = np.exp(tau1)
+        return tau_eb,rtau
+    # elif estimateError=='bootstrap':
+        
     #%% Poleward boundary model
     
     
     theta_pb = np.deg2rad(90 - ds['ocb'].stack(z=('lim','mlt')).values)
-    theta_pb1 = theta_pb/np.exp(mtau)
+    theta_pb1 = theta_pb/np.exp(tau_eb[::10])
 
     # Temporal design matix
     M = BSpline(tKnots, np.eye(n_tcp), tOrder)(time)
@@ -822,39 +792,13 @@ def makeBoundaryModelBSpline(ds,stop=1e-3,eL1=0,eL2=0,pL1=0,pL2=0,tOrder = 3,tKn
     for i in range(n_G): L2TL2[i*n_tcp:(i+1)*n_tcp,i*n_tcp:(i+1)*n_tcp] = L2.T@L2
     R = pL1*LTL+pL2*L2TL2
     
-    # Iteratively estimation of model parameters
-    diff = 10000
-    w = np.ones(d_s[ind].shape)
-    m = None
-    iteration = 0
-    while diff > stop:
-        print('Iteration:',iteration)
-        ms = np.linalg.inv((G_s[ind,:]*w[:,None]).T@(G_s[ind,:]*w[:,None])+R)@(G_s[ind,:]*w[:,None]).T@(d_s[ind]*w)
-        ms = ms.reshape((n_G, n_tcp)).T
-        # Retrieve B-spline smooth model paramters (coarse)
-        mNew    = M@ms
-
-        mtau2=[]
-        for i, tt in enumerate(time):
-            mtau2.append(G@mNew[i, :])
-        mtau2=np.array(mtau2).squeeze()
-
-        residuals = mtau2.flatten()[ind] - d_s[ind]
-        rmse = np.sqrt(np.average(residuals**2,weights=w))
-        weights = 1.5*rmse/np.abs(residuals)
-        weights[weights > 1] = 1.
-        w = weights
-        if m is not None:
-            diff = np.sqrt(np.mean((mNew - m)**2))/(1+np.sqrt(np.mean(mNew**2)))
-            print('Relative change model norm', diff)
-
-        m = mNew
-        iteration += 1
-
-    # Model and residual norm
-    m_pb = m
-    norm_pb_m = np.sqrt(np.average((L@ms).flatten()**2))
-    norm_pb_r = rmse
+    # Iteratively solve the full inverse problem
+    ms,m,rmse,w=solveInverseIteratively(G_s,d_s,ind,time,R,M,G,n_G,n_tcp,stop)
+    
+    # # Model and residual norm
+    # m_pb = m
+    # norm_pb_m = np.sqrt(np.average((L@ms).flatten()**2))
+    # norm_pb_r = rmse
 
     # Evaluation
     Gtemp = BSpline(sKnots, np.eye(n_scp), sOrder)(mlt_eval)
@@ -943,7 +887,7 @@ def makeBoundaryModelBSpline(ds,stop=1e-3,eL1=0,eL2=0,pL1=0,pL2=0,tOrder = 3,tKn
     ds2['v_theta'].attrs = {'long_name': '$V_\\theta$','unit':'m/s'}
     ds2['u_phi'].attrs = {'long_name': '$U_\\phi$','unit':'m/s'}
     ds2['u_theta'].attrs = {'long_name': '$U_\\theta$','unit':'m/s'}
-    return ds2,(norm_eb_m,norm_eb_r,norm_pb_m,norm_pb_r),(m_eb,m_pb)    
+    return ds2
     
 def calcFlux(ds,height=130):
     '''

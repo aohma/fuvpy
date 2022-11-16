@@ -15,222 +15,13 @@ import matplotlib.gridspec as gridspec
 from scipy.interpolate import BSpline
 from scipy.linalg import lstsq
 from scipy.stats import binned_statistic_2d
-import statsmodels.api as sm
+# import statsmodels.api as sm
 import fuvpy as fuv
-from polplot import pp
+from polplot import pp,sdarngrid,bin_number
 import matplotlib.path as path
 from scipy.stats import binned_statistic
-# events = glob.glob('/Users/aohma/BCSS-DAG Dropbox/Anders Ohma/data/fuv200012/north/*')
-# events.sort()
+from scipy.optimize import curve_fit
 
-# for e in events[2:3]:
-#     wicfiles = glob.glob(e+'/*.idl')   
-#     wic = fuv.readFUVimage(wicfiles)
-#     wic = fuv.makeFUVdayglowModel(wic,transform='log')
-#     wic = fuv.makeFUVshModel(wic,4,4)
-    
- 
-    # wic.to_netcdf('/Users/aohma/BCSS-DAG Dropbox/Anders Ohma/data/fuv200012/wic_'+e[63:]+'.nc')
-# events = glob.glob('/Users/aohma/BCSS-DAG Dropbox/Anders Ohma/data/fuv200012/north/*')
-# events.sort()
-
-# for e in events:
-#     wicfiles = glob.glob(e+'/*.idl')   
-#     wic = readFUVimage(wicfiles)
-#     wic = makeFUVdayglowModelC(wic,transform='log')
-#     wic = makeFUVshModelNew(wic,4,4)
-    
-#     wic.to_netcdf('/Users/aohma/BCSS-DAG Dropbox/Anders Ohma/data/fuv200012/wic_'+e[63:]+'.nc')
-
-# wicfiles = glob.glob('/Users/aohma/BCSS-DAG Dropbox/TMP/lompe_tutorial_2022-02-20/simon_event/wic_data/*.idl')   
-# wic = readFUVimage(wicfiles)
-# wic = makeFUVdayglowModelC(wic,transform='log')
-# wic = makeFUVshModelNew(wic,4,4)
-# wic.to_netcdf('/Users/aohma/BCSS-DAG Dropbox/TMP/lompe_tutorial_2022-02-20/simon_event/wic_20020519.nc')
-
-
-# Field to include:
-# ind,date,row,col,mlat,mlt,hemisphere,img,dgimg,shimg,onset,rind 
-
-# HDD events
-
-# find time between images
-
-# events = sorted(glob.glob('/Volumes/Seagate Backup Plus Drive/fuv/wic/idl/north/*'))
-
-# for e in events:
-#     wicfiles = glob.glob(e+'/*.idl')   
-#     wic = fuv.readImg(wicfiles)
-     
-#     wic = fuv.makeDGmodelTest(wic,stop=1e-3,tKnotSep=240,minlat=40)
-#     wic = fuv.makeSHmodel(wic,4,4,stop=1e-3,knotSep=240)
-#     wic.to_netcdf('/Volumes/Seagate Backup Plus Drive/fuv/wic/nc/wic_'+e[53:]+'.nc')
-
-
-events = glob.glob('/Volumes/Seagate Backup Plus Drive/fuv/wic/idl/north/*')
-events.sort()
-
-ddate = []
-ddates = []
-for e in events:
-    wicfiles = glob.glob(e+'/*.idl')   
-#     wic = fuv.readImg(wicfiles)
-#     ddate.append(wic.date.diff(dim='date').mean().values/ np.timedelta64(1, 's'))
-#     ddates.append(wic.date.diff(dim='date').values/ np.timedelta64(1, 's'))
-    
-#     wic = makeFUVdayglowModelC(wic,transform='log')
-#     wic = makeFUVshModelNew(wic,4,4)
-    
-#     wic.to_netcdf('/Volumes/Seagate Backup Plus Drive/fuv/wic/nc/wic_'+e[53:]+'.nc')
-
-# HDD events s12
-
-# events = glob.glob('/Volumes/Seagate Backup Plus Drive/fuv/s12/idl/north/*')
-# events.sort()
-
-# for e in events:
-#     wicfiles = glob.glob(e+'/*.idl')   
-#     wic = readFUVimage(wicfiles)
-#     wic = makeFUVdayglowModelC(wic)
-#     wic['shmodel'] = wic['dgmodel']
-#     wic['shimg'] = wic['dgimg']
-#     wic['shweight'] = wic['dgweight']
-    
-#     wic.to_netcdf('/Volumes/Seagate Backup Plus Drive/fuv/s12/nc/s12_'+e[53:]+'.nc')
-
-# wicfiles = glob.glob('/Users/aohma/BCSS-DAG Dropbox/Anders Ohma/data/wic/2001-06-01-2nd/*.idl')   
-# wic = fuv.readImg(wicfiles)
-# wic = fuv.makeDGmodel(wic,transform='log',stop=1e-2,tKnotSep=240)
-# wic = fuv.makeSHmodel(wic,4,4,stop=1e-2,knotSep=240)
-
-# wicfiles = glob.glob('/Users/aohma/BCSS-DAG Dropbox/Anders Ohma/python/git/fuvpy/data/wicFiles/*.idl')   
-# wic = fuv.readImg(wicfiles)
-# wic = fuv.makeDGmodel(wic,transform='log')
-# wic = fuv.makeSHmodel(wic,4,4)
-
-# events = sorted(glob.glob('/Volumes/Seagate Backup Plus Drive/fuv/wic/nc/wic*'))
-# for e in events:
-#     wic = xr.load_dataset(e)
-#     bi = fuv.findBoundaries(wic,dampingVal=1e1)
-#     bm = fuv.makeBoundaryModel(bi,knotSep=10,dampingValE=1e1,dampingValP=1e1)[0]
-#     bb = fuv.makeBoundaryModelBSpline(bi,tKnotSep=10,dampingValE=1e1,dampingValP=1e1)[0]
-#     # bm = fuv.calcFlux(bm)
-#     # bm = fuv.calcIntensity(wic,bm)
-    
-#     bi.to_netcdf('/Volumes/Seagate Backup Plus Drive/fuv/wic/nc/bi_'+e[-17:])
-#     bm.to_netcdf('/Volumes/Seagate Backup Plus Drive/fuv/wic/nc/bm_'+e[-17:])
-#     bb.to_netcdf('/Volumes/Seagate Backup Plus Drive/fuv/wic/nc/bb_'+e[-17:])
-
-# Boundaries
-# events = sorted(glob.glob('/Users/aohma/BCSS-DAG Dropbox/Anders Ohma/data/fuv200012/nc/wic*'))
-# events = sorted(glob.glob('/Volumes/Seagate Backup Plus Drive/fuv/wic/nc/wic*'))
-
-# for e in events[:1]:
-#     wic = xr.load_dataset(e)
-    # bi = fuv.findBoundaries(wic,dampingVal=1e1)
-    # bb = fuv.makeBoundaryModelBSpline(bi,tKnotSep=10,eL1=1e1,eL2=1e1,pL1=1e0,pL2=1e1)[0]
-
-    # bb = fuv.calcFlux(bb)
-    # bb = fuv.calcIntensity(wic,bb)
-    
-    # bi.to_netcdf('/Users/aohma/BCSS-DAG Dropbox/Anders Ohma/data/fuv200012/nc/bi_'+e[-17:])
-    # bb.to_netcdf('/Users/aohma/BCSS-DAG Dropbox/Anders Ohma/data/fuv200012/nc/bb_'+e[-17:]) 
-
-# bi = fuv.findBoundaries(wic)
-# bm = fuv.makeBoundaryModel(bi,dampingValE=0.001,dampingValP=0.001)
-
-# fi1 = fuv.calcFlux(bi.sel(lim=1))
-# fm1 = fuv.calcFlux(bm)
-# fi2 = fuv.calcFlux2(bi.sel(lim=1))
-# fm2 = fuv.calcFlux2(bm)
-
-# plt.figure()
-# # fi1['openFlux'].plot()
-# # fm1['openFlux'].plot()
-# fi2['openFlux'].plot()
-# fm2['openFlux'].plot()
-
-# plt.figure()
-# # fi1['auroralFlux'].plot()
-# # fm1['auroralFlux'].plot()
-# fi2['auroralFlux'].plot()
-# fm2['auroralFlux'].plot()
-
-## L-curve test and "discrepancy" test
-# events = sorted(glob.glob('/Users/aohma/BCSS-DAG Dropbox/Anders Ohma/data/fuv200012/nc/wic*'))
-# # lmbds = np.r_[0,np.geomspace(1e-4,1e5,10)]
-# lmbds1 = np.array([1e-4,1e0,1e1,1e2,1e1,1e1,1e1,1e1])
-# lmbds2 = np.array([0,0  ,0  ,0  ,1e0,1e1,1e2,1e3])
-# n = len(lmbds1)
-
-# bbs = []
-# b_norm_r = []
-# b_norm_m = []
-
-# for e in events:
-#     wic = xr.load_dataset(e)
-#     bi = fuv.findBoundaries(wic,dampingVal=1e1)
-#     # Gtemp,G = fuv.makeBoundaryModelBSpline(bi,tKnotSep=10,dampingValE=0,dampingValP=0)
-#     for i in range(n):
-#         # bm = fuv.makeBoundaryModel(bi,knotSep=10,dampingValE=l,dampingValP=1)[2]
-#         blist = fuv.makeBoundaryModelBSpline(bi,tKnotSep=10,eL1=lmbds1[i],eL2=lmbds2[i],pL1=1e10)
-#         # f_norm_r.append(bm[1])
-#         # f_norm_m.append(bm[0])
-#         bb = blist[0]
-#         r = (90. - np.abs(bb['eqb']))
-#         a = (bb.mlt.values - 6.)/12.*np.pi
-#         bb['ex'] =  113.5*r*np.cos(a)
-#         bb['ey'] =  113.5*r*np.sin(a)
-#         r = (90. - np.abs(bb['ocb']))
-#         a = (bb.mlt.values - 6.)/12.*np.pi
-#         bb['px'] =  113.5*r*np.cos(a)
-#         bb['py'] =  113.5*r*np.sin(a)
-#         bbs.append(bb)
-#         b_norm_r.append(blist[1][1])
-#         b_norm_m.append(blist[1][0])
-
-# bbc = []
-# for i in range(n):
-#     bbc.append(xr.concat([bbs[j] for j in range(i,len(bbs),n)], dim='date'))
-
-
-# ## "Discrepancy" test
-# events = sorted(glob.glob('/Users/aohma/BCSS-DAG Dropbox/Anders Ohma/data/fuv200012/nc/wic*'))
-# #lmbds = np.geomspace(1e-5,1e6,12)
-# lmbds = np.r_[0,np.geomspace(1e-4,1e5,10)]
-# bbs = []
-
-# for e in events[2:3]:
-#     wic = xr.load_dataset(e)
-#     bi = fuv.findBoundaries(wic,dampingVal=1e1)
-#     # Gtemp,G = fuv.makeBoundaryModelBSpline(bi,tKnotSep=10,dampingValE=0,dampingValP=0)
-#     for l in lmbds:
-#         # bm = fuv.makeBoundaryModel(bi,knotSep=10,dampingValE=l,dampingValP=1)[2]
-#         bb = fuv.makeBoundaryModelBSpline(bi,tKnotSep=10,eL1=1e1,eL2=1e3,pL1=1e0,pL2=l)[0]
-#         # f_norm_r.append(bm[1])
-#         # f_norm_m.append(bm[0])
-#         # b_norm_r.append(bb[1])
-#         # b_norm_m.append(bb[0])
-        
-#         r = (90. - np.abs(bb['ocb']))
-#         a = (bb.mlt.values - 6.)/12.*np.pi
-#         bb['ex'] = 113.5*r*np.cos(a)
-#         bb['ey'] = 113.5*r*np.sin(a)
-#         bbs.append(bb)
-        
-
-
-# pplot(wic.isel(date=slice(2,6)),'img',robust=True,cbar_kwargs={'extend':'both'})
-# pplot(wic.isel(date=slice(2,6)),'img',row=True)
-# pplot(wic.isel(date=slice(2,6)),'img',col_wrap=2)
-
-# pplot(wic.isel(date=slice(2,6)),'img',cbar_kwargs={'orientation':'horizontal'})
-# pplot(wic.isel(date=slice(2,6)),'img',row=True,cbar_kwargs={'orientation':'horizontal'})
-# pplot(wic.isel(date=slice(2,6)),'img',col_wrap=2,cbar_kwargs={'orientation':'horizontal','extend':'max'})
-
-# pplot(wic.isel(date=slice(2,6)),'img',add_cbar = False)
-# pplot(wic.isel(date=slice(2,6)),'img',row=True,add_cbar = False)
-# pplot(wic.isel(date=slice(2,6)),'img',col_wrap=2,add_cbar = False)
 
 def makeData():
     wicfiles = glob.glob('/Users/aohma/BCSS-DAG Dropbox/Anders Ohma/projects/aurora_dayglow/fuv_2000-08-28-1st/idl/wic/*')
@@ -252,8 +43,8 @@ def makeData():
     s12.to_netcdf('/Users/aohma/BCSS-DAG Dropbox/Anders Ohma/projects/aurora_dayglow/fuv_2000-08-28-1st/s12.nc')
     s13.to_netcdf('/Users/aohma/BCSS-DAG Dropbox/Anders Ohma/projects/aurora_dayglow/fuv_2000-08-28-1st/s13.nc')    
  
-def weightedBinning(fraction,d,dm,w,sKnots,n_scp,sOrder):
-    bins = np.r_[sKnots[0],np.linspace(0,sKnots[-1],51)]
+def weightedBinning(fraction,d,dm,w,sKnots):
+    bins = np.r_[sKnots[0],np.arange(0,sKnots[-1]+0.25,0.25)]
     # bins = np.quantile(fraction,np.linspace(0,1,101))
     # bins = np.r_[-1e10,bins,1e10]
     binnumber = np.digitize(fraction,bins)
@@ -266,36 +57,33 @@ def weightedBinning(fraction,d,dm,w,sKnots,n_scp,sOrder):
         else:
             rmse[ind]=np.sqrt(np.average((d[ind]-dm[ind])**2,weights=w[ind]))
     
-    ind2 = np.isfinite(rmse) & (dm>0)
+    ind2 = np.isfinite(rmse)
     # Fit using Bspline
     
     # test with smoother knots
     
     # G= BSpline(sKnots, np.eye(n_scp), sOrder)(fraction)
+    # m =np.linalg.lstsq(G[ind2].T@G[ind2],G[ind2].T@np.log(rmse[ind2]**2),rcond=None)[0]
+    
+    # # test with linear 
+    # G = np.vstack((dm,np.ones_like(dm))).T
     # m =np.linalg.lstsq(G[ind2].T@G[ind2],G[ind2].T@rmse[ind2],rcond=None)[0]
     
-    # test with linear 
-    G = np.vstack((dm,np.ones_like(dm))).T
-    m =np.linalg.lstsq(G[ind2].T@G[ind2],G[ind2].T@rmse[ind2],rcond=None)[0]
+    # # test with linear 
+    # G = np.vstack((dm**2,np.ones_like(dm))).T
+    # m =np.linalg.lstsq(G[ind2].T@G[ind2],G[ind2].T@rmse[ind2]**2,rcond=None)[0]
     
-    # test with linear 
-    G = np.vstack((dm**2,np.ones_like(dm))).T
-    m =np.linalg.lstsq(G[ind2].T@G[ind2],G[ind2].T@rmse[ind2]**2,rcond=None)[0]
+    # Test, non-linear fit
+    def func(x,a,b):
+        return a*x+b
     
-    return np.sqrt(G@m),rmse
+    popt, pcov=curve_fit(func, dm[ind2]**2, rmse[ind2]**2, bounds=(0,np.inf))
+    # rmseFit=np.full_like(d,np.nan)
+    # rmseFit[ind2]=np.sqrt(popt)
+    rmseFit = np.sqrt(func(dm**2,*popt))
     
-def makeFig1(wic,outpath):
-    ''' 
-    Plot a few WIC images
-    wic : Dataset with the images to be plotted
-    outpath : path to where the image is saved
+    return rmseFit,rmse
     
-    '''  
-    
-    wic['img'].plot(x='col',y='row',col='date',vmin=0,vmax=12000,xticks=[],yticks=[],subplot_kws={'xlabel':''},cbar_kwargs={'label':'WIC intensity [counts]'})
-    plt.savefig(outpath + 'wicExample.png',bbox_inches='tight',dpi = 300)
-    plt.clf()
-    plt.close()
     
 def makeFig1c(wic,s12,s13,idate,outpath):
     ''' 
@@ -343,147 +131,7 @@ def makeFig1b(inpath,outpath,idate):
     plt.savefig(outpath + 'wicFF.png',bbox_inches='tight',dpi = 300)
     plt.clf()
     plt.close()
-def makeFig2(wic,outpath):
-    ''' 
-    Plot B-splines and dayglow fit for a wic image
-    wic : Dataset with the image to be plotted. Must be a single date.
-    outpath (str) : Path to where the image is saved
-    '''
-    wic = wic.copy()
-    if len(wic.sizes)!=2: 
-        raise Exception('multiple dates given.')
-    
-    
-    fig,axs = plt.subplots(3,1,figsize=(9,6.5),constrained_layout = True)
-    
 
-    
-    # B-spline
-    sOrder = 3
-    sKnots = [-5,-3,-1,-0.2,-0.1,0,0.1,0.2,1,3,5]
-    sKnots = np.r_[np.repeat(sKnots[0],sOrder),sKnots, np.repeat(sKnots[-1],sOrder)]
-    n_scp = len(sKnots)-sOrder-1
-    G= BSpline(sKnots, np.eye(n_scp), sOrder)(np.linspace(-5,5,1001))
-    G = np.where(G==0,np.nan,G)
-    
-    cmap = plt.get_cmap('cool',n_scp)
-    for i in range(n_scp):
-        axs[1].plot(np.linspace(-5,5,1001),G[:,i],c=cmap(i))
-    axs[1].set_xticklabels([])
-    axs[1].set_xlim([-5,5])
-    axs[1].set_ylim([0,1])
-    axs[1].set_ylabel('Spatial B-splines')
-    
-    
-    # Dayglow
-    x = np.cos(np.deg2rad(wic['sza'].values.flatten()))/np.cos(np.deg2rad(wic['dza'].values.flatten()))
-    y = wic['img'].values.flatten()
-    w = wic['dgweight'].values.flatten()
-    m = wic['dgmodel'].values.flatten()
-    e = wic['dgsigma'].values.flatten()
-    
-    y = y[x.argsort()]
-    w = w[x.argsort()]
-    m = m[x.argsort()]
-    e = e[x.argsort()]
-    x = x[x.argsort()]
-    
-    axs[0].scatter(x,10**y,c='C0',s=0.5,alpha=0.2)
-    axs[0].set_xlim([-5,5])
-    axs[0].set_ylim([0,16000]) 
-    axs[0].set_xticklabels([])
-    axs[0].set_ylabel('WIC intensity [counts]')
-    
-    sc= axs[2].scatter(x,y,c=w,s=0.5,vmin=0, vmax=1)
-    axs[2].plot(x[np.isfinite(m)],m[np.isfinite(m)],c='r')
-    axs[2].plot(x[np.isfinite(m)],m[np.isfinite(m)]-e[np.isfinite(m)],c='r')
-    axs[2].plot(x[np.isfinite(m)],m[np.isfinite(m)]+e[np.isfinite(m)],c='r')
-    axs[2].set_xlim([-5,5])
-    # axs[2].set_ylim([6.1,10.2]) 
-    axs[2].set_xlabel('$\\cos (\\alpha_s) / \cos(\\alpha_d)$')
-    axs[2].set_ylabel('WIC intensity [counts]')
-    
-    # cbaxes = inset_axes(axs[1], width="1%", height="30%", loc=2) 
-    cbaxes = axs[2].inset_axes([.85,.3,.1,.03]) 
-    
-    cb = plt.colorbar(sc,cax=cbaxes, ticks=[0,0.5,1.], orientation='horizontal')
-    cb.set_label('Weight')
-    
-    axs[0].text(0.03, 0.94, 'a', fontsize=12, horizontalalignment='center', verticalalignment='center', transform=axs[0].transAxes)
-    axs[1].text(0.03, 0.94, 'b', fontsize=12, horizontalalignment='center', verticalalignment='center', transform=axs[1].transAxes)
-    axs[2].text(0.03, 0.94, 'c', fontsize=12, horizontalalignment='center', verticalalignment='center', transform=axs[2].transAxes)
-    
-    plt.savefig(outpath + 'dayglowFit.png',bbox_inches='tight',dpi = 300)
-    plt.clf()
-    plt.close()
-    
-def makeFig2b(wic,outpath):
-    ''' 
-    Plot B-splines and dayglow fit for a wic image
-    wic : Dataset with the image to be plotted. Must be a single date.
-    outpath (str) : Path to where the image is saved
-    '''
-    
-    
-    
-    fig,axs = plt.subplots(3,1,figsize=(10,9),constrained_layout = True)
-    
-    # B-spline
-    sOrder = 3
-    sKnots = [-5,-3,-1,-0.2,-0.1,0,0.1,0.2,1,3,5]
-    sKnots = np.r_[np.repeat(sKnots[0],sOrder),sKnots, np.repeat(sKnots[-1],sOrder)]
-    n_scp = len(sKnots)-sOrder-1
-    G= BSpline(sKnots, np.eye(n_scp), sOrder)(np.linspace(-5,5,1001))
-    
-    axs[0].plot(np.linspace(-5,5,1001),G)
-    axs[0].set_xticklabels([])
-    axs[0].set_xlim([-5,5])
-    axs[0].set_ylim([0,1])
-    axs[0].set_ylabel('B-splines')
-    
-    
-    # Dayglow
-    x = np.cos(np.deg2rad(wic.isel(date=67)['sza'].values.flatten()))/np.cos(np.deg2rad(wic.isel(date=67)['dza'].values.flatten()))
-    y = np.log(wic.isel(date=67)['img'].values.flatten())
-    w = wic.isel(date=67)['dgweight'].values.flatten()
-    m = np.log(wic.isel(date=67)['dgmodel'].values.flatten())
-    
-    y = y[x.argsort()]
-    w = w[x.argsort()]
-    m = m[x.argsort()]
-    x = x[x.argsort()]
-    
-    sc= axs[1].scatter(x,y,c=w,s=0.5,vmin=0, vmax=1)
-    axs[1].plot(x[np.isfinite(m)],m[np.isfinite(m)],c='r')
-    axs[1].set_xlim([-5,5]) 
-    axs[1].set_xticklabels([])
-    axs[1].set_ylabel('Original image [log(counts)]')
-    
-    # cbaxes = inset_axes(axs[1], width="1%", height="30%", loc=2) 
-    cbaxes = axs[1].inset_axes([.85,.15,.1,.03]) 
-    
-    cb = plt.colorbar(sc,cax=cbaxes, ticks=[0,1.], orientation='horizontal')
-    cb.set_label('Weight', labelpad=-8)
-    
-    
-    # Temporal Dayglow
-    idates = [27,67,107,147,187,227,267]
-    cmap = plt.get_cmap('plasma',6)
-    for i, idate in enumerate(idates):
-        x = np.cos(np.deg2rad(wic.isel(date=idate)['sza'].values.flatten()))/np.cos(np.deg2rad(wic.isel(date=idate)['dza'].values.flatten()))
-        m = np.log(wic.isel(date=idate)['dgmodel'].values.flatten())
-        
-        m = m[x.argsort()]
-        x = x[x.argsort()]
-        axs[2].plot(x[np.isfinite(m)],m[np.isfinite(m)],c=cmap(i))
-        
-    axs[2].set_xlim([-5,5]) 
-    axs[2].set_xlabel('$x = \\cos (\\theta_s) / \cos(\\theta_d)$')
-    axs[2].set_ylabel('Dayglow [log(counts)]')
-    
-    plt.savefig(outpath + 'dayglowFit.png',bbox_inches='tight',dpi = 300)
-    plt.clf()
-    plt.close()
 
 def makeFig2c(imgs,outpath,idate,inImg='img',transform=None,sOrder=3,dampingVal=0,tukeyVal=5,stop=1e-3,minlat=0,dzalim=80,sKnots=None,tKnotSep=None,tOrder=2,dzacorr = 0):
     '''
@@ -552,7 +200,8 @@ def makeFig2c(imgs,outpath,idate,inImg='img',transform=None,sOrder=3,dampingVal=
 
     # Spatial knots and viewing angle correction
     if imgs['id'] in ['WIC','SI12','SI13','UVI']:
-        fraction = np.exp(dzacorr*(1. - 1/np.cos(np.deg2rad(dza))))/np.cos(np.deg2rad(dza))*np.cos(np.deg2rad(sza))
+        # fraction = np.exp(dzacorr*(1. - 1/np.cos(np.deg2rad(dza))))/np.cos(np.deg2rad(dza))*np.cos(np.deg2rad(sza))
+        fraction = np.cos(np.deg2rad(sza))/np.cos(np.deg2rad(dza))
         if sKnots is None: sKnots = [-5,-3,-1,-0.2,-0.1,0,0.1,0.2,1,3,5]
     elif imgs['id'] == 'VIS':
         fraction = np.cos(np.deg2rad(sza))
@@ -604,16 +253,18 @@ def makeFig2c(imgs,outpath,idate,inImg='img',transform=None,sOrder=3,dampingVal=
     # Data
     ind = (sza >= 0) & (dza <= dzalim) & (glat >= minlat) & (np.isfinite(d)) & remove[None,:] & (fraction>sKnots[0]) & (fraction<sKnots[-1])
     
-    # # Spatial weights
-    # ws = np.full(sza.shape,np.nan)
-    # for i in range(len(sza)):
-    #     count,bin_edges,bin_number=binned_statistic(fraction[i,ind[i,:]],fraction[i,ind[i,:]],statistic=
-    # 'count',bins=np.linspace(sKnots[0],sKnots[-1],21))
-    #     ws[i,ind[i,:]]=1/np.maximum(10,count[bin_number-1])
+    # return sza,fraction,ind,sKnots
+    # Spatial weights
+    ws = np.full_like(fraction,np.nan)
+    for i in range(len(sza)):
+        count,bin_edges,bin_number=binned_statistic(fraction[i,ind[i,:]],fraction[i,ind[i,:]],statistic=
+    'count',bins=np.arange(sKnots[0],sKnots[-1]+0.1,0.1))
+        ws[i,ind[i,:]]=1/np.maximum(1,count[bin_number-1])
 
     d_s = d.flatten()
     ind = ind.flatten()
-    ws = np.ones_like(d_s)
+    ws = ws.flatten()
+    # ws = np.ones_like(d_s)
     w = np.ones(d_s.shape)
     # sigma = np.zeros(d_s.shape)
     # Damping
@@ -624,38 +275,80 @@ def makeFig2c(imgs,outpath,idate,inImg='img',transform=None,sOrder=3,dampingVal=
     diff = 1e10
     iteration = 0
     m = None
+    dm=None
+    
+    # return d_s,ind,ws,fraction
+    
     while (diff>stop)&(iteration < 100):
         print('Iteration:',iteration)
 
         m_s = np.linalg.lstsq((G_s[ind,:]*w[ind,None]*ws[ind,None]).T@(G_s[ind,:]*w[ind,None]*ws[ind,None])+R,(G_s[ind,:]*w[ind,None]*ws[ind,None]).T@(d_s[ind]*w[ind]*ws[ind]),rcond=None)[0]
 
         mNew    = M@m_s.reshape((n_scp, n_tcp)).T
+        
+        if dm is not None:
+            dmOld=dm
+        
         dm=[]
         for i, tt in enumerate(time):
             dm.append(G_g[i]@mNew[i, :])
 
         dm=np.array(dm).squeeze()
         residuals = (d.flatten()[ind] - dm.flatten()[ind])#/dm.flatten()[ind]
-        rmse = np.sqrt(np.average(residuals**2,weights=w[ind]))
-        sigma = np.full_like(d_s,np.nan)
-        sigmaBinned = np.full_like(d_s,np.nan)
-        sigma[ind],sigmaBinned[ind] = weightedBinning(fraction.flatten()[ind], d.flatten()[ind],dm.flatten()[ind], w[ind],sKnots,n_scp,sOrder)
-        # return sigma[ind]
+        # rmse = np.sqrt(np.average(residuals**2,weights=w[ind]))
+        if iteration==0:
+            sigma = np.full_like(d_s,np.nan)
+            sigmaBinned = np.full_like(d_s,np.nan)
+            sigma[ind],sigmaBinned[ind] = weightedBinning(fraction.flatten()[ind], d.flatten()[ind],dm.flatten()[ind], w[ind]*ws[ind],sKnots)
+
         # # # Heteroskedasitic consistent covariance
         # # V = ((G_s[ind,:]*w[ind,None]*residuals[:,None]).T@(G_s[ind,:]*w[ind,None]*residuals[:,None]))
-        # # GTG = (G_s[ind,:]*w[ind,None]).T@(G_s[ind,:]*w[ind,None])
-        # C = np.linalg.inv((G_s[ind,:]*w[ind,None]).T@(G_s[ind,:]*w[ind,None])) @ ((G_s[ind,:]*w[ind,None]*residuals[:,None]).T@(G_s[ind,:]*w[ind,None]*residuals[:,None]))#@np.linalg.inv((G_s[ind,:]*w[ind,None]).T@(G_s[ind,:]*w[ind,None]))
-        # # return C
-        # # var_m = M@ (abs(np.diag(C))).reshape((n_scp, n_tcp)).T
-        # var_m=[]
-        # for i in range(n_scp*n_tcp):
-        #     var_m.append(M@C[:,i].reshape((n_scp, n_tcp)).T)
-        # return C,var_m,G_g
+        # GTG = (G_s[ind,:]*w[ind,None]*ws[ind,None]).T@(G_s[ind,:]*w[ind,None]*ws[ind,None])
+        # C = np.linalg.inv(GTG) @ ((G_s[ind,:]*w[ind,None]*ws[ind,None]*residuals[:,None]).T@(G_s[ind,:]*w[ind,None]*ws[ind,None]*residuals[:,None]))@np.linalg.inv(GTG)
+        # out=np.std(np.random.multivariate_normal(m_s,C,100),axis=0)
+
+        # # # # var_m = M@ (abs(np.diag(C))).reshape((n_scp, n_tcp)).T
+        # # # var_m=[]
+        # # # for i in range(n_scp*n_tcp):
+        # # #     var_m.append(M@out.reshape((n_scp, n_tcp)).T)
+        # var_m    = M@out.reshape((n_scp, n_tcp)).T
         # sigma = []
         # for i, tt in enumerate(time):
-        #     sigma.append(np.sqrt(abs(G_g[i]@var_m[i, :])))
-        # sigma=np.array(sigma).squeeze()
+        #     sigma.append(abs(G_g[i]@var_m[i, :]))
+        # sigma=np.array(sigma).squeeze().flatten()
         # sigma = np.where(np.isnan(sigma),0,sigma)
+
+        # m_r = np.random.multivariate_normal(m_s,C,100)
+        # # return m_s,m_r
+        # dm_r = []
+        # for j in range(len(m_r)):
+        #     dm_r.append([])
+        #     mTemp = M@m_r[j,:].reshape((n_scp, n_tcp)).T
+        #     for i, tt in enumerate(time):
+        #         dm_r[j].append(G_g[i]@mTemp[i, :])
+        #     dm_r[j]=np.array(dm_r[j]).squeeze()  
+        # return M,m_s,dm,dm_r,C
+        # list_m.append(m_s)
+        # list_G.append(G_s[ind,:]*w[ind,None]*ws[ind,None])
+        # list_C.append(C)
+        
+        # TEST CO
+        
+        
+        # TEST covar with no time dep, maybe?
+        # G0 = np.vstack(G_g)
+        # G0TG0 = (G0[ind,:]*w[ind,None]*ws[ind,None]).T@(G0[ind,:]*w[ind,None]*ws[ind,None])
+        # C0 = np.linalg.inv(G0TG0) @ ((G0[ind,:]*w[ind,None]*ws[ind,None]*residuals[:,None]).T@(G0[ind,:]*w[ind,None]*ws[ind,None]*residuals[:,None]))@np.linalg.inv(G0TG0)
+        # S0 = G0TG0*C0
+        # Gk = BSpline(sKnots, np.eye(n_scp), sOrder)(sKnots)[sOrder-1:-sOrder+1]
+        # Sd = np.array([np.sqrt(np.sum(Gk[i,:][None,:]*S0)) for i in range(n_scp)])
+        # return Sd
+        # GTG = np.vstack(G_g)[ind,:].T@np.vstack(G_g)[ind,:]
+        
+        # Covar with no time dependence:
+        # G0 = np.vstack(G_g)
+        # C = np.linalg.inv((G0[ind,:]*w[ind,None]).T@(G0[ind,:]*w[ind,None])) @ ((G0[ind,:]*w[ind,None]*residuals[:,None]).T@(G0[ind,:]*w[ind,None]*residuals[:,None]))@np.linalg.inv((G0[ind,:]*w[ind,None]).T@(G0[ind,:]*w[ind,None]))
+        # return C
         
         # C = np.linalg.inv((G_s[ind,:]*w[ind,None]).T@(G_s[ind,:]*w[ind,None])) @ ((G_s[ind,:]*w[ind,None]*residuals[:,None]).T@(G_s[ind,:]*w[ind,None]*residuals[:,None]))#@np.linalg.inv((G_s[ind,:]*w[ind,None]).T@(G_s[ind,:]*w[ind,None]))
         # sigma[ind] = np.sqrt(((G_s[ind,:]*w[ind,None])@C*(G_s[ind,:]*w[ind,None])).sum(-1))
@@ -682,21 +375,28 @@ def makeFig2c(imgs,outpath,idate,inImg='img',transform=None,sOrder=3,dampingVal=
         # # sigma = rmse/np.nanmean(dm.flatten()[ind])*dm.flatten()
 
         # iw = ((residuals)/(tukeyVal*rmse))**2
-        iw = ((residuals)/(tukeyVal*sigma[ind]))**2
-        iw[iw>1] = 1
-        w[ind] = (1-iw)**2
+        w[ind] = (1 - np.minimum(1,(residuals/(tukeyVal*sigma[ind]))**2))**2
+        # iw = ((residuals)/(tukeyVal*sigma[ind]))**2
+        # iw[iw>1] = 1
+        # w[ind] = (1-iw)**2
         
         if diff == 1e10:
             dm0 =dm
             sigma0 = sigma
             sigma0B = sigmaBinned
+            diff = 1e9
 
         if m is not None:
             diff = np.sqrt(np.mean((mNew-m)**2))/(1+np.sqrt(np.mean(mNew**2)))
+            diff2 = np.sqrt(np.nanmean((dm.flatten()[ind]-dmOld.flatten()[ind])**2))/(1+np.sqrt(np.nanmean(dm.flatten()[ind]**2)))
             print('Relative change model norm',diff)
+            print('Relative change model',diff2)
         m = mNew
         iteration += 1
-    
+
+    print(np.sqrt(np.average(m_s**2)))
+    print(np.sqrt(np.average((residuals/sigma[ind])**2,weights=w[ind])))
+
     # Add dayglow model and corrected image to the Dataset
     if transform=='log':
         imgs['dgmodel'] = (['date','row','col'],(np.exp(dm)).reshape((n_t,len(imgs.row),len(imgs.col))))
@@ -714,6 +414,7 @@ def makeFig2c(imgs,outpath,idate,inImg='img',transform=None,sOrder=3,dampingVal=
 
     # Remove pixels outside model scope
     ind = (imgs.sza>=0)& (imgs.dza <= dzalim) & (imgs.glat >= minlat) & imgs.bad
+    # ind = (sza >= 0) & (dza <= dzalim) & (glat >= minlat) & (np.isfinite(d)) & remove[None,:] & (fraction>sKnots[0]) & (fraction<sKnots[-1])
     imgs['img'] = xr.where(~ind,np.nan,imgs['img'])
     imgs['dgmodel'] = xr.where(~ind,np.nan,imgs['dgmodel'])
     imgs['dgmodel0'] = xr.where(~ind,np.nan,imgs['dgmodel0'])
@@ -737,7 +438,7 @@ def makeFig2c(imgs,outpath,idate,inImg='img',transform=None,sOrder=3,dampingVal=
     pc=axs[0].pcolormesh(yEdge,xEdge,zMean,cmap='magma',vmin=0,vmax=16000)
     axs[0].set_xticklabels([])
     axs[0].set_xlim([0,time[-1]])
-    axs[0].set_ylim([-5,5])
+    axs[0].set_ylim([-3.5,3.5])
     axs[0].set_ylabel('$\\cos (\\alpha_s) / \cos(\\alpha_d)$')
     # cbaxes = inset_axes(axs[1], width="1%", height="30%", loc=2) 
     cbaxes = axs[0].inset_axes([.85,.3,.1,.03]) 
@@ -750,6 +451,7 @@ def makeFig2c(imgs,outpath,idate,inImg='img',transform=None,sOrder=3,dampingVal=
     cmap = plt.get_cmap('copper',n_tcp)
     for i in range(n_tcp):
         axs[1].plot(time,M[:,i],c=cmap(i))
+    axs[1].vlines(tKnots[tOrder+1:-tOrder-1]/60,0,1,color='r',linestyle='--',linewidth=0.6)
     axs[1].set_xticklabels([])
     axs[1].set_xlim([0,time[-1]])
     axs[1].set_ylim([0,1])
@@ -763,7 +465,7 @@ def makeFig2c(imgs,outpath,idate,inImg='img',transform=None,sOrder=3,dampingVal=
     pc=axs[2].pcolormesh(yEdge,xEdge,zMean,cmap='magma',vmin=0,vmax=16000)
     axs[2].set_xticklabels([])
     axs[2].set_xlim([0,time[-1]])
-    axs[2].set_ylim([-5,5])
+    axs[2].set_ylim([-3.5,3.5])
     axs[2].set_ylabel('$\\cos (\\alpha_s) / \cos(\\alpha_d)$')
     # cbaxes = inset_axes(axs[1], width="1%", height="30%", loc=2) 
     cbaxes = axs[2].inset_axes([.85,.3,.1,.03]) 
@@ -801,8 +503,9 @@ def makeFig2c(imgs,outpath,idate,inImg='img',transform=None,sOrder=3,dampingVal=
     cmap = plt.get_cmap('cool',n_scp)
     for i in range(n_scp):
         axs[1].plot(np.linspace(-5,5,1001),G[:,i],c=cmap(i))
+    axs[1].vlines(sKnots[sOrder+1:-sOrder-1],0,1,color='r',linestyle='--',linewidth=0.6)
     axs[1].set_xticklabels([])
-    axs[1].set_xlim([-5,5])
+    axs[1].set_xlim([-3.5,3.5])
     axs[1].set_ylim([0,1])
     axs[1].set_ylabel('Spatial B-splines')
     
@@ -811,48 +514,50 @@ def makeFig2c(imgs,outpath,idate,inImg='img',transform=None,sOrder=3,dampingVal=
     x = np.cos(np.deg2rad(wic['sza'].values.flatten()))/np.cos(np.deg2rad(wic['dza'].values.flatten()))
     y = wic['img'].values.flatten()
     w = wic['dgweight'].values.flatten()
-    m = wic['dgmodel'].values.flatten()
-    m0 = wic['dgmodel0'].values.flatten()
-    e = wic['dgsigma'].values.flatten()
-    e0 = wic['dgsigma0'].values.flatten()
-    b = wic['dgsigmaB'].values.flatten()
-    b0 = wic['dgsigma0B'].values.flatten()
+    mid = int(len(wic.date)/2) # Only model of middle image
+    xm = np.cos(np.deg2rad(wic.isel(date=mid)['sza'].values.flatten()))/np.cos(np.deg2rad(wic.isel(date=mid)['dza'].values.flatten()))
+    m = wic.isel(date=mid)['dgmodel'].values.flatten()
+    m0 = wic.isel(date=mid)['dgmodel0'].values.flatten()
+    e = wic.isel(date=mid)['dgsigma'].values.flatten()
+    e0 = wic.isel(date=mid)['dgsigma0'].values.flatten()
+    b = wic.isel(date=mid)['dgsigmaB'].values.flatten()
+    b0 = wic.isel(date=mid)['dgsigma0B'].values.flatten()
     
-    y = y[x.argsort()]
-    w = w[x.argsort()]
-    m = m[x.argsort()]
-    m0 = m0[x.argsort()]
-    e = e[x.argsort()]
-    e0 = e0[x.argsort()]
-    b = b[x.argsort()]
-    b0 = b0[x.argsort()]
-    x = x[x.argsort()]
+
     
     axs[0].scatter(x,y,c='C0',s=0.5,alpha=0.2)
-    axs[0].set_xlim([-5,5])
+    axs[0].set_xlim([-3.5,3.5])
     # axs[0].set_ylim([0,16000]) 
     axs[0].set_xticklabels([])
     axs[0].set_ylabel('Intensity [counts]')
 
-    axs[3].plot(x[np.isfinite(m)],m[np.isfinite(m)],c='C1',linewidth=1)
+    # Sort to interp
+    m = m[xm.argsort()]
+    m0 = m0[xm.argsort()]
+    e = e[xm.argsort()]
+    e0 = e0[xm.argsort()]
+    b = b[xm.argsort()]
+    b0 = b0[xm.argsort()]
+    xm = xm[xm.argsort()]
     
-    xi = np.linspace(-5,5,1001)
-    mi = np.interp(xi,x[np.isfinite(m)],m[np.isfinite(m)])
-    mi0 = np.interp(xi,x[np.isfinite(m0)],m0[np.isfinite(m0)])
-    ei = np.interp(xi,x[np.isfinite(e)],e[np.isfinite(e)])
-    ei0 = np.interp(xi,x[np.isfinite(e0)],e0[np.isfinite(e0)])
+    # interp for plotting
+    xi = np.linspace(-3.5,3.5,1001)
+    mi = np.interp(xi,xm[np.isfinite(m)],m[np.isfinite(m)],left=np.nan,right=np.nan)
+    mi0 = np.interp(xi,xm[np.isfinite(m0)],m0[np.isfinite(m0)],left=np.nan,right=np.nan)
+    ei = np.interp(xi,xm[np.isfinite(e)],e[np.isfinite(e)],left=np.nan,right=np.nan)
+    ei0 = np.interp(xi,xm[np.isfinite(e0)],e0[np.isfinite(e0)],left=np.nan,right=np.nan)
 
-    axs[3].plot(xi,mi0,c='C0',linestyle='-',label='$I_{bs}$ first iteration')
-    axs[3].plot(xi,ei0,c='C0',linestyle=':',label='$\\sigma_{bs}$ first iteration')
+    axs[3].plot(xi,mi0,c='C0',linestyle='-',label='Initial $I_{bs}$')
+    # axs[3].plot(xi,ei0,c='C0',linestyle=':',label='$\\sigma_{bs}$ first iteration')
     
-    axs[3].plot(xi,mi,c='C1',linestyle='-',label='$I_{bs}$ final iteration')
-    axs[3].plot(xi,ei,c='C1',linestyle=':',label='$\\sigma_{bs}$ final iteration')
+    axs[3].plot(xi,mi,c='C1',linestyle='-',label='Final $I_{bs}$')
+    axs[3].plot(xi,ei,c='C3',linestyle=':',label='$\\sigma_{bs}$')
     # axs[3].plot(x[np.isfinite(b)],b[np.isfinite(b)],c='C1',linewidth=0.6)
     # axs[3].fill_between(x[np.isfinite(m)],m[np.isfinite(m)]-e[np.isfinite(m)],m[np.isfinite(m)]+e[np.isfinite(m)],facecolor='C1',edgecolor=None,alpha=0.4)
     
     # axs[3].plot(x[np.isfinite(b0)],b0[np.isfinite(b0)],c='C0',linewidth=0.6)
     # axs[3].fill_between(x[np.isfinite(m0)],m0[np.isfinite(m0)]-e0[np.isfinite(m0)],m0[np.isfinite(m0)]+e0[np.isfinite(m0)],facecolor='C0',edgecolor=None,alpha=0.4)
-    axs[3].set_xlim([-5,5])
+    axs[3].set_xlim([-3.5,3.5])
     # axs[2].set_ylim([0,15499]) 
     axs[3].set_xlabel('$\\cos (\\alpha_s) / \cos(\\alpha_d)$')
     axs[3].set_ylabel('$I_{bs}$ and $\\sigma_{bs}$ [counts]')
@@ -860,10 +565,10 @@ def makeFig2c(imgs,outpath,idate,inImg='img',transform=None,sOrder=3,dampingVal=
     axs[3].legend(loc=(0.1,0.5),frameon=False)
 
     sc= axs[2].scatter(x,y,c=w,s=0.5,vmin=0, vmax=1)
-    axs[2].plot(x[np.isfinite(m)],m[np.isfinite(m)],c='C1')
+    axs[2].plot(xi,mi,c='C1')
     # axs[2].fill_between(x[np.isfinite(m)],m[np.isfinite(m)]-e[np.isfinite(m)],m[np.isfinite(m)]+e[np.isfinite(m)],color='r',alpha=0.2)
     # axs[2].plot(x[np.isfinite(m)],e[np.isfinite(m)],c='C1')
-    axs[2].set_xlim([-5,5])
+    axs[2].set_xlim([-3.5,3.5])
     axs[2].set_xticklabels([])
     axs[2].set_ylabel('Intensity [counts]')
     # cbaxes = inset_axes(axs[1], width="1%", height="30%", loc=2) 
@@ -881,6 +586,7 @@ def makeFig2c(imgs,outpath,idate,inImg='img',transform=None,sOrder=3,dampingVal=
     plt.close()
     
     return  imgs
+
 
 def makeFig3(wic,s12,s13,outpath):
     ''' 
@@ -1183,502 +889,8 @@ def makeFig4(wic,s12,s13,outpath):
     plt.clf()
     plt.close()
 
-def makeFig5(wic,outpath,sectors,inImg='shimg',limFactor=1,order=3,dampingVal=0):
-    '''
-    A simple function to identify the ocb of a FUV image.
-    NEEDS CLEANING + COMMENTS
 
-    Parameters
-    ----------
-    imgs : xarray.Dataset
-        Dataset with the FUV images.
-    countlim : float
-        countlimit when identifying the ocbs. All values lower than countlim are set to zero.
-    inImg : str, optional
-        Name of the image to use in the determination. The default is 'shimage'.
-    mltRes : int, optional
-        Number of MLT bins. Default is 24 (1-wide sectors).
-    limFactors : array_like, optional
-        Array containing fractions to multipy with noise used as threshold.
-        Default is None, (np.linspace(0.5,1.5,5) is used).
-    order : int, optional
-        Order of the B-spline fitting the intensity profile in each circular sector.
-        Default is 3.
-    damplingVal : float, optional
-        Damping value (Tikhonov regularization) in the B-spline fit.
-        Default is 0.
-
-    Returns
-    -------
-    xarray.Dataset
-        A Dataset containing the identified boundaries.
-    '''
-    
-    fig = plt.figure(figsize=(11,9))
-
-    gs = gridspec.GridSpec(nrows=3,ncols=4,hspace=0.25,wspace=0.3)
-    
-    # Corr
-    pax = pp(plt.subplot(gs[:,:3]),minlat=50)
-    fuv.plotimg(wic,'shimg',pax=pax,crange=(0,200),cmap='Greens')
-    cbaxes = pax.ax.inset_axes([.2,.0,.6,.03]) 
-    cb = plt.colorbar(pax.ax.collections[0],cax=cbaxes, orientation='horizontal',extend='both')
-    cb.set_label('Corrected image [Counts]')
-    pax.ax.set_title(wic['id'].values.tolist() + ': ' + 
-             wic['date'].dt.strftime('%Y-%m-%d %H:%M:%S').values.tolist(),pad=-550)
-    pax.writeMLTlabels(mlat=49.5)
-    pax.write(50, 9, '50',verticalalignment='center',horizontalalignment='center')
-    
-    mltRes=24
-    edges = np.linspace(0,24,mltRes+1)
-
-    # Circle in which all boundaries are assumed to be located
-    colatMax = np.concatenate((np.linspace(40,30,mltRes+1)[1:-1:2],np.linspace(30,40,mltRes+1)[1:-1:2]))
-
-
-    colatAll = 90-abs(wic['mlat'].values.copy().flatten())
-    dAll = wic[inImg].values.copy().flatten()
-    wdgAll = wic['shweight'].values.copy().flatten()
-    jjj = (np.isfinite(dAll))&(colatAll<40)
-    av = np.average(dAll[jjj],weights=wdgAll[jjj])
-    mae = np.average(abs(dAll[jjj]-av),weights=wdgAll[jjj])
-    
-    print(av)
-    print(mae)
-    print(np.sqrt(np.average(dAll[jjj]**2,weights=wdgAll[jjj])))
-    print(np.sqrt(np.average((dAll[jjj]-av)**2,weights=wdgAll[jjj])))
-    
-    colat = 90-abs(wic['mlat'].values.copy().flatten())
-    mlt = wic['mlt'].values.copy().flatten()
-    d = wic[inImg].values.copy().flatten()
-    wDG = wic['shweight'].values.copy().flatten()
-
-    ocb=[]
-    eqb=[]
-    for s in range(len(edges)-1):
-        
-
-        colatSec = colat[(mlt>edges[s])&(mlt<edges[s+1])&(colat<40)]
-        dSec = d[(mlt>edges[s])&(mlt<edges[s+1])&(colat<40)]
-        wSec = wDG[(mlt>edges[s])&(mlt<edges[s+1])&(colat<40)]
-
-
-
-        if np.nansum(wSec[colatSec<colatMax[s]])==0:
-            avSec=av
-        else:
-            jjj = (colatSec<colatMax[s])&(np.isfinite(dSec))
-            avSec = np.average(dSec[jjj],weights=wSec[jjj])
-
-        iii = np.isfinite(colatSec)&np.isfinite(dSec)
-        knots = np.linspace(0,40,21).tolist()
-        knots = np.r_[np.repeat(knots[0],order),knots, np.repeat(knots[-1],order)]
-
-        ev = np.linspace(0,40,401)
-        if colatSec[iii].size == 0:
-            ocb.append(np.nan)
-            eqb.append(np.nan)
-        else:
-            # Prepare the model
-
-            # Number of control points
-            n_cp = len(knots)-order-1
-
-            # Temporal design matix
-            G = BSpline(knots, np.eye(n_cp), order)(colatSec[iii])
-
-            damping = dampingVal*np.ones(G.shape[1])
-            damping = dampingVal*(np.arange(G.shape[1],0,-1)/G.shape[1])
-            RR = np.diag(damping)
-
-            # Iterative estimation of model parameters
-            diff = 10000
-
-            w = 1-wSec[iii]
-            m = None
-            stop=1000
-            while diff > stop:
-                Gw = G*w[:, np.newaxis]
-                GTG = Gw.T.dot(Gw)
-                GTd = Gw.T.dot((w*dSec[iii])[:, np.newaxis])
-                mNew = lstsq(GTG+RR, GTd)[0]
-                residuals = G.dot(mNew).flatten() - dSec[iii]
-                rmse = np.sqrt(np.average(residuals**2))
-                weights = 1.*rmse/np.abs(residuals)
-                weights[weights > 1] = 1.
-                w = weights
-                if m is not None:
-                    diff = np.sqrt(np.mean((m - mNew)**2))/(1+np.sqrt(np.mean(mNew**2)))
-
-                m = mNew
-
-            
-            G = BSpline(knots, np.eye(n_cp), order)(ev)
-            dmSec = G.dot(m).flatten()
-            dmSec[ev>np.max(colatSec[iii])]=np.nan
-
-            ## identify main peak
-            ind = (ev<colatMax[s])&(ev<np.max(colatSec[iii]))
-
-
-
-            # isAbove = dmSec[ind]>avSec+limFactor*mae
-            isAbove = dmSec[ind]>limFactor*mae
-            if (isAbove==True).all()|(isAbove==False).all(): #All above or below
-                ocb.append(np.nan)
-                eqb.append(np.nan)
-            else:
-                isAbove2 = np.concatenate(([False],isAbove,[False]))
-
-                firstAbove = np.argwhere(np.diff(isAbove2.astype(int))== 1).flatten()
-                firstBelow = np.argwhere(np.diff(isAbove2.astype(int))==-1).flatten()
-
-                if firstAbove[0]==0:
-                    ind1=1
-                else:
-                    ind1=0
-
-                if firstBelow[-1]==len(isAbove):
-                    ind2=-1
-                else:
-                    ind2=len(firstBelow)
-                #     firstAbove=firstAbove[:-1]
-                #     firstBelow=firstBelow[:-1]
-                firstAbove=(firstAbove[ind1:ind2])
-                firstBelow=(firstBelow[ind1:ind2])
-
-                areaSec=[]
-                for k in range(len(firstAbove)):
-                    areaSec.append(np.sum(dmSec[ind][firstAbove[k]:firstBelow[k]]))
-
-
-                if len(areaSec)==0:
-                    ocb.append(np.nan)
-                    eqb.append(np.nan)
-                elif ((s<6)|(s>=18))&(len(areaSec)>1):
-                    k = np.argmax(areaSec)
-                    if k>0:
-                        ocb.append(ev[firstAbove[k-1]-1])
-                        eqb.append(ev[firstBelow[k]])
-                    else:
-                        ocb.append(ev[firstAbove[k]-1])
-                        eqb.append(ev[firstBelow[k+1]])
-                else:
-                    k = np.argmax(areaSec)
-                    ocb.append(ev[firstAbove[k]-1])
-                    eqb.append(ev[firstBelow[k]])
-
-        ## Plot
-        if s in sectors:
-            ax = plt.subplot(gs[(sectors==s).nonzero()[0][0],3])
-            ax.scatter(90-colatSec,dSec,c=1-wSec,s=.5)
-            ax.plot(90-ev,dmSec,c='C1',linewidth = 1)
-            ax.set_xlim([90,50])
-            ax.set_ylim([-500,3000])
-            ax.set_title(str(s) + '-' + str(s+1) + ' MLT' )
-            ax.axhspan(-500,limFactor*mae,facecolor='k',edgecolor=None,alpha=0.2)
-            
-            ax.axvline(90-ocb[s],c='r',linewidth=1)
-            ax.axvline(90-eqb[s],c='r',linewidth=1)
-            
-            ax.set_ylabel('Intensity [counts]')
-            if (sectors==s).nonzero()[0][0] == 2:
-                ax.set_xlabel('Magnetic latitude [deg]')
-            else:
-                ax.set_xticklabels([])
-
-
-    ds = xr.Dataset(
-        data_vars=dict(
-            ocb=(['mlt'], 90-np.array(ocb)),
-            eqb=(['mlt'], 90-np.array(eqb)),
-            ),
-
-        coords=dict(
-            mlt = edges[:-1]+0.5
-        ),
-        )
-    
-    pax.scatter(ds.ocb.values, ds.mlt.values,c='r')
-    pax.scatter(ds.eqb.values, ds.mlt.values,c='r')
-    
-    pax.plot([50,90],[sectors[0],sectors[0]],c='C0')
-    pax.plot([50,90],[sectors[0]+1,sectors[0]+1],c='C0')
-    pax.plot([50,90],[sectors[1],sectors[1]],c='C0')
-    pax.plot([50,90],[sectors[1]+1,sectors[1]+1],c='C0')
-    pax.plot([50,90],[sectors[2],sectors[2]],c='C0')
-    pax.plot([50,90],[sectors[2]+1,sectors[2]+1],c='C0')
-    
-    plt.savefig(outpath + 'boundaryDetection.png',bbox_inches='tight',dpi = 300)
-    plt.clf()
-    plt.close()
-  
-
-
-def makeFig9(wic,bi,bf,outpath):
-    if len(wic.date)!=20: 
-        raise Exception('Must be 20 images.')
-    
-    n_lims = len(bi.lim)
-    fig = plt.figure(figsize=(11,15))
-
-    gs = gridspec.GridSpec(nrows=5,ncols=4,hspace=0.05,wspace=0)
-    
-    for i in range(5):
-        for j in range(4):
-            ## WIC ##
-            t= 4*i+j
-            pax = pp(plt.subplot(gs[i,j]),minlat=50)
-            fuv.plotimg(wic.isel(date=t),'shimg',pax=pax,crange=(0,1000),cmap='Greens')
-            pax.scatter(bi.isel(date=t)['ocb'].values,np.tile(bi.mlt.values,(5,1)).T,s=2,color='k')
-            pax.scatter(bi.isel(date=t)['eqb'].values,np.tile(bi.mlt.values,(5,1)).T,s=2,color='k')
-            pax.plot(bf.isel(date=t)['ocb'].values,bf.mlt.values,color='r')
-            pax.plot(bf.isel(date=t)['eqb'].values,bf.mlt.values,color='r')
-            
-            pax.write(50, 12,wic.isel(date=t)['date'].dt.strftime('%H:%M:%S').values.tolist(),verticalalignment='bottom',horizontalalignment='center',fontsize=12)
-            pax.write(50,  6, '06',verticalalignment='center',horizontalalignment='right',fontsize=8)
-            pax.write(50, 12, '12',verticalalignment='top',horizontalalignment='center',fontsize=8)
-            pax.write(50, 18, '18',verticalalignment='center',horizontalalignment='left',fontsize=8)
-            pax.write(50, 24, '24',verticalalignment='bottom',horizontalalignment='center',fontsize=8)
-            pax.write(50, 9, '50',verticalalignment='center',horizontalalignment='center',fontsize=8)
-            
-    cbaxes = pax.ax.inset_axes([-1.22,.05,.4,.03]) 
-    cb = plt.colorbar(pax.ax.collections[0],cax=cbaxes,ticks=[0,1000.],orientation='horizontal',extend='both')
-    cb.set_label('Counts', labelpad=-8)
-    
-    
-    plt.savefig(outpath + 'boundaryModel.png',bbox_inches='tight',dpi = 300)
-    plt.clf()
-    plt.close()
-    
-    
-def lmbdaE(bi):
-    dampingVals=np.geomspace(1e-4,1e3,22)
-    
-    norms_m_eb = []
-    norms_r_eb = []
-    for ii,lmbda in enumerate(dampingVals):
-        bm,norms = fuv.makeBoundaryModel(bi,dampingValE=lmbda)
-        norms_m_eb.append(norms[0])
-        norms_r_eb.append(norms[1])
-    
-    return np.array(norms_m_eb),np.array(norms_r_eb)
-
-def lmbdaP(bi,dampingValE):
-    dampingVals=np.geomspace(1e-5,1e2,22)
-    
-    norms_m_pb = []
-    norms_r_pb = []
-    for ii,lmbda in enumerate(dampingVals):
-        bm,norms = fuv.makeBoundaryModel(bi,dampingValE=dampingValE,dampingValP=lmbda)
-        norms_m_pb.append(norms[2])
-        norms_r_pb.append(norms[3])
-    
-    return np.array(norms_m_pb),np.array(norms_r_pb)    
-
-def makeFig10(wic,bf,outpath):
-    if len(wic.date)!=20: 
-        raise Exception('Must be 20 images.')
-    
-    fig = plt.figure(figsize=(11,15))
-
-    gs = gridspec.GridSpec(nrows=5,ncols=4,hspace=0.05,wspace=0)
-    
-    for i in range(5):
-        for j in range(4):
-            ## WIC ##
-            t= 4*i+j
-            pax = pp(plt.subplot(gs[i,j]),minlat=50)
-            pax.plot(bf.isel(date=t)['ocb'].values,bf.mlt.values,color='r')
-            # pax.plot(bf.isel(date=t)['eqb'].values,bf.mlt.values,color='r')
-            pax.plotpins(bf.isel(date=t)['ocb'].values[::2],bf.mlt.values[::2],-bf.isel(date=t)['v_theta'].values[::2],bf.isel(date=t)['v_phi'].values[::2],SCALE=300,unit='m/s',markersize=0)
-            # pax.plotpins(bf.isel(date=t)['eqb'].values[::2],bf.mlt.values[::2],-bf.isel(date=t)['u_theta'].values[::2],bf.isel(date=t)['u_phi'].values[::2],SCALE=500,markersize=0)
-            
-            pax.write(50, 12,wic.isel(date=t)['date'].dt.strftime('%H:%M:%S').values.tolist(),verticalalignment='bottom',horizontalalignment='center',fontsize=12)
-            pax.write(50,  6, '06',verticalalignment='center',horizontalalignment='right',fontsize=8)
-            pax.write(50, 12, '12',verticalalignment='top',horizontalalignment='center',fontsize=8)
-            pax.write(50, 18, '18',verticalalignment='center',horizontalalignment='left',fontsize=8)
-            pax.write(50, 24, '24',verticalalignment='bottom',horizontalalignment='center',fontsize=8)
-            pax.write(50, 9, '50',verticalalignment='center',horizontalalignment='center',fontsize=8)
-            
-    
-    
-    plt.savefig(outpath + 'boundaryVel.png',bbox_inches='tight',dpi = 300)
-    plt.clf()
-    plt.close()   
-
-def makeFigA1(path):
-    events = glob.glob('/Volumes/Seagate Backup Plus Drive/fuv/wic/nc/wic*')
-    events.sort()
-    
-    # wics = []
-    # for e in events:
-    #     wics.append(xr.load_dataset(e))
-    # wic = xr.concat(wics, dim='date')
-    wic = xr.load_dataset(events[3])
-    
-    fig,axs = plt.subplots(1,2,figsize=(10,5))
-    
-    wic.plot.scatter(x='sza',y='shimg',hue='shweight',ax=axs[0],s=0.01,alpha=0.4)
-    wic['Model'] = wic['dgmodel'] + wic['shmodel']
-    wic.plot.scatter(x='Model',y='img',hue='shweight',ax=axs[1],s=0.01,alpha=0.4)
-    
-    plt.savefig(path + 'dayglowPerformance.png',bbox_inches='tight',dpi=150)
-    plt.clf()
-    plt.close()
-
-
-def makeFigX(path):
-    ''' Make radial Fourier example '''
-    
-    mlt = np.linspace(0,24,241)
-    phi = np.deg2rad(15*mlt)
-    
-    c = np.array([25,7,2,-3,1,-1,2])
-    f = np.array([np.ones_like(phi),np.cos(phi),np.sin(phi),np.cos(2*phi),np.sin(2*phi),np.cos(3*phi),np.sin(3*phi)])
-    
-    fig,axs = plt.subplots(1,4,figsize=(10,3),constrained_layout = True)
-    
-    for i in range(4):
-        pax = pp(axs[i])
-        pax.plot(90-c[:1+2*i]@f[:1+2*i,:],mlt)
-        if i == 0:
-            pax.ax.set_title('$n = '+str(i) + '$\n $a_'+str(i)+' = '+str(c[0])+'$',pad=-10)
-        else:
-            pax.ax.set_title('$n = '+str(i) + '$\n $a_'+str(i)+' = '+str(c[2*i-1])+'$ and $b_'+str(i)+' = '+str(c[2*i])+'$',pad=-10)
-        
-    plt.savefig(path + 'shExample.pdf',bbox_inches='tight')
-    plt.clf()
-    plt.close()
-    
-    
-def makeGIF(wic,bi,bm,outpath,minlat=50):
-
-    ospath  = outpath.replace(r' ',r'\ ')
-
-    wic['shimg'].attrs = {'long_name': 'Counts', 'units': ''}
-  
-    r = (90. - np.abs(bm['ocb']))/(90. - minlat)
-    a = (bm.mlt.values - 6.)/12.*np.pi
-    bm['px'] =  r*np.cos(a)
-    bm['py'] =  r*np.sin(a)
-    
-    r = (90. - np.abs(bm['eqb']))/(90. - minlat)
-    a = (bm.mlt.values - 6.)/12.*np.pi
-    bm['ex'] =  r*np.cos(a)
-    bm['ey'] =  r*np.sin(a)
-    
-    for t in range(len(bm.date)):
-        fig,ax = plt.subplots(figsize=(7,6))
-        pax = pp(ax,plotgrid=False)
-        ax.fill(bm.isel(date=t)['ex'],bm.isel(date=t)['ey'],color='k')
-        ax.fill(bm.isel(date=t)['px'],bm.isel(date=t)['py'],color='w')
-        ax.set_title(bm.date[t].dt.strftime('%H:%M:%S').values.tolist(),y=1.0, pad=-30)
-        
-        plt.savefig(outpath + 'temp/binary'+str(t).zfill(4)+'.png',bbox_inches='tight',dpi=150)
-        plt.clf()
-        plt.close()
-        
-        fig,ax = plt.subplots(figsize=(7,6))
-        pax = pp(ax)
-        fuv.plotimg(wic.isel(date=t),'shimg',pax=pax,crange=(0,300),cmap='Greens')
-        pax.scatter(bi.isel(date=t)['ocb'].values,np.tile(bi.mlt.values,(5,1)).T,s=1,color='k')
-        pax.scatter(bi.isel(date=t)['eqb'].values,np.tile(bi.mlt.values,(5,1)).T,s=1,color='k')
-        pax.plot(bm.isel(date=t)['ocb'].values,bm.mlt.values,color='r')
-        pax.plot(bm.isel(date=t)['eqb'].values,bm.mlt.values,color='r')
-        cbar = plt.colorbar(pax.ax.collections[0],ax=ax,extend='both')
-        cbar.set_label(wic['shimg'].attrs['long_name'])
-        
-        ax.set_title(bm.date[t].dt.strftime('%H:%M:%S').values.tolist())
-        plt.savefig(outpath + 'temp/wic'+str(t).zfill(4)+'.png',bbox_inches='tight',dpi=150)
-        plt.clf()
-        plt.close()
-
-    os.system('convert '+ospath+'temp/wic*.png '+ospath+'imgs.gif')
-    os.system('convert '+ospath+'temp/binary*.png '+ospath+'oval.gif')
-    os.system('rm '+ospath+'temp/*.png')
-    
-def makeFigAutocorr(bi,outpath):
-    bm,norms,ms = fuv.makeBoundaryModel(bi,knotSep=5,dampingValE=0,dampingValP=0)
-    bm0,norms0,ms0 = fuv.makeBoundaryModel(bi,knotSep=15,dampingValE=10,dampingValP=2e2)
-    
-    x = 123/60*np.arange(len(sm.tsa.acf(ms[0][:,0])))
-    
-    fig,axs = plt.subplots(1,2,figsize=(6,3))
-    # axs[0].plot(x,sm.tsa.acf(ms[0][:,0]))
-    axs[0].plot(x,sm.tsa.acf(ms[0][:,1]))
-    axs[0].plot(x,sm.tsa.acf(ms[0][:,2]))
-    
-    axs[0].legend(['$a_1$','$b_1$'],loc=1,frameon=False)
-    axs[0].set_xlim([0,50])
-    axs[0].set_xlabel('Minutes')
-    axs[0].set_ylim([-0.5,1])
-    
-    
-    # axs[1].plot(x,sm.tsa.acf(ms[0][:,0]-ms0[0][:,0]))
-    axs[1].plot(x,sm.tsa.acf(ms[0][:,1]-ms0[0][:,1]))
-    axs[1].plot(x,sm.tsa.acf(ms[0][:,2]-ms0[0][:,2]))
-    
-    axs[1].legend(['$a_1$','$b_1$'],loc=1,frameon=False)
-    axs[1].set_xlim([0,50])
-    axs[1].set_xlabel('Minutes')
-    axs[1].set_ylim([-0.5,1])
-    axs[1].set_yticklabels([])
-    
-    plt.savefig(outpath + 'boundary_autocorr.pdf',bbox_inches='tight')
-    plt.clf()
-    plt.close()
-    
-def calcIntensity(wic,bm,outpath):
-    wic['shimg'].attrs = {'long_name': 'Counts', 'units': ''}
-  
-    r = (90. - np.abs(bm['ocb']))
-    a = (bm.mlt.values - 6.)/12.*np.pi
-    bm['px'] =  r*np.cos(a)
-    bm['py'] =  r*np.sin(a)
-    
-    r = (90. - np.abs(bm['eqb']))
-    a = (bm.mlt.values - 6.)/12.*np.pi
-    bm['ex'] =  r*np.cos(a)
-    bm['ey'] =  r*np.sin(a)
-    
-    r = (90. - np.abs(wic['mlat']))
-    a = (wic.mlt.values - 6.)/12.*np.pi
-    wic['x'] =  r*np.cos(a)
-    wic['y'] =  r*np.sin(a)
-    
-    mc=[]
-    mc0=[]
-    mc6=[]
-    mc12=[]
-    mc18=[]
-    for t in range(len(bm.date)):
-        # Create an PB polygon
-        poly = path.Path(np.stack((bm.isel(date=t).px.values,bm.isel(date=t).py.values),axis=1))
-
-        # Identify gridcell with center inside the PB polygon
-        inpb = poly.contains_points(np.stack((wic.isel(date=t).x.values.flatten(),wic.isel(date=t).y.values.flatten()),axis=1))
-    
-        # Create an EB polygon
-        poly = path.Path(np.stack((bm.isel(date=t).ex.values,bm.isel(date=t).ey.values),axis=1))
-
-        # Identify gridcell with center inside the EB polygon
-        ineb = poly.contains_points(np.stack((wic.isel(date=t).x.values.flatten(),wic.isel(date=t).y.values.flatten()),axis=1))
-    
-        mc.append(np.nanmedian(wic.isel(date=t).shimg.values.flatten()[ineb & ~inpb]))
-        mc0.append(np.nanmedian(wic.isel(date=t).shimg.values.flatten()[ineb & ~inpb & ((wic.isel(date=t)['mlt'].values.flatten()<3)|(wic.isel(date=t)['mlt'].values.flatten()>21))]))
-        mc6.append(np.nanmedian(wic.isel(date=t).shimg.values.flatten()[ineb & ~inpb & ((wic.isel(date=t)['mlt'].values.flatten()>3)&(wic.isel(date=t)['mlt'].values.flatten()<9))]))
-        mc12.append(np.nanmedian(wic.isel(date=t).shimg.values.flatten()[ineb & ~inpb & ((wic.isel(date=t)['mlt'].values.flatten()>9)&(wic.isel(date=t)['mlt'].values.flatten()<15))]))
-        mc18.append(np.nanmedian(wic.isel(date=t).shimg.values.flatten()[ineb & ~inpb & ((wic.isel(date=t)['mlt'].values.flatten()>15)&(wic.isel(date=t)['mlt'].values.flatten()<21))]))
-    
-    bm=bm.assign({'median':('date',np.array(mc)),
-                  'median00':('date',np.array(mc0)),
-                  'median06':('date',np.array(mc6)),
-                  'median12':('date',np.array(mc12)),
-                  'median18':('date',np.array(mc18))})
-    return bm
-
-def makeSHmodelTest(imgs,Nsh,Msh,order=2,dampingVal=0,tukeyVal=5,stop=1e-3,knotSep=None):
+def makeSHmodelTest(imgs,Nsh,Msh,order=2,dampingVal=0,tukeyVal=5,stop=1e-3,minlat=0,knotSep=None):
     '''
     Function to model the FUV residual background and subtract it from the input image
 
@@ -1713,8 +925,9 @@ def makeSHmodelTest(imgs,Nsh,Msh,order=2,dampingVal=0,tukeyVal=5,stop=1e-3,knotS
             - imgs['shimg'] is the dayglow-corrected image (dayglow subtracked from the input image)
             - imgs['shweight'] is the weight if each pixel after the final iteration
     '''
-    from fuvpy.utils import sh
-    from fuvpy.utils.sunlight import subsol
+
+    from fuvpy.src.utils import sh
+    from fuvpy.src.utils.sunlight import subsol
     
     date = imgs['date'].values
     time=(date-date[0])/ np.timedelta64(1, 'm')
@@ -1750,9 +963,12 @@ def makeSHmodelTest(imgs,Nsh,Msh,order=2,dampingVal=0,tukeyVal=5,stop=1e-3,knotS
     M = BSpline(knots, np.eye(n_cp), order)(time)
 
     # Iterative (few iterations)
-    skeys = sh.SHkeys(Nsh, Msh).Mge(1).MleN().setNmin(1)
-    ckeys = sh.SHkeys(Nsh, Msh).MleN().setNmin(1)
-
+    # skeys = sh.SHkeys(Nsh, Msh).Mge(1).MleN().setNmin(1)
+    # ckeys = sh.SHkeys(Nsh, Msh).MleN().setNmin(1)
+    # skeys = sh.SHkeys(Nsh, Msh).Mge(1).MleN().NminusModd()
+    # ckeys = sh.SHkeys(Nsh, Msh).MleN().NminusModd()
+    skeys = sh.SHkeys(Nsh, Msh).Mge(1).MleN().NminusMeven()
+    ckeys = sh.SHkeys(Nsh, Msh).MleN().NminusMeven()
     print('Building sh G matrix')
     G_g=[]
     G_s=[]
@@ -1780,48 +996,80 @@ def makeSHmodelTest(imgs,Nsh,Msh,order=2,dampingVal=0,tukeyVal=5,stop=1e-3,knotS
     G_s = np.array(G_s)
     G_s = G_s.reshape(-1,G_s.shape[2])
 
+    # Pixels to include in model
+    ind = (np.isfinite(d))&(glat>minlat)&(imgs['bad'].values.flatten())[None,:] &(np.isfinite(dg))  
+
+    # Spatial weights
+    grid,mltres=sdarngrid(5,5,minlat//5*5) # Equal area grid
+    ws = np.full(glat.shape,np.nan)
+    for i in range(len(glat)):
+        gbin = bin_number(grid,glat[i,ind[i]],glon[i,ind[i]]/15)
+        count=np.full(grid.shape[1],0)
+        un,count_un=np.unique(gbin,return_counts=True)
+        count[un]=count_un
+        ws[i,ind[i]]=1/count[gbin]
+
     # Data
-    ind = (np.isfinite(d))&(glat>0)&(imgs['bad'].values.flatten())[None,:]
     d_s = d.flatten()
     ind = ind.flatten()
     w = wdg.flatten() # Weights from dayglow model
-
+    ws = ws.flatten() 
+    sigma = dg.flatten()
     # Damping
     damping = dampingVal*np.ones(G_s.shape[1])
     R = np.diag(damping)
+    
+    # # 1st order regularization
+    # L = np.hstack((-np.identity(n_cp-1),np.zeros((n_cp-1,1))))+np.hstack((np.zeros((n_cp-1,1)),np.identity(n_cp-1)))
+    # LTL = np.zeros((n_cp*n_G,n_cp*n_G))
+    # for i in range(n_G): LTL[i*n_cp:(i+1)*n_cp,i*n_cp:(i+1)*n_cp] = L.T@L
+    # R =damping*LTL
 
-    diff = 1e10*stop
+    diff = 1e10
     iteration = 0
     m = None
+    dm = None
     while (diff>stop)&(iteration < 100):
         print('Iteration:',iteration)
         # Solve for spline amplitudes
-        m_s = np.linalg.lstsq((G_s[ind,:]*w[ind,None]).T@(G_s[ind,:]*w[ind,None])+R,(G_s[ind,:]*w[ind,None]).T@(d_s[ind]*w[ind]),rcond=None)[0]
+        m_s = np.linalg.lstsq((G_s[ind,:]*w[ind,None]*ws[ind,None]).T@(G_s[ind,:]*w[ind,None]*ws[ind,None])+R,(G_s[ind,:]*w[ind,None]*ws[ind,None]).T@(d_s[ind]*w[ind]*ws[ind]),rcond=None)[0]
+
+        if dm is not None:
+            dmOld=dm
 
         # Retrieve B-spline smooth model paramters (coarse)
         mNew    = M@m_s.reshape((n_G, n_cp)).T
+        plt.plot(mNew)
         dm=[]
         for i, tt in enumerate(time):
             dm.append(G_g[i]@mNew[i, :])
 
         dm=np.array(dm).squeeze()
         residuals = dm.flatten()[ind] - d.flatten()[ind]
-        rmse = np.sqrt(np.average(residuals**2,weights=w[ind]))
+        # if diff == 1e10: rmse = np.sqrt(np.average(residuals**2,weights=w[ind]*ws[ind]))
 
-        iw = ((residuals)/(tukeyVal*rmse))**2
-        iw[iw>1] = 1
-        w[ind] = (1-iw)**2
+        w[ind] = (1-np.minimum(1,((residuals)/(tukeyVal))**2))**2
+
+        if diff==1e10: diff=1e9
 
         if m is not None:
             diff = np.sqrt(np.mean( (mNew-m)**2))/(1+np.sqrt(np.mean(mNew**2)))
+            diff2 = np.sqrt(np.nanmean((dm.flatten()[ind]-dmOld.flatten()[ind])**2))/(1+np.sqrt(np.nanmean(dm.flatten()[ind]**2)))
             print('Relative change model norm:',diff)
+            print('Relative change model norm:',diff2)
         m = mNew
         iteration += 1
 
-
+    
     imgs['shmodel'] = (['date','row','col'],(dm*dg).reshape((n_t,len(imgs.row),len(imgs.col))))
     imgs['shimg'] = imgs['dgimg']-imgs['shmodel']
     imgs['shweight'] = (['date','row','col'],(w).reshape((n_t,len(imgs.row),len(imgs.col))))
+
+    # Remove pixels outside model scope
+    ind = (imgs.glat >= minlat) & imgs.bad & np.isfinite(imgs.dgsigma)
+    imgs['shmodel'] = xr.where(~ind,np.nan,imgs['shmodel'])
+    imgs['shimg'] = xr.where(~ind,np.nan,imgs['shimg'])
+    imgs['shweight'] = xr.where(~ind,np.nan,imgs['shweight'])
 
     # Add attributes
     imgs['shmodel'].attrs = {'long_name': 'Spherical harmonics model'}
@@ -1829,3 +1077,44 @@ def makeSHmodelTest(imgs,Nsh,Msh,order=2,dampingVal=0,tukeyVal=5,stop=1e-3,knotS
     imgs['shweight'].attrs = {'long_name': 'Spherical harmonics model weights'}
 
     return imgs
+
+def runEvent(inpath,outpath):
+    # NO ws SH: 0.01,0.3,0.3
+    wic = xr.load_dataset(inpath + 'wic.nc')
+    wic = makeFig2c(wic,outpath,[66,67,68],sKnots=[-3.5,-0.25,0,0.25,1.5,3.5],stop=0.01,tKnotSep=240,minlat=-90,tukeyVal=5,dzalim=75,dampingVal=0.03)
+    wic = makeSHmodelTest(wic,4,4,knotSep=240,stop=0.01,tukeyVal=5,dampingVal=1e-4)
+    
+    s12 = xr.load_dataset(inpath + 's12.nc')
+    s12 = makeFig2c(s12,outpath,[66,67,68],sKnots=[-3.5,-0.25,0,0.25,1.5,3.5],stop=0.01,tKnotSep=240,minlat=-90,tukeyVal=5,dzalim=75,dampingVal=1)
+    s12 = makeSHmodelTest(s12,4,4,knotSep=240,stop=0.01,tukeyVal=5,dampingVal=0.3)
+    
+    s13 = xr.load_dataset(inpath + 's13.nc')
+    s13 = makeFig2c(s13,outpath,[66,67,68],sKnots=[-3.5,-0.25,0,0.25,1.5,3.5],stop=0.01,tKnotSep=240,minlat=-90,tukeyVal=5,dzalim=75,dampingVal=1)
+    s13 = makeSHmodelTest(s13,4,4,knotSep=240,stop=0.01,tukeyVal=5,dampingVal=1e1)
+    
+    return wic,s12,s13
+
+
+
+def lcurve(imgs,model='BS'):
+    L0s = np.r_[0,np.geomspace(1e-5,1e2,7+1)]
+    
+    norms = []
+    for i in range(len(L0s)):
+        if model == 'BS':
+            _,temp=findNormsBS(imgs,sKnots=[-3.5,-0.25,0,0.25,1.5,3.5],stop=0.01,tKnotSep=150,minlat=-90,tukeyVal=5,dzalim=75,dampingVal=L0s[i])
+        elif model= 'SH':
+            _,temp=findNormsBS(imgs,sKnots=[-3.5,-0.25,0,0.25,1.5,3.5],stop=0.01,tKnotSep=150,minlat=-90,tukeyVal=5,dzalim=75,dampingVal=L0s[i])
+        norms.append(temp)
+    
+    plt.loglog(norm_r,norm_m,'.-')
+    return norm_m,norm_r
+
+
+    
+
+
+
+
+
+    
