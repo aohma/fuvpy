@@ -6,40 +6,51 @@ Created on Tue Apr 26 21:18:55 2022
 @author: aohma
 """
 import glob
-import os
 import numpy as np
 import pandas as pd
 import xarray as xr
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+
 from scipy.interpolate import BSpline
-from scipy.linalg import lstsq
-from scipy.stats import binned_statistic_2d
-# import statsmodels.api as sm
-import fuvpy as fuv
-from polplot import pp,sdarngrid,bin_number
-import matplotlib.path as path
-from scipy.stats import binned_statistic
+from scipy.stats import binned_statistic,binned_statistic_2d
 from scipy.optimize import curve_fit
+
+import fuvpy as fuv
+from polplot import pp
 
 
 def runEvent(inpath,outpath):
-    # NO ws SH: 0.01,0.3,0.3
+
     wic = xr.load_dataset(inpath + 'wic.nc')
-    wic = fuv.makeBSmodel(wic,sKnots=[-3.5,-0.25,0,0.25,1.5,3.5],stop=0.01,tKnotSep=240,minlat=-90,tukeyVal=5,dzalim=75,dampingVal=0.03)
+    wic = fuv.makeBSmodel(wic,sKnots=[-3.5,-0.25,0,0.25,1.5,3.5],stop=0.01,tKnotSep=240,minlat=-90,tukeyVal=5,dzalim=75,dampingVal=1e-2)
     wic = fuv.makeSHmodel(wic,4,4,knotSep=240,stop=0.01,tukeyVal=5,dampingVal=1e-4)
     
     s12 = xr.load_dataset(inpath + 's12.nc')
-    s12 = fuv.makeBSmodel(s12,sKnots=[-3.5,-0.25,0,0.25,1.5,3.5],stop=0.01,tKnotSep=240,minlat=-90,tukeyVal=5,dzalim=75,dampingVal=1)
+    s12 = fuv.makeBSmodel(s12,sKnots=[-3.5,-0.25,0,0.25,1.5,3.5],stop=0.01,tKnotSep=240,minlat=-90,tukeyVal=5,dzalim=75,dampingVal=1e-1)
     s12 = fuv.makeSHmodel(s12,4,4,knotSep=240,stop=0.01,tukeyVal=5,dampingVal=0.3)
     
     s13 = xr.load_dataset(inpath + 's13.nc')
-    s13 = fuv.makeBSmodel(s13,sKnots=[-3.5,-0.25,0,0.25,1.5,3.5],stop=0.01,tKnotSep=240,minlat=-90,tukeyVal=5,dzalim=75,dampingVal=1)
+    s13 = fuv.makeBSmodel(s13,sKnots=[-3.5,-0.25,0,0.25,1.5,3.5],stop=0.01,tKnotSep=240,minlat=-90,tukeyVal=5,dzalim=75,dampingVal=1e-2)
     s13 = fuv.makeSHmodel(s13,4,4,knotSep=240,stop=0.01,tukeyVal=5,dampingVal=1e1)
     
     return wic,s12,s13
 
-def weightedBinning(fraction,d,dm,w,sKnots):
+def lcurve(imgs,model='BS'):
+    L0s = np.r_[0,np.geomspace(1e-5,1e2,7+1)]
+    
+    norms = []
+    for i in range(len(L0s)):
+        if model == 'BS':
+            _,temp=fuv.makeBSmodel(imgs,sKnots=[-3.5,-0.25,0,0.25,1.5,3.5],stop=0.01,n_tKnots=5,minlat=-90,tukeyVal=5,dzalim=75,dampingVal=L0s[i],returnNorms=True)
+        elif model == 'SH':
+            _,temp=fuv.makeSHmodel(imgs,4,4,n_tKnots=5,stop=0.01,tukeyVal=5,dampingVal=L0s[i],returnNorms=True)
+        norms.append(temp)
+    
+    # plt.loglog(norm_r,norm_m,'.-')
+    return np.array(norms)
+
+def _noiseModel(fraction,d,dm,w,sKnots):
     bins = np.r_[sKnots[0],np.arange(0,sKnots[-1]+0.25,0.25)]
     binnumber = np.digitize(fraction,bins)
     
@@ -61,7 +72,7 @@ def weightedBinning(fraction,d,dm,w,sKnots):
     popt, pcov=curve_fit(func, dm[ind2]**2, rmse[ind2]**2, bounds=(0,np.inf))
     rmseFit = np.sqrt(func(dm**2,*popt))
     
-    return rmseFit,rmse
+    return rmseFit
     
     
 def makeFig1(wic,s12,s13,idate,outpath):
@@ -93,7 +104,7 @@ def makeFig1(wic,s12,s13,idate,outpath):
     plt.clf()
     plt.close()
     
-def makeFig2(inpath,outpath,idate):
+def makeFig2(inpath,idate,outpath):
     '''
     Figure showing WIC flat-field correction
 
@@ -127,7 +138,7 @@ def makeFig2(inpath,outpath,idate):
     plt.close()
 
 
-def makeFig3(imgs,outpath,idate,inImg='img',sOrder=3,dampingVal=0,tukeyVal=5,stop=1e-3,minlat=0,dzalim=75,sKnots=None,tKnotSep=None,tOrder=2):
+def makeFig3(imgs,outpath,idate,inImg='img',sOrder=3,dampingVal=0,tukeyVal=5,stop=1e-3,minlat=0,dzalim=75,sKnots=None,n_tKnots=2,tOrder=2):
     '''
     Figures showing the performance of the B-spline model
 
@@ -159,8 +170,8 @@ def makeFig3(imgs,outpath,idate,inImg='img',sOrder=3,dampingVal=0,tukeyVal=5,sto
         Maximum viewing angle to include. The default is 80.
     sKnots : array like, optional
         Location of the spatial Bspline knots. The default is None (default is used).
-    tKnotSep : int, optional
-        Approximate separation of temporal knots in minutes. The default is None (only knots at endpoints)
+    n_tKnots : int, optional
+        Number of temporal knots, equally spaced between the endpoints. The default is 2 (only knots at endpoints)
     tOrder : int, optional
         Order of the temporal spline fit. The default is 2.
 
@@ -177,35 +188,24 @@ def makeFig3(imgs,outpath,idate,inImg='img',sOrder=3,dampingVal=0,tukeyVal=5,sto
     # Add temporal dimension if missing
     if len(imgs.sizes)==2: imgs = imgs.expand_dims('date')
 
-    # Reshape the data
-    sza   = imgs['sza'].stack(z=('row','col')).values
-    dza   = imgs['dza'].stack(z=('row','col')).values
-    d = imgs[inImg].stack(z=('row','col')).values
-    glat  = imgs['glat'].stack(z=('row','col')).values
-    remove = imgs['bad'].stack(z=('row','col')).values
-
     # Spatial knots and viewing angle correction
     if imgs['id'] in ['WIC','SI12','SI13','UVI']:
-        fraction = np.cos(np.deg2rad(sza))/np.cos(np.deg2rad(dza))
+        fraction = np.cos(np.deg2rad(imgs['sza'].stack(z=('row','col')).values))/np.cos(np.deg2rad(imgs['dza'].stack(z=('row','col')).values))
         if sKnots is None: sKnots = [-3.5,-0.25,0,0.25,1.5,3.5]
     elif imgs['id'] == 'VIS':
-        fraction = np.cos(np.deg2rad(sza))
+        fraction = np.cos(np.deg2rad(imgs['sza'].stack(z=('row','col')).values))
         if sKnots is None: sKnots= [-1,-0.1,0,0.1,0.4,1]
     sKnots = np.r_[np.repeat(sKnots[0],sOrder),sKnots, np.repeat(sKnots[-1],sOrder)]
 
     # Minuets since first image
-    date = imgs['date'].values
-    time=(date-date[0])/ np.timedelta64(1, 'm')
+    time=(imgs['date'].values-imgs['date'].values[0])/ np.timedelta64(1, 'm')
 
     # temporal and spatial size
-    n_t = d.shape[0]
-    n_s = d.shape[1]
+    n_t = fraction.shape[0]
+    n_s = fraction.shape[1]
 
     # Temporal knots
-    if tKnotSep==None:
-        tKnots = np.linspace(time[0], time[-1], 2)
-    else:
-        tKnots = np.linspace(time[0], time[-1], int(np.round(time[-1]/tKnotSep)+1))
+    tKnots = np.linspace(time[0], time[-1], n_tKnots)
     tKnots = np.r_[np.repeat(tKnots[0],tOrder),tKnots, np.repeat(tKnots[-1],tOrder)]
 
     # Number of control points
@@ -213,42 +213,39 @@ def makeFig3(imgs,outpath,idate,inImg='img',sOrder=3,dampingVal=0,tukeyVal=5,sto
     n_scp = len(sKnots)-sOrder-1
 
     # Temporal design matix
-    print('Building dayglow G matrix')
+    print('Building design matrix')
     M = BSpline(tKnots, np.eye(n_tcp), tOrder)(time)
 
+    # Spatial design matrix
     G_g=[]
     G_s=[]
     for i in range(n_t):
         G= BSpline(sKnots, np.eye(n_scp), sOrder)(fraction[i,:]) # Spatial design matirx
         G_t = np.zeros((n_s, n_scp*n_tcp))
-
         for j in range(n_tcp):
             G_t[:, np.arange(j, n_scp*n_tcp, n_tcp)] = G*M[i, j]
 
-
         G_g.append(G)
         G_s.append(G_t)
-
     G_s=np.vstack(G_s)
 
+    # Index of data to use in model
+    ind = (imgs['sza'].stack(z=('row','col')).values >= 0) & (imgs['dza'].stack(z=('row','col')).values <= dzalim) & (imgs['glat'].stack(z=('row','col')).values >= minlat) & (np.isfinite(imgs[inImg].stack(z=('row','col')).values)) & imgs['bad'].stack(z=('row','col')).values[None,:] & (fraction>sKnots[0]) & (fraction<sKnots[-1])
 
-    # Data
-    ind = (sza >= 0) & (dza <= dzalim) & (glat >= minlat) & (np.isfinite(d)) & remove[None,:] & (fraction>sKnots[0]) & (fraction<sKnots[-1])
-    
-    # return sza,fraction,ind,sKnots
     # Spatial weights
     ws = np.full_like(fraction,np.nan)
-    for i in range(len(sza)):
+    for i in range(len(fraction)):
         count,bin_edges,bin_number=binned_statistic(fraction[i,ind[i,:]],fraction[i,ind[i,:]],statistic=
     'count',bins=np.arange(sKnots[0],sKnots[-1]+0.1,0.1))
         ws[i,ind[i,:]]=1/np.maximum(1,count[bin_number-1])
 
-    d_s = d.flatten()
+    # Make everything flat
+    d_s = imgs[inImg].stack(z=('row','col')).values.flatten()
     ind = ind.flatten()
     ws = ws.flatten()
-    w = np.ones(d_s.shape)
+    w = np.ones_like(d_s)
 
-    # Damping
+    # Damping (zeroth-order Tikhonov regularization)
     damping = dampingVal*np.ones(G_s.shape[1])
     R = np.diag(damping)
 
@@ -256,38 +253,26 @@ def makeFig3(imgs,outpath,idate,inImg='img',sOrder=3,dampingVal=0,tukeyVal=5,sto
     diff = 1e10
     iteration = 0
     m = None
-    dm=None
-    
-    # return d_s,ind,ws,fraction
-    
     while (diff>stop)&(iteration < 100):
         print('Iteration:',iteration)
 
         m_s = np.linalg.lstsq((G_s[ind,:]*w[ind,None]*ws[ind,None]).T@(G_s[ind,:]*w[ind,None]*ws[ind,None])+R,(G_s[ind,:]*w[ind,None]*ws[ind,None]).T@(d_s[ind]*w[ind]*ws[ind]),rcond=None)[0]
 
         mNew    = M@m_s.reshape((n_scp, n_tcp)).T
-        
-        if dm is not None:
-            dmOld=dm
-        
         dm=[]
         for i, tt in enumerate(time):
             dm.append(G_g[i]@mNew[i, :])
 
         dm=np.array(dm).squeeze()
-        residuals = (d.flatten()[ind] - dm.flatten()[ind])#/dm.flatten()[ind]
-        # rmse = np.sqrt(np.average(residuals**2,weights=w[ind]))
-        if iteration==0:
-            sigma = np.full_like(d_s,np.nan)
-            sigmaBinned = np.full_like(d_s,np.nan)
-            sigma[ind],sigmaBinned[ind] = weightedBinning(fraction.flatten()[ind], d.flatten()[ind],dm.flatten()[ind], w[ind]*ws[ind],sKnots)
-
-        w[ind] = (1 - np.minimum(1,(residuals/(tukeyVal*sigma[ind]))**2))**2
+        residuals = (d_s[ind] - dm.flatten()[ind])
         
-        if iteration == 0:
-            dm0 =dm
-            sigma0 = sigma
-            sigma0B = sigmaBinned
+        if iteration == 0: dm0 = dm
+
+        if iteration<=1:
+            sigma = np.full_like(d_s,np.nan)
+            sigma[ind] = _noiseModel(fraction.flatten()[ind], d_s[ind],dm.flatten()[ind], w[ind]*ws[ind],sKnots)
+            
+        w[ind] = (1 - np.minimum(1,(residuals/(tukeyVal*sigma[ind]))**2))**2
 
         if m is not None:
             diff = np.sqrt(np.mean((mNew-m)**2))/(1+np.sqrt(np.mean(mNew**2)))
@@ -302,9 +287,6 @@ def makeFig3(imgs,outpath,idate,inImg='img',sOrder=3,dampingVal=0,tukeyVal=5,sto
     imgs['dgimg'] = imgs[inImg]-imgs['dgmodel']
     imgs['dgweight'] = (['date','row','col'],(w).reshape((n_t,len(imgs.row),len(imgs.col))))
     imgs['dgsigma'] = (['date','row','col'],(sigma).reshape((n_t,len(imgs.row),len(imgs.col))))
-    imgs['dgsigma0'] = (['date','row','col'],(sigma0).reshape((n_t,len(imgs.row),len(imgs.col))))
-    imgs['dgsigmaB'] = (['date','row','col'],(sigmaBinned).reshape((n_t,len(imgs.row),len(imgs.col))))
-    imgs['dgsigma0B'] = (['date','row','col'],(sigma0B).reshape((n_t,len(imgs.row),len(imgs.col))))
 
     # Remove pixels outside model scope
     ind = (imgs.sza>=0)& (imgs.dza <= dzalim) & (imgs.glat >= minlat) & imgs.bad
@@ -315,9 +297,6 @@ def makeFig3(imgs,outpath,idate,inImg='img',sOrder=3,dampingVal=0,tukeyVal=5,sto
     imgs['dgimg'] = xr.where(~ind,np.nan,imgs['dgimg'])
     imgs['dgweight'] = xr.where(~ind,np.nan,imgs['dgweight'])
     imgs['dgsigma'] = xr.where(~ind,np.nan,imgs['dgsigma'])
-    imgs['dgsigma0'] = xr.where(~ind,np.nan,imgs['dgsigma0'])
-    imgs['dgsigmaB'] = xr.where(~ind,np.nan,imgs['dgsigmaB'])
-    imgs['dgsigma0B'] = xr.where(~ind,np.nan,imgs['dgsigma0B'])
     
     # change time to hours
     time = time/60
@@ -413,9 +392,7 @@ def makeFig3(imgs,outpath,idate,inImg='img',sOrder=3,dampingVal=0,tukeyVal=5,sto
     m = wic.isel(date=mid)['dgmodel'].values.flatten()
     m0 = wic.isel(date=mid)['dgmodel0'].values.flatten()
     e = wic.isel(date=mid)['dgsigma'].values.flatten()
-    e0 = wic.isel(date=mid)['dgsigma0'].values.flatten()
-    b = wic.isel(date=mid)['dgsigmaB'].values.flatten()
-    b0 = wic.isel(date=mid)['dgsigma0B'].values.flatten()
+
     
 
     
@@ -429,9 +406,6 @@ def makeFig3(imgs,outpath,idate,inImg='img',sOrder=3,dampingVal=0,tukeyVal=5,sto
     m = m[xm.argsort()]
     m0 = m0[xm.argsort()]
     e = e[xm.argsort()]
-    e0 = e0[xm.argsort()]
-    b = b[xm.argsort()]
-    b0 = b0[xm.argsort()]
     xm = xm[xm.argsort()]
     
     # interp for plotting
@@ -439,7 +413,6 @@ def makeFig3(imgs,outpath,idate,inImg='img',sOrder=3,dampingVal=0,tukeyVal=5,sto
     mi = np.interp(xi,xm[np.isfinite(m)],m[np.isfinite(m)],left=np.nan,right=np.nan)
     mi0 = np.interp(xi,xm[np.isfinite(m0)],m0[np.isfinite(m0)],left=np.nan,right=np.nan)
     ei = np.interp(xi,xm[np.isfinite(e)],e[np.isfinite(e)],left=np.nan,right=np.nan)
-    ei0 = np.interp(xi,xm[np.isfinite(e0)],e0[np.isfinite(e0)],left=np.nan,right=np.nan)
 
     axs[3].plot(xi,mi0,c='C0',linestyle='-',label='Initial $I_{bs}$')
     
@@ -469,15 +442,15 @@ def makeFig3(imgs,outpath,idate,inImg='img',sOrder=3,dampingVal=0,tukeyVal=5,sto
     plt.clf()
     plt.close()
     
-    return  imgs
 
-
-def makeFig4(wic,s12,s13,outpath):
+def makeFig4(wic,s12,s13,idate,outpath):
     ''' 
     Plot dayglow model overview for all cameras
     wic (xarray.Dataset): Wic image to be plotted. 
     '''
-    
+    wic = wic.isel(date=idate).copy()
+    s12 = s12.isel(date=idate).copy()
+    s13 = s13.isel(date=idate).copy()
     
     fig = plt.figure(figsize=(11,9))
 
@@ -774,208 +747,8 @@ def makeFig5(wic,s12,s13,outpath):
     plt.close()
 
 
-def makeSHmodelTest(imgs,Nsh,Msh,order=2,dampingVal=0,tukeyVal=5,stop=1e-3,minlat=0,knotSep=None):
-    '''
-    Function to model the FUV residual background and subtract it from the input image
-
-    Parameters
-    ----------
-    imgs : xarray.Dataset
-        Dataset with the FUV images
-    Nsh : int
-        Order of the SH
-    Msh : int
-        Degree of the SH
-    order: int, optional
-        Order of the temporal spline fit. The default is 2.
-    dampingVal : TYPE, optional
-        Damping to reduce the influence of the time-dependent part of the model.
-        The default is 0 (no damping).
-    tukeyVal : float, optional
-        Determines to what degree outliers are down-weighted.
-        Iterative reweights is (1-(residuals/(tukeyVal*rmse))^2)^2
-        Larger tukeyVal means less down-weight
-        Default is 5
-    stop : float, optional
-        When to stop the iteration. The default is 0.001.
-    knotSep : int, optional
-        Approximate separation of temporal knots in minutes. The default is None (only knots at endpoints)
-
-    Returns
-    -------
-    imgs : xarray.Dataset
-        A copy(?) of the image Dataset with two new fields:
-            - imgs['shmodel'] is the dayglow model
-            - imgs['shimg'] is the dayglow-corrected image (dayglow subtracked from the input image)
-            - imgs['shweight'] is the weight if each pixel after the final iteration
-    '''
-
-    from fuvpy.src.utils import sh
-    from fuvpy.src.utils.sunlight import subsol
-    
-    date = imgs['date'].values
-    time=(date-date[0])/ np.timedelta64(1, 'm')
-
-    glat = imgs['glat'].stack(z=('row','col')).values
-    glon = imgs['glon'].stack(z=('row','col')).values
-    d = imgs['dgimg'].stack(z=('row','col')).values
-    # dg = imgs['dgmodel'].stack(z=('row','col')).values
-    dg = imgs['dgsigma'].stack(z=('row','col')).values
-    wdg = imgs['dgweight'].stack(z=('row','col')).values
-
-    # Treat dg as variance
-    d = d/dg
-    
-
-    sslat, sslon = map(np.ravel, subsol(date))
-    phi = np.deg2rad((glon - sslon[:,None] + 180) % 360 - 180)
-
-    n_t = glat.shape[0]
-    n_s = glat.shape[1]
-
-    # Temporal knots
-    if knotSep==None:
-        knots = np.linspace(time[0], time[-1], 2)
-    else:
-        knots = np.linspace(time[0], time[-1], int(np.round(time[-1]/knotSep)+1))
-    knots = np.r_[np.repeat(knots[0],order),knots, np.repeat(knots[-1],order)]
-
-    # Number of control points
-    n_cp = len(knots)-order-1
-
-    # Temporal design matix
-    M = BSpline(knots, np.eye(n_cp), order)(time)
-
-    # Iterative (few iterations)
-    # skeys = sh.SHkeys(Nsh, Msh).Mge(1).MleN().setNmin(1)
-    # ckeys = sh.SHkeys(Nsh, Msh).MleN().setNmin(1)
-    # skeys = sh.SHkeys(Nsh, Msh).Mge(1).MleN().NminusModd()
-    # ckeys = sh.SHkeys(Nsh, Msh).MleN().NminusModd()
-    skeys = sh.SHkeys(Nsh, Msh).Mge(1).MleN().NminusMeven()
-    ckeys = sh.SHkeys(Nsh, Msh).MleN().NminusMeven()
-    print('Building sh G matrix')
-    G_g=[]
-    G_s=[]
-    for i in range(n_t):
-        # calculate Legendre functions at glat:
-        P, dP = sh.get_legendre(Nsh, Msh, 90 - glat[i,:])
-        Pc = np.hstack([P[key] for key in ckeys])
-        Ps = np.hstack([P[key] for key in skeys])
-
-        Gcos = Pc * np.cos(phi[i,:].reshape((-1, 1)) * ckeys.m)
-        Gsin = Ps * np.sin(phi[i,:].reshape((-1, 1)) * skeys.m)
-
-        G = np.hstack((Gcos, Gsin))
-        G = G/dg[i,:][:,None]
-        n_G = np.shape(G)[1]
-
-        G_t = np.zeros((n_s, n_G*n_cp))
-
-        for j in range(n_cp):
-            G_t[:, np.arange(j, n_G*n_cp, n_cp)] = G*M[i, j]
-
-        G_g.append(G)
-        G_s.append(G_t)
-
-    G_s = np.array(G_s)
-    G_s = G_s.reshape(-1,G_s.shape[2])
-
-    # Pixels to include in model
-    ind = (np.isfinite(d))&(glat>minlat)&(imgs['bad'].values.flatten())[None,:] &(np.isfinite(dg))  
-
-    # Spatial weights
-    grid,mltres=sdarngrid(5,5,minlat//5*5) # Equal area grid
-    ws = np.full(glat.shape,np.nan)
-    for i in range(len(glat)):
-        gbin = bin_number(grid,glat[i,ind[i]],glon[i,ind[i]]/15)
-        count=np.full(grid.shape[1],0)
-        un,count_un=np.unique(gbin,return_counts=True)
-        count[un]=count_un
-        ws[i,ind[i]]=1/count[gbin]
-
-    # Data
-    d_s = d.flatten()
-    ind = ind.flatten()
-    w = wdg.flatten() # Weights from dayglow model
-    ws = ws.flatten() 
-    sigma = dg.flatten()
-    # Damping
-    damping = dampingVal*np.ones(G_s.shape[1])
-    R = np.diag(damping)
-    
-    # # 1st order regularization
-    # L = np.hstack((-np.identity(n_cp-1),np.zeros((n_cp-1,1))))+np.hstack((np.zeros((n_cp-1,1)),np.identity(n_cp-1)))
-    # LTL = np.zeros((n_cp*n_G,n_cp*n_G))
-    # for i in range(n_G): LTL[i*n_cp:(i+1)*n_cp,i*n_cp:(i+1)*n_cp] = L.T@L
-    # R =damping*LTL
-
-    diff = 1e10
-    iteration = 0
-    m = None
-    dm = None
-    while (diff>stop)&(iteration < 100):
-        print('Iteration:',iteration)
-        # Solve for spline amplitudes
-        m_s = np.linalg.lstsq((G_s[ind,:]*w[ind,None]*ws[ind,None]).T@(G_s[ind,:]*w[ind,None]*ws[ind,None])+R,(G_s[ind,:]*w[ind,None]*ws[ind,None]).T@(d_s[ind]*w[ind]*ws[ind]),rcond=None)[0]
-
-        if dm is not None:
-            dmOld=dm
-
-        # Retrieve B-spline smooth model paramters (coarse)
-        mNew    = M@m_s.reshape((n_G, n_cp)).T
-        plt.plot(mNew)
-        dm=[]
-        for i, tt in enumerate(time):
-            dm.append(G_g[i]@mNew[i, :])
-
-        dm=np.array(dm).squeeze()
-        residuals = dm.flatten()[ind] - d.flatten()[ind]
-        # if diff == 1e10: rmse = np.sqrt(np.average(residuals**2,weights=w[ind]*ws[ind]))
-
-        w[ind] = (1-np.minimum(1,((residuals)/(tukeyVal))**2))**2
-
-        if diff==1e10: diff=1e9
-
-        if m is not None:
-            diff = np.sqrt(np.mean( (mNew-m)**2))/(1+np.sqrt(np.mean(mNew**2)))
-            diff2 = np.sqrt(np.nanmean((dm.flatten()[ind]-dmOld.flatten()[ind])**2))/(1+np.sqrt(np.nanmean(dm.flatten()[ind]**2)))
-            print('Relative change model norm:',diff)
-            print('Relative change model norm:',diff2)
-        m = mNew
-        iteration += 1
-
-    
-    imgs['shmodel'] = (['date','row','col'],(dm*dg).reshape((n_t,len(imgs.row),len(imgs.col))))
-    imgs['shimg'] = imgs['dgimg']-imgs['shmodel']
-    imgs['shweight'] = (['date','row','col'],(w).reshape((n_t,len(imgs.row),len(imgs.col))))
-
-    # Remove pixels outside model scope
-    ind = (imgs.glat >= minlat) & imgs.bad & np.isfinite(imgs.dgsigma)
-    imgs['shmodel'] = xr.where(~ind,np.nan,imgs['shmodel'])
-    imgs['shimg'] = xr.where(~ind,np.nan,imgs['shimg'])
-    imgs['shweight'] = xr.where(~ind,np.nan,imgs['shweight'])
-
-    # Add attributes
-    imgs['shmodel'].attrs = {'long_name': 'Spherical harmonics model'}
-    imgs['shimg'].attrs = {'long_name': 'Spherical harmonics corrected image'}
-    imgs['shweight'].attrs = {'long_name': 'Spherical harmonics model weights'}
-
-    return imgs
 
 
-# def lcurve(imgs,model='BS'):
-#     L0s = np.r_[0,np.geomspace(1e-5,1e2,7+1)]
-    
-#     norms = []
-#     for i in range(len(L0s)):
-#         if model == 'BS':
-#             _,temp=findNormsBS(imgs,sKnots=[-3.5,-0.25,0,0.25,1.5,3.5],stop=0.01,tKnotSep=150,minlat=-90,tukeyVal=5,dzalim=75,dampingVal=L0s[i])
-#         elif model == 'SH':
-#             _,temp=findNormsBS(imgs,sKnots=[-3.5,-0.25,0,0.25,1.5,3.5],stop=0.01,tKnotSep=150,minlat=-90,tukeyVal=5,dzalim=75,dampingVal=L0s[i])
-#         norms.append(temp)
-    
-#     plt.loglog(norm_r,norm_m,'.-')
-#     return norm_m,norm_r
 
 
     

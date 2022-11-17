@@ -93,7 +93,7 @@ def makeBSmodel(imgs,inImg='img',sOrder=3,dampingVal=0,tukeyVal=5,stop=1e-3,minl
     n_scp = len(sKnots)-sOrder-1
 
     # Temporal design matix
-    print('Building dayglow G matrix')
+    print('Building design matrix')
     M = BSpline(tKnots, np.eye(n_tcp), tOrder)(time)
 
     # Spatial design matrix
@@ -133,8 +133,6 @@ def makeBSmodel(imgs,inImg='img',sOrder=3,dampingVal=0,tukeyVal=5,stop=1e-3,minl
     diff = 1e10
     iteration = 0
     m = None
-
-
     while (diff>stop)&(iteration < 100):
         print('Iteration:',iteration)
 
@@ -148,9 +146,9 @@ def makeBSmodel(imgs,inImg='img',sOrder=3,dampingVal=0,tukeyVal=5,stop=1e-3,minl
         dm=np.array(dm).squeeze()
         residuals = (d_s[ind] - dm.flatten()[ind])
 
-        if iteration==0:
+        if iteration<=1:
             sigma = np.full_like(d_s,np.nan)
-            sigma[ind] = _noiseModel(fraction.flatten()[ind], d_s[ind],dm.flatten()[ind], w[ind],sKnots)
+            sigma[ind] = _noiseModel(fraction.flatten()[ind], d_s[ind],dm.flatten()[ind], w[ind]*ws[ind],sKnots)
         w[ind] = (1 - np.minimum(1,(residuals/(tukeyVal*sigma[ind]))**2))**2
 
         if m is not None:
@@ -207,7 +205,6 @@ def _noiseModel(fraction,d,dm,w,sKnots):
 
     popt, pcov=curve_fit(func, dm[ind2]**2, rmse[ind2]**2, bounds=(0,np.inf))
     rmseFit = np.sqrt(func(dm**2,*popt))
-
     return rmseFit
 
 
@@ -270,17 +267,14 @@ def makeSHmodel(imgs,Nsh,Msh,dampingVal=0,tukeyVal=5,stop=1e-3,minlat=0,n_tKnots
     n_s = glat.shape[1]
 
     # Temporal knots
-    if tKnotSep==None:
-        knots = np.linspace(time[0], time[-1], 2)
-    else:
-        knots = np.linspace(time[0], time[-1], int(np.round(time[-1]/tKnotSep)+1))
-    knots = np.r_[np.repeat(knots[0],tOrder),knots, np.repeat(knots[-1],tOrder)]
+    tKnots = np.linspace(time[0], time[-1], n_tKnots)
+    tKnots = np.r_[np.repeat(tKnots[0],tOrder),tKnots, np.repeat(tKnots[-1],tOrder)]
 
     # Number of control points
-    n_cp = len(knots)-tOrder-1
+    n_cp = len(tKnots)-tOrder-1
 
     # Temporal design matix
-    M = BSpline(knots, np.eye(n_cp), tOrder)(time)
+    M = BSpline(tKnots, np.eye(n_cp), tOrder)(time)
 
     # Iterative (few iterations)
     skeys = sh.SHkeys(Nsh, Msh).Mge(1).MleN().NminusMeven()
@@ -320,7 +314,7 @@ def makeSHmodel(imgs,Nsh,Msh,dampingVal=0,tukeyVal=5,stop=1e-3,minlat=0,n_tKnots
     grid,mltres=sdarngrid(5,5,minlat//5*5) # Equal area grid
     ws = np.full(glat.shape,np.nan)
     for i in range(len(glat)):
-        gbin = bin_number(grid,glat[i,ind[i]],glon[i,ind[i]]/15)
+        gbin = bin_number(grid,glat[i,ind[i]],imgs['glon'].stack(z=('row','col')).values[i,ind[i]]/15)
         count=np.full(grid.shape[1],0)
         un,count_un=np.unique(gbin,return_counts=True)
         count[un]=count_un
@@ -362,14 +356,14 @@ def makeSHmodel(imgs,Nsh,Msh,dampingVal=0,tukeyVal=5,stop=1e-3,minlat=0,n_tKnots
         iteration += 1
 
     normM = np.sqrt(np.average(m_s**2))
-    normR = np.sqrt(np.average(residuals[ind]**2,weights=w[ind]))
+    normR = np.sqrt(np.average(residuals**2,weights=w[ind]))
 
     imgs['shmodel'] = (['date','row','col'],(dm*imgs['dgsigma'].stack(z=('row','col')).values).reshape((n_t,len(imgs.row),len(imgs.col))))
     imgs['shimg'] = imgs['dgimg']-imgs['shmodel']
     imgs['shweight'] = (['date','row','col'],(w).reshape((n_t,len(imgs.row),len(imgs.col))))
 
     # Remove pixels outside model scope
-    ind = (imgs.glat >= minlat) & imgs.bad & np.isfinite(imgs['dgsimga'])
+    ind = (imgs.glat >= minlat) & imgs.bad & np.isfinite(imgs['dgsigma'])
     imgs['shmodel'] = xr.where(~ind,np.nan,imgs['shmodel'])
     imgs['shimg'] = xr.where(~ind,np.nan,imgs['shimg'])
     imgs['shweight'] = xr.where(~ind,np.nan,imgs['shweight'])
