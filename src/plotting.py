@@ -14,13 +14,7 @@ import matplotlib.gridspec as gridspec
 import matplotlib.colors as mcolors
 from matplotlib.collections import PolyCollection
 
-
-# Optional dependencies
-try:
-    from polplot import pp
-except:
-    print('polplot not found. Polar plotting functions will not work.'+
-          'To install polplot: git clone https://github.com/klaundal/polplot.git')
+from fuvpy.src.polplot import pp
     
 def getIMAGEcmap():
     """
