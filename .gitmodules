@@ -1,0 +1,3 @@
+[submodule "src/polplot"]
+	path = src/polplot
+	url = ../polplot
