@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fuvpy"
+version = "1.0.0"
+dependencies = [
+    "matplotlib",
+    "netcdf4",
+    "numpy",
+    "pandas",
+    "scipy",
+    "xarray",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["fuvpy"]
