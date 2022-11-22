@@ -17,7 +17,6 @@ from scipy.stats import binned_statistic,binned_statistic_2d,spearmanr
 from scipy.optimize import curve_fit
 
 import fuvpy as fuv
-from fuvpy import pp
 
 
 def runEvent(inpath):
