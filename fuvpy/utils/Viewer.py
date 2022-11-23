@@ -17,8 +17,8 @@ import pandas as pd
 import os
 
 """Adjustment Box"""
-mlat_size= 4 # goes from clicked mlat -2 to clicked mlat +2
-mlt_size= 1 # goes from clicked mlt -0.5 to clicked mlt +0.5
+lat_size= 4 # goes from clicked mlat -2 to clicked mlat +2
+lt_size= 1 # goes from clicked mlt -0.5 to clicked mlt +0.5
 """ Functions that shouldn't be touched """
 # For making the mlt axis showing pixel intensity at the mlat that has been chosen
 class Make_MLT_ax():
@@ -83,74 +83,74 @@ def radians2mlt(radians):
 # For showing the image file on the specified axis
 
 # What happens when an axis is clicked
-def clicked(image_axis, mlt_axis, mlat_axis, mlt, mlat):
+def clicked(image_axis, lt_axis, lat_axis, lt, lat):
     global marker
-    marker= image_axis.scatter(mlat, mlt, marker='+', color='black', zorder=100, s=500)
-    if mlt_axis and mlat_axis:
+    marker= image_axis.scatter(lat, lt, marker='+', color='black', zorder=100, s=500)
+    if lt_axis and lat_axis:
         global profile1, profile2, lines, window
         cmap=image_axis.image.get_cmap()
-        mlt_lims= (mlt-mlt_size/2, mlt+mlt_size/2)
+        lt_lims= (lt-lt_size/2, lt+lt_size/2)
         image= image_axis.image_dat
-        if mlt_lims[0]>=0 and mlt_lims[1]<24:
-            image= image.where((image.mlat>=mlat-mlat_size/2)\
-                                                           &(image.mlat<=mlat+mlat_size/2)\
-                                                           &(image.mlt>=mlt-mlt_size/2)\
-                                                           &(image.mlt<=mlt+mlt_size/2))
-        elif mlt_lims[0]<0:
-            image= image.where((image.mlat>=mlat-mlat_size/2)\
-                                                           &(image.mlat<=mlat+mlat_size/2)\
-                                                           &((image.mlt>=24+(mlt-mlt_size/2))\
-                                                           |(image.mlt<=mlt+mlt_size/2)))
-        elif mlt_lims[1]>24:
-            image= image.where((image.mlat>=mlat-mlat_size/2)\
-                                                           &(image.mlat<=mlat+mlat_size/2)\
-                                                           &((image.mlt>=(mlt-mlt_size/2))\
-                                                           |(image.mlt<=(mlt+mlt_size/2)-24)))
-        window= image_axis.plot([mlat+mlat_size/2]*2 + [mlat-mlat_size/2]*2+ [mlat+mlat_size/2],
-                                    [mlt-mlt_size/2, mlt+mlt_size/2, mlt+mlt_size/2, mlt-mlt_size/2, mlt-mlt_size/2],
+        if lt_lims[0]>=0 and lt_lims[1]<24:
+            image= image.where((image.lat>=lat-lat_size/2)\
+                                                           &(image.lat<=lat+lat_size/2)\
+                                                           &(image.lt>=lt-lt_size/2)\
+                                                           &(image.lt<=lt+lt_size/2))
+        elif lt_lims[0]<0:
+            image= image.where((image.lat>=lat-lat_size/2)\
+                                                           &(image.lat<=lat+lat_size/2)\
+                                                           &((image.lt>=24+(lt-lt_size/2))\
+                                                           |(image.lt<=lt+lt_size/2)))
+        elif lt_lims[1]>24:
+            image= image.where((image.lat>=lat-lat_size/2)\
+                                                           &(image.lat<=lat+lat_size/2)\
+                                                           &((image.lt>=(lt-lt_size/2))\
+                                                           |(image.lt<=(lt+lt_size/2)-24)))
+        window= image_axis.plot([lat+lat_size/2]*2 + [lat-lat_size/2]*2+ [lat+lat_size/2],
+                                    [lt-lt_size/2, lt+lt_size/2, lt+lt_size/2, lt-lt_size/2, lt-lt_size/2],
                                     color='orange')
         image= image.where(image.data!=0)
         ind= image.data== np.nanmax(image.data)
-        mlt_= np.nanmax(image.where(ind).mlt.values)
-        mlat_= np.nanmax(image.where(ind).mlat.values)
+        lt_= np.nanmax(image.where(ind).lt.values)
+        lat_= np.nanmax(image.where(ind).lat.values)
 
         crange= image_axis.image.get_clim()
-        profile1= [mlat_axis.scatter(image.mlat.values, image.data.values, c=image.data.values, cmap=cmap, vmin= crange[0], vmax=crange[1])]+\
-                   mlat_axis.plot([mlat]*2, [np.nanmin(image.data), np.nanmax(image.data)], color='black')
-        profile1.extend(mlat_axis.plot([round(mlat_, 2)]*2, [np.nanmin(image.data), np.nanmax(image.data)],
+        profile1= [lat_axis.scatter(image.lat.values, image.data.values, c=image.data.values, cmap=cmap, vmin= crange[0], vmax=crange[1])]+\
+                   lat_axis.plot([lat]*2, [np.nanmin(image.data), np.nanmax(image.data)], color='black')
+        profile1.extend(lat_axis.plot([np.round(lat_, 2)]*2, [np.nanmin(image.data), np.nanmax(image.data)],
                                        color='black', linestyle='--'))
         try:
-            mlat_axis.set_ylim(np.nanmin(image.data)-abs(np.nanmin(image.data))*.1,
+            lat_axis.set_ylim(np.nanmin(image.data)-abs(np.nanmin(image.data))*.1,
                                np.nanmax(image.data)+ abs(np.nanmax(image.data))*.1)
         except:
             pass
-        mlat_axis.set_xlim((mlat-mlat_size/2)-abs(mlat-mlat_size/2)*.01, (mlat+mlat_size/2)+abs(mlat+mlat_size/2)*.01)
-        radians= mlt2radians(image.mlt.values)
+        lat_axis.set_xlim((lat-lat_size/2)-abs(lat-lat_size/2)*.01, (lat+lat_size/2)+abs(lat+lat_size/2)*.01)
+        radians= mlt2radians(image.lt.values)
         xlims= radians2mlt(np.array([np.nanmin(radians), np.nanmax(radians)]))
         xlims[0]= np.floor(xlims[0]*10)/10
         xlims[1]= np.ceil(xlims[1]*10)/10
         try:
-            mlt_axis.set_xlim(*mlt2radians(xlims))
-            mlt_axis.set_ylim(np.nanmin(image.data)-abs(np.nanmin(image.data))*0.1, np.nanmax(image.data)+abs(np.nanmax(image.data))*.1)
+            lt_axis.set_xlim(*mlt2radians(xlims))
+            lt_axis.set_ylim(np.nanmin(image.data)-abs(np.nanmin(image.data))*0.1, np.nanmax(image.data)+abs(np.nanmax(image.data))*.1)
         except:
             pass
 
-        profile2= [mlt_axis.scatter(radians, image.data.values, c=image.data.values, cmap=cmap, vmin=crange[0], vmax=crange[1])]+\
-                   mlt_axis.plot([mlt2radians(mlt)]*2, [np.nanmin(image.data), np.nanmax(image.data)], color='black')
+        profile2= [lt_axis.scatter(radians, image.data.values, c=image.data.values, cmap=cmap, vmin=crange[0], vmax=crange[1])]+\
+                   lt_axis.plot([mlt2radians(lt)]*2, [np.nanmin(image.data), np.nanmax(image.data)], color='black')
 
-        profile2.extend(mlt_axis.plot([mlt2radians(round(mlt_, 2))]*2, [np.nanmin(image.data), np.nanmax(image.data)],
+        profile2.extend(lt_axis.plot([mlt2radians(np.round(lt_, 2))]*2, [np.nanmin(image.data), np.nanmax(image.data)],
                                   color='black', linestyle='--'))
-        if mlt_lims[0]<0:
-            labels= np.append(np.arange(24-mlt_size/4, round(mlt_lims[0]+24, 1)-mlt_size/4, -mlt_size/4)[::-1], np.arange(0, round(mlt_lims[1], 1)+mlt_size/4, mlt_size/4))
-        elif mlt_lims[1]>24:
-            labels= np.append(np.arange(24-mlt_size/4, round(mlt_lims[0], 1)-mlt_size/4, -mlt_size/4)[::-1], np.arange(0, round(mlt_lims[1]-24, 1)+mlt_size/4, mlt_size/4))
+        if lt_lims[0]<0:
+            labels= np.append(np.arange(24-lt_size/4, np.round(lt_lims[0]+24, 1)-lt_size/4, -lt_size/4)[::-1], np.arange(0, np.round(lt_lims[1], 1)+lt_size/4, lt_size/4))
+        elif lt_lims[1]>24:
+            labels= np.append(np.arange(24-lt_size/4, np.round(lt_lims[0], 1)-lt_size/4, -lt_size/4)[::-1], np.arange(0, np.round(lt_lims[1]-24, 1)+lt_size/4, lt_size/4))
         else:
-            labels= np.round(np.arange(round(mlt_lims[0], 1), round(mlt_lims[1], 1)+mlt_size/4, mlt_size/4), 2)
+            labels= np.round(np.arange(np.round(lt_lims[0], 1), np.round(lt_lims[1], 1)+lt_size/4, lt_size/4), 2)
         rads=mlt2radians(labels)
-        mlt_axis.set_xticks(rads, labels)
+        lt_axis.set_xticks(rads, labels)
 
-        lines= image_axis.plot([mlat]*100, np.append(np.linspace(0, 6, 50)[::-1], np.linspace(18, 24, 50)[::-1]), zorder=100, color='orange', alpha=.7) + \
-               image_axis.plot(np.linspace(50, 90, 100), [mlt]*100, zorder=100, color='orange', alpha=.7)
+        lines= image_axis.plot([lat]*100, np.append(np.linspace(0, 6, 50)[::-1], np.linspace(18, 24, 50)[::-1]), zorder=100, color='orange', alpha=.7) + \
+               image_axis.plot(np.linspace(50, 90, 100), [lt]*100, zorder=100, color='orange', alpha=.7)
 
 
 
@@ -158,6 +158,34 @@ def clicked(image_axis, mlt_axis, mlat_axis, mlt, mlat):
 
 class Visualise():
     def __init__(self, fig, axes, caxes, MLTax=False, MLATax=False, cax_association=False):
+        """
+        For initialising and setting up the visualisation tool. A tool for interacting, analysing
+        and visualising data that can be displayed in polar co-ordinates with ease.
+        
+        Parameters
+        ----------
+        fig : matplotlib figure
+            Figure object.
+        axes : Polarplot axis or list
+            Polarplot object made by the polplot package or list of Polarplot objects.
+        caxes : matplotlib AxesSubplot
+            AxesSubplot object or list of AxesSubplot objects where the colorbar(s) go.
+        MLTax : matplotlib AxesSubplot, optional
+            AxesSubplot object where MLT distributions can go when polar plots are 
+            clicked on for more detail. The default is False.
+        MLATax : matplotlib AxesSubplot, optional
+            AxesSubplot object where MLT distributions can go when polar plots are 
+            clicked on for more detail. The default is False.
+        cax_association : list, optional
+            List of indices that associate the colorbar subplot to the polar plot.
+            The same index can be used more than once when the colorbar is shared.
+            The default is False.
+
+        Returns
+        -------
+        None.
+
+        """
         if not isinstance(axes, (list, np.ndarray)):
             axes= [axes]
         if not isinstance(caxes, (list, np.ndarray)):
@@ -179,12 +207,67 @@ class Visualise():
         self.MLATax=MLATax
         self.cbars= [False]*len(np.unique(cax_association))
         self.figure= fig
-    def show_image(self, file, axis, crange=False, cmap=False, cbar_orientation=False, in_put='img'):
-        if file.endswith('.idl'):
-            axis.image_dat= fuv.readImg(file).isel(date = 0).rename({in_put:'data'})
+    def show_image(self, file, axis, crange=False, cmap=False, cbar_orientation=False, 
+                   in_put='img', lt_val='mlt', lat_val='mlat', date=0):
+        """
+        For plotting the data onto the polar plots and enabling the interactive features
+        of the visualisation tool. Can be used continually each time data wants to be plotted
+        as it will remove the old data and update colorbars etc.
+
+        Parameters
+        ----------
+        file : string or xarray
+            Must provide the path and file name of an idl or xarray file or provide an xarray object.
+        axis : Polarplot axis
+            Polarplot axis on which the data will be plotted.
+        crange : tuple, optional
+            Colorbar range for the data. The default is False in which case
+            the colorbar range will be automatic based on the range of the data or if show image
+            has been previously run it will reuse the previous range.
+        cmap : string, optional
+            Name of matplotlib colormap to be used. The default is False in which case
+            the defualt matplotlib colormap is used.
+        cbar_orientation : string, optional
+            Orientation of the colorbar. The default is False in which case
+            the orientation is horizontal or the orientation of the previous set up if show image
+            has been run previously.
+        in_put : string, optional
+            String that is used in the file for the data that is to be plotted. 
+            The default is 'img'.
+        lt_val : string, optional
+            String that is used in the file for the coordinate to be used as the local time. 
+            The default is 'mlt'.
+        lat_val : string, optional
+            String that is used in the file for the coordinate to be used as the latitude. 
+            The default is 'mlat'.
+        date: string or datetime or integer
+            Only used when input is an idl file. When using string or datetime will 
+            select where the date in the file matches the date argument. Using
+            an integer will select the date at that index.
+            ie date=0 will pick the first date in the file. Default is 0
+        Returns
+        -------
+        Image: matplotlib Polycollection
+            The polycollection object corresponding to the data plotted.
+        Colorbar: matplotlib Colorbar
+            The colorbar object associated with the data plotted.
+
+        """
+        axis.ax.format_coord= axis.make_format(lt_val, lat_val)
+        if type(file)==str:
+            if file.endswith('.idl'):
+                if isinstance(date, int):
+                    axis.image_dat= fuv.readImg(file).isel(date = date).rename({in_put:'data', 
+                                                                             lt_val:'lt', lat_val:'lat'})
+                else:
+                    axis.image_dat= fuv.readImg(file).sel(date = date).rename({in_put:'data', 
+                                                                             lt_val:'lt', lat_val:'lat'})
+            else:
+                import xarray as xr
+                axis.image_dat= xr.load_dataset(file).rename({in_put:'data', 
+                                                                         lt_val:'lt', lat_val:'lat'})
         else:
-            import xarray as xr
-            axis.image_dat= xr.load_dataset(file).rename({in_put:'data'})
+            axis.image_dat= file.rename({in_put:'data', lt_val:'lt', lat_val:'lat'})
         if axis.image:
             axis.image.remove()
             axis.image=False
@@ -195,8 +278,8 @@ class Visualise():
                 pass
             except ValueError:
                 pass
-        mlt= axis.image_dat.mlt
-        image= axis.image_dat.where(eval(axis.ltlims)&(axis.image_dat.mlat>=(axis.minlat)))
+        lt= axis.image_dat.lt
+        image= axis.image_dat.where(eval(axis.ltlims)&(axis.image_dat.lat>=(axis.minlat)))
         maxi= np.nanmax(axis.image_dat.data)
         mini= np.nanmin(axis.image_dat.data)
         cbar= self.cbars[axis.cax_number]
@@ -214,7 +297,7 @@ class Visualise():
                         ax.image.set_clim(crange)
                     if ax.image and cmap!= ax.image.get_cmap().name:
                         ax.image.set_cmap(cmap)
-            im= axis.plotimg(image.mlat.values, image.mlt.values, image.data.values, crange=crange, cmap=cmap, zorder=1)
+            im= axis.plotimg(image.lat.values, image.lt.values, image.data.values, crange=crange, cmap=cmap, zorder=1)
             cbar=self.figure.colorbar(im, cax=cax, orientation= cbar_orientation)
             self.cbars[axis.cax_number]=cbar
         else:
@@ -246,7 +329,7 @@ class Visualise():
                         ax.image.set_clim(crange)
                     if cmap!= ax.image.get_cmap().name:
                         ax.image.set_cmap(cmap)
-            im= axis.plotimg(image.mlat.values, image.mlt.values, image.data.values, crange=crange, cmap=cmap, zorder=1)
+            im= axis.plotimg(image.lat.values, image.lt.values, image.data.values, crange=crange, cmap=cmap, zorder=1)
             if new_cbar:
                 if cbar.orientation=='horizontal':
                     label= cbar.ax.get_xlabel()
@@ -261,23 +344,26 @@ class Visualise():
                 for ax in self.axes:
                     if ax.cax_number== axis.cax_number and ax.image:
                         ax.image.set_clim(crange)
-        axis.ax.set_title(image.date.values.astype('datetime64[s]').tolist(), y=0.1)
+        try:
+            axis.ax.set_title(image.date.values.astype('datetime64[s]').tolist(), y=0.1)
+        except AttributeError:
+            UserWarning('Failed to use date in file to make subplot title. AttributeError')
         axis.image= im
         return im, cbar
     # Handles which axis was clicked, where it was clicked and preparation for the clicked function
     def onclick(self, axes, prof_axis1, prof_axis2, caxes, event):
-        bools_ax= np.array([axis.in_axes(event) for axis in axes])
+        bools_ax= np.array([axis.ax.in_axes(event) for axis in axes])
         bools_cax= np.array([axis.in_axes(event) for axis in caxes])
         if any(bools_ax):
-            global mlt, mlat
+            global lt, lat
             ix, iy= event.xdata, event.ydata
             try:
                 marker.remove()
                 for p in profile1+ profile2+ lines+window: p.remove()
             except:
                 pass
-            mlat, mlt= np.array(axes)[bools_ax][0]._XYtomltMlat(ix, iy)
-            clicked(np.array(axes)[bools_ax][0], prof_axis1, prof_axis2, mlt, mlat)
+            lat, lt= np.array(axes)[bools_ax][0]._xy2latlt(ix, iy)
+            clicked(np.array(axes)[bools_ax][0], prof_axis1, prof_axis2, lt, lat)
         elif any(bools_cax):
             ix, iy= event.xdata, event.ydata
             cax_number= np.argmax(bools_cax)
@@ -306,7 +392,7 @@ class Visualise():
 
 if __name__=='__main__':
     import inspect
-    folder= '/'.join(inspect.getfile(fuv).split('/')[:-1])+'/data/wicFiles/'
+    folder= '/'.join(inspect.getfile(fuv).split('/')[:-2])+'/examples/sample_wicfiles/'
     file=folder+'wic20002410928.idl'
     np.datetime64('2001-12-06T10:17:26')
     file2=folder+'wic20002410930.idl'
@@ -320,4 +406,5 @@ if __name__=='__main__':
     cax2= fig.add_subplot(gs[1,0])
     vis=Visualise(fig, np.asarray([ax, ax2]), np.asarray([cax, cax2]), MLTax, MLATax, cax_association=[0, 1])
     vis.show_image(file, ax, cmap='viridis_r', in_put='sza')
-    vis.show_image(file2, ax2)
+    xarray= fuv.readImg(file2).isel(date=0)
+    vis.show_image(xarray, ax2)
