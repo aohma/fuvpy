@@ -8,7 +8,7 @@ Created on Wed May  4 10:22:03 2022
 
 """ Imports """
 import matplotlib.pyplot as plt
-from polplot.polplot import Polarplot as polar
+from fuvpy.polplot import Polarplot as polar
 import fuvpy as fuv
 from glob import glob
 import numpy as np
@@ -196,7 +196,7 @@ class Visualise():
             except ValueError:
                 pass
         mlt= axis.image_dat.mlt
-        image= axis.image_dat.where(eval(axis.mltlims)&(axis.image_dat.mlat>=(axis.minlat)))
+        image= axis.image_dat.where(eval(axis.ltlims)&(axis.image_dat.mlat>=(axis.minlat)))
         maxi= np.nanmax(axis.image_dat.data)
         mini= np.nanmin(axis.image_dat.data)
         cbar= self.cbars[axis.cax_number]
