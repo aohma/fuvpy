@@ -7,13 +7,15 @@ At present, the package includes functions to remove background emissions and to
 The code is based on xarray, using xarray.Dataset objects to store the images.
 Functions to read .idl and .sav files produced by fuview3 and xvis (IMAGE and Polar mission software) into this format are provided.
 Other formats need to be confected into a xarray.Dataset with coordinates ['date','row','col'] and data_vars = ['img','mlat','mlon','mlt','glat','glon','dza','sza'].
-Here, 'date' is the datetime of the images and 'row' and 'col' refer to the
+Here, 'date' is the datetime of the images and 'row' and 'col' refer to the row and column of the camera (2D image).
 The data_vars are thus 3D arrays:
+
 - 'img' is the measured intensity of each pixel
 - 'mlat', 'mlon' and 'mlt' are the magnetic latitude, longitude and local time of each pixel, respectively
 - 'glat' and 'glon' are the geographic latitude and longitude of each pixel, respectively
 - 'dza' is the viewing angle of each pixel
 - 'sza' is the solar zenith anlge of each pixel
+
 If needed, the magnetic coordinates can be calculated from the geographic coordinates (or vice versa) using e.g. apexpy (pip install apexpy).
 The solar zenith angle can be calculated based on the subsolar point, which is found using fuvpy.subsol()
 
@@ -52,4 +54,4 @@ Create a virtual environment with ``conda``, where all dependencies are automati
 
 Option 2
 --------
-Add the path to the fuvpy folder to PYTHONPATH, and make sure that all dependencies are installed. 
+Add the path to the fuvpy folder to PYTHONPATH, and make sure that all dependencies are installed.
