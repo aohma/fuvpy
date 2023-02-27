@@ -8,10 +8,13 @@ Created on Fri Sep 30 09:28:25 2022
 
 import numpy as np
 import xarray as xr
+import time as timing
 
 from scipy.interpolate import BSpline
 from scipy.optimize import curve_fit
 from scipy.stats import binned_statistic
+from scipy.sparse import csc_array
+from scipy.linalg import lstsq
 
 from fuvpy.utils import sh
 from fuvpy.utils.sunlight import subsol
@@ -64,7 +67,7 @@ def makeBSmodel(imgs,inImg='img',sOrder=3,dampingVal=0,tukeyVal=5,stop=1e-3,minl
     norms : tuple, optional
         A tuple containing the residual and model norms. Only if returnNorms is True
     '''
-
+    start = timing.process_time()
     # Add temporal dimension if missing
     if len(imgs.sizes)==2: imgs = imgs.expand_dims('date')
 
@@ -129,6 +132,7 @@ def makeBSmodel(imgs,inImg='img',sOrder=3,dampingVal=0,tukeyVal=5,stop=1e-3,minl
     damping = dampingVal*np.ones(G_s.shape[1])
     R = np.diag(damping)
 
+    print(timing.process_time() - start)
     # Iterativaly solve the inverse problem
     diff = 1e10
     iteration = 0
@@ -156,7 +160,8 @@ def makeBSmodel(imgs,inImg='img',sOrder=3,dampingVal=0,tukeyVal=5,stop=1e-3,minl
             print('Relative change model norm',diff)
         m = mNew
         iteration += 1
-
+        print(timing.process_time() - start)
+        
     normM = np.sqrt(np.average(m_s**2))
     normR = np.sqrt(np.average(residuals**2,weights=w[ind]))
 
@@ -183,6 +188,160 @@ def makeBSmodel(imgs,inImg='img',sOrder=3,dampingVal=0,tukeyVal=5,stop=1e-3,minl
         return imgs,(normR,normM)
     else:
         return imgs
+
+def makeBSmodelTest(imgs,inImg='img',sOrder=3,dampingVal=0,tukeyVal=5,stop=1e-3,minlat=-90,dzalim=75,sKnots=None,n_tKnots=2,tOrder=2,returnNorms=False):
+    '''
+    Function to model the FUV dayglow and subtract it from the input image. Testing scipy.sparse
+
+    Parameters
+    ----------
+    imgs : xarray.Dataset
+        Dataset with the FUV images, imported by readFUVimage()
+    inImg : str, optional
+        Name of the input image to be used in the model. The default is 'img'.
+    sOrder : int, optional
+        Order of the spatial spline fit. The default is 3.
+    dampingVal : float, optional
+        Damping (Tikhonov regularization).
+        The default is 0 (no damping).
+    tukeyVal : float, optional
+        Determines to what degree outliers are down-weighted.
+        Iterative reweights is (1-(residuals/(tukeyVal*rmse))^2)^2
+        Larger tukeyVal means less down-weight
+        Default is 5
+    stop : float, optional
+        When to stop the iteration. The default is 0.001.
+    minlat : float, optional
+        Lower glat boundary to include in the model. The default is -90.
+    dzalim : float, optional
+        Maximum viewing angle to include. The default is 75.
+    sKnots : array like, optional
+        Location of the spatial Bspline knots. The default is None (default is used).
+    n_tKnots : int, optional
+        Number of temporal knots, equally spaced between the endpoints. The default is 2 (only knots at endpoints)
+    tOrder : int, optional
+        Order of the temporal spline fit. The default is 2.
+    returnNorms : bool, optional
+        If True, also return the residual and model norms
+
+    Returns
+    -------
+    imgs : xarray.Dataset
+        A copy of the image Dataset with four new fields:
+            - imgs['dgmodel'] is the B-spline based dayglow model
+            - imgs['dgimg'] is the dayglow-corrected image (dayglow subtracked from the input image)
+            - imgs['dgweight'] is the weights after the final iteration
+            - imgs['dgsigma'] is the modelled spread
+    norms : tuple, optional
+        A tuple containing the residual and model norms. Only if returnNorms is True
+    '''
+    start = timing.process_time()
+    # Spatial knots and viewing angle correction
+    if imgs['id'] in ['WIC','SI12','SI13','UVI']:
+        fraction = np.cos(np.deg2rad(imgs['sza'].stack(z=('date','row','col')).values))/np.cos(np.deg2rad(imgs['dza'].stack(z=('date','row','col')).values))
+        if sKnots is None: sKnots = [-3.5,-0.25,0,0.25,1.5,3.5]
+    elif imgs['id'] == 'VIS':
+        fraction = np.cos(np.deg2rad(imgs['sza'].stack(z=('date','row','col')).values))
+        if sKnots is None: sKnots= [-1,-0.1,0,0.1,0.4,1]
+    sKnots = np.r_[np.repeat(sKnots[0],sOrder),sKnots, np.repeat(sKnots[-1],sOrder)]
+
+    # Minuets since first image
+    time=(imgs['date'].values-imgs['date'].values[0])/ np.timedelta64(1, 'm')
+
+    # temporal and spatial size
+    n_t = len(imgs.date)
+    n_r = len(imgs.row)
+    n_c = len(imgs.col)
+
+    # Index of data to use in model
+    ind = (imgs['sza'].stack(z=('date','row','col')).values >= 0) & (imgs['dza'].stack(z=('date','row','col')).values <= dzalim) & (imgs['glat'].stack(z=('date','row','col')).values >= minlat) & (np.isfinite(imgs[inImg].stack(z=('date','row','col')).values)) & imgs['bad'].stack(z=('row','col')).values[np.tile(np.arange(n_r*n_c),n_t)] & (fraction>sKnots[0]) & (fraction<sKnots[-1])
+
+
+    # Temporal knots
+    tKnots = np.linspace(time[0], time[-1], n_tKnots)
+    tKnots = np.r_[np.repeat(tKnots[0],tOrder),tKnots, np.repeat(tKnots[-1],tOrder)]
+
+    # Number of control points
+    n_tcp = len(tKnots)-tOrder-1
+    n_scp = len(sKnots)-sOrder-1
+
+    # Temporal design matrix
+    Gtime = BSpline.design_matrix(time[np.arange(n_t).repeat(n_r*n_c)][ind], tKnots,tOrder)
+
+    # Spatial design matrix
+    Gfrac = BSpline.design_matrix(fraction[ind],sKnots,sOrder)
+
+    G = Gfrac[:,np.repeat(np.arange(n_scp),n_tcp)]*Gtime[:,np.tile(np.arange(n_tcp),n_scp)]
+
+    # Spatial weights
+    ws = []
+    for i in range(n_t):
+        count,bin_edges,bin_number=binned_statistic(fraction[i*(n_r*n_c):(i+1)*(n_r*n_c)][ind[i*(n_r*n_c):(i+1)*(n_r*n_c)]],None,statistic=
+    'count',bins=np.arange(sKnots[0],sKnots[-1]+0.1,0.1))
+        ws.extend(1/np.maximum(1,count[bin_number-1]))
+    ws = csc_array(ws).T
+
+    # Make everything flat
+    d = imgs[inImg].stack(z=('date','row','col')).values[ind]
+    
+    # Initiate iterative weights
+    w = np.ones_like(d)
+    w = csc_array(w).T
+    
+
+    # Damping (zeroth-order Tikhonov regularization)
+    damping = dampingVal*np.ones(n_scp*n_tcp)
+    R = np.diag(damping)
+
+    print(timing.process_time() - start)
+    # Iterativaly solve the inverse problem
+    diff = 1e10
+    iteration = 0
+    dm = np.full((n_t*n_r*n_c),np.nan)
+    m = None
+    while (diff>stop)&(iteration < 100):
+        print('Iteration:',iteration)
+        mNew = lstsq((G*w*ws).T.dot(G*w*ws)+R,(G*w*ws).T.dot(d*w.toarray().squeeze()*ws.toarray().squeeze()),lapack_driver='gelsy')[0]
+        
+        dm[ind]=G.dot(mNew)
+        residuals = (d - dm[ind])
+
+        if iteration<=1:
+            sigma = np.full_like(dm,np.nan)
+            sigma[ind] = _noiseModel(fraction[ind], d,dm[ind], w.toarray().squeeze()*ws.toarray().squeeze(),sKnots)
+        w[:] = (1 - np.minimum(1,(residuals/(tukeyVal*sigma))**2))**2
+
+        if m is not None:
+            diff = np.sqrt(np.mean((mNew-m)**2))/(1+np.sqrt(np.mean(mNew**2)))
+            print('Relative change model norm',diff)
+        m = mNew
+        iteration += 1
+        print(timing.process_time() - start)
+
+    # normM = np.sqrt(np.average(m_s**2))
+    # normR = np.sqrt(np.average(residuals**2,weights=w[ind]))
+    
+
+    # Add dayglow model and corrected image to the Dataset
+    imgs['dgmodel'] = (['date','row','col'],dm.reshape(n_t,n_r,n_c))
+    imgs['dgimg'] = imgs[inImg]-imgs['dgmodel']
+    # imgs['dgweight'] = (['date','row','col'],(w).reshape((n_t,len(imgs.row),len(imgs.col))))
+    imgs['dgsigma'] = (['date','row','col'],(sigma).reshape((n_t,n_r,n_c)))
+
+    # Remove pixels outside model scope
+    ind = (imgs.sza>=0)& (imgs.dza <= dzalim) & (imgs.glat >= minlat) & imgs.bad
+    imgs['dgmodel'] = xr.where(~ind,np.nan,imgs['dgmodel'])
+    imgs['dgimg'] = xr.where(~ind,np.nan,imgs['dgimg'])
+    # imgs['dgweight'] = xr.where(~ind,np.nan,imgs['dgweight'])
+    # imgs['dgsigma'] = xr.where(~ind,np.nan,imgs['dgsigma'])
+
+    # Add attributes
+    imgs['dgmodel'].attrs = {'long_name': 'BS model'}
+    imgs['dgimg'].attrs = {'long_name': 'BS corrected image'}
+    # imgs['dgweight'].attrs = {'long_name': 'BS model weights'}
+    # imgs['dgsigma'].attrs = {'long_name': 'BS model spread'}
+
+    return imgs
 
 def _noiseModel(fraction,d,dm,w,sKnots):
 
@@ -377,3 +536,248 @@ def makeSHmodel(imgs,Nsh,Msh,dampingVal=0,tukeyVal=5,stop=1e-3,minlat=0,n_tKnots
         return imgs,(normR,normM)
     else:
         return imgs
+
+
+def bin_number2(grid, mlat, mlt):
+    """
+    Ultra-fast routine to determine the bin number of mlat and mlt
+    NB HARD CODED VERSION TO USE DATA FROM BOTH HEMISPHERES
+
+    Parameters
+    ----------
+    grid : 2 x N array
+        Array containing the edges of the mlat-mlt bins.
+        First row is mlat and second row mlt.
+        grid can be constructed using either equal_area_grid or sdarngrid
+    mlat : array
+        Array with the mlats to bin
+    mlt : array
+        Array with the mlts to bin
+
+    Returns
+    -------
+    bin_n : array
+        Array with the bin number for each mlat-mlt pair.
+        Locations outside the defined grid are set to -1 in the returned array.
+
+
+    SMH 2021/04/15
+    Modified by JPR 2021/10/20
+    2022-05-02: JPR added nan handling
+    2022-05-05: AO added better handling of values outside grid (including nans).
+    """
+
+    llat = np.unique(grid[0]) # latitude circles
+    assert np.allclose(np.sort(llat) - llat, 0) # should be in sorted order automatically. If not, the algorithm will not work
+    dlat = np.diff(llat)[0] # latitude step
+    latbins = np.hstack(( llat, llat[-1] + dlat )) # make latitude bin edges
+
+    bin_n = -np.ones_like(mlat).astype(int) # initiate binnumber
+    ii = (np.isfinite(mlat))&(np.isfinite(mlt))&(mlat>=latbins[0])&(mlat<=latbins[-1]) # index of real values inside the grid
+    mlat,mlt = mlat[ii],mlt[ii] # Reduce to only real values inside grid
+
+    latbin_n = np.digitize(mlat, latbins) - 1 # find the latitude index for each data point
+
+    # number of longitude bins in each latitude ring:
+    nlons = np.array([len(np.unique(grid[1][grid[0] == lat])) for lat in llat])
+
+    # normalize all longitude bins to the equatorward ring:
+    _mlt = mlt * nlons[latbin_n] / nlons[17]
+
+    # make longitude bin edges for the equatorward ring:
+    llon = np.unique(grid[1][grid[0] == llat[17]])
+    dlon = np.diff(llon)[0]
+    lonbins = np.hstack((llon, llon[-1] + dlon)) # make longitude bin edges
+    lonbin_n = np.digitize(_mlt, lonbins) - 1 # find the longitude bin
+
+    # map from 2D bin numbers to 1D by adding the number of bins in each row equatorward:
+    bin_n[ii] = lonbin_n + np.cumsum(np.hstack((0, nlons)))[latbin_n]
+
+    return bin_n
+
+def makeSBSmodel(imgs):
+    '''
+    Testing Spherical B-spline modelling
+
+    Parameters
+    ----------
+    imgs : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    imgs : TYPE
+        DESCRIPTION.
+
+    '''
+
+    sslat, sslon = map(np.ravel, subsol(imgs['date'].values))
+    
+    
+    r = 6500 
+    theta = np.deg2rad(90-imgs.glat.values)
+    phi = np.deg2rad((imgs['glon'].values - sslon[:,None,None] + 180) % 360 - 180)
+    
+    xGEO = r * np.sin(theta) * np.cos(phi)
+    yGEO = r * np.sin(theta) * np.sin(phi) 
+    zGEO = r * np.cos(theta)
+    
+    slat = np.full_like(theta,np.nan)
+    slon = np.full_like(theta,np.nan)
+    for i in range(len(imgs.date)):
+        conv = np.array([[-np.sin(np.deg2rad(sslat[i])),0,np.cos(np.deg2rad(sslat[i]))],
+                         [0,-1,0],
+                         [np.cos(np.deg2rad(sslat[i])),0,np.sin(np.deg2rad(sslat[i]))]])
+        xyz = conv @ np.vstack((xGEO[i,:,:].flatten(),yGEO[i,:,:].flatten(),zGEO[i,:,:].flatten()))
+        
+        slat[i,:,:] = 90-np.rad2deg(np.arccos(xyz[2,:]/r)).reshape(xGEO[i,:,:].shape)
+        np.seterr(invalid='ignore', divide='ignore')
+        slon[i,:,:] = np.rad2deg(((np.arctan2(xyz[1,:], xyz[0,:])*180/np.pi) % 360)/180*np.pi).reshape(xGEO[i,:,:].shape)
+        
+    imgs['slat'] = (['date','row','col'],slat)
+    imgs['slon'] = (['date','row','col'],slon)
+       
+    # Viewving angle correction
+    background=np.nanmedian(imgs['img'].values[(imgs['bad'].values)&(imgs['sza'].values>100|np.isnan(imgs['sza'].values))])
+    dzacorr=0.15
+    imgs['cimg'] = (imgs['img']-background)*np.cos(np.deg2rad(imgs['dza']))/np.exp(dzacorr*(1. - 1/np.cos(np.deg2rad(imgs['dza']))))
+    
+    latOrder = 3
+    lonOrder = 3
+    tOrder = 2
+    tKnotSep=None
+    
+    dzalim=75
+    minlat=-90
+    dampingVal =1e-2
+    tukeyVal = 3
+    stop = 1e-3
+    
+    # Coordinates and data
+    time=(imgs['date'].to_series().values-imgs['date'].values[0])/ np.timedelta64(1, 'm')
+    slat = imgs['slat'].stack(z=('row','col')).values
+    slon = imgs['slon'].stack(z=('row','col')).values
+    d = imgs['cimg'].stack(z=('row','col')).values
+    
+    ind = (imgs['sza'].stack(z=('row','col')).values >= 0) & (imgs['dza'].stack(z=('row','col')).values <= dzalim) & (imgs['glat'].stack(z=('row','col')).values >= minlat) & (np.isfinite(imgs['cimg'].stack(z=('row','col')).values)) & imgs['bad'].stack(z=('row','col')).values[None,:] 
+        
+    # temporal and spatial size
+    n_t = slat.shape[0]
+    
+    # colat knots
+    latKnots = [-90,-10,0,10,50,90]
+    latKnots = np.r_[np.repeat(latKnots[0],latOrder),latKnots, np.repeat(latKnots[-1],latOrder)]
+    n_latcp = len(latKnots)-latOrder-1 # Number of control points
+    
+    # lon knots full
+    lonKnots = np.array([0,90,180,270])
+    lonKnots = np.r_[lonKnots-360,lonKnots,lonKnots+360]
+    lonKnots = np.r_[np.repeat(lonKnots[0],lonOrder),lonKnots, np.repeat(lonKnots[-1],lonOrder)]
+    n_loncp = len(lonKnots)-lonOrder-1 # Number of control points
+    
+    # Temporal knots
+    if tKnotSep==None:
+        tKnots = np.linspace(time[0], time[-1], 2)
+    else:
+        tKnots = np.linspace(time[0], time[-1], int(np.round(time[-1]/tKnotSep)+1))
+    tKnots = np.r_[np.repeat(tKnots[0],tOrder),tKnots, np.repeat(tKnots[-1],tOrder)]
+    n_tcp = len(tKnots)-tOrder-1 # Number of control points
+    
+    # Temporal design matix
+    M = BSpline(tKnots, np.eye(n_tcp), tOrder)(time)
+    
+    print('Building design matrix')
+    
+    G_g=[]
+    G_s=[]
+    for t in range(n_t):
+        # Colat design matix
+        n_s = np.sum(ind[t,:]) # Spatial data points at time t
+        Glat = BSpline(latKnots, np.eye(n_latcp), latOrder)(slat[t,ind[t,:]])
+        Gtemp = BSpline(lonKnots, np.eye(n_loncp), lonOrder)(slon[t,ind[t,:]])
+        Glon = Gtemp[:,4:8].copy()+Gtemp[:,8:12].copy()
+        
+        G = np.tile(Glon,(1,n_latcp))*np.repeat(Glat,4,axis=1)
+        G_t = np.tile(G,(1,n_tcp))*np.repeat(M[t,:],n_latcp*4)[None,:]
+        
+        G = np.tile(Glon,(1,n_latcp))*np.repeat(Glat,4,axis=1)
+        G_t = np.repeat(G,n_tcp,axis=1)*np.tile(M[t,:],n_latcp*4)[None,:]
+            
+        G_g.append(G)
+        G_s.append(G_t)
+    G_s=np.vstack(G_s)
+    
+    
+    # Spatial weights
+    grid,mltres=sdarngrid(5,5,-90) # Equal area grid
+    ws = np.full(slat.shape,np.nan)
+    for i in range(len(slat)):
+        sbin = bin_number2(grid,slat[i,ind[i]],slon[i,ind[i]]/15)
+        count=np.full(grid.shape[1],0)
+        un,count_un=np.unique(sbin,return_counts=True)
+        count[un]=count_un
+        ws[i,ind[i]]=1/count[sbin]
+    
+    # Make everything flat
+    d_s = d[ind]
+    ws = ws[ind]
+    w = np.ones_like(d_s)
+    
+    # Damping (zeroth-order Tikhonov regularization)
+    damping = dampingVal**np.ones(G_s.shape[1])
+    R = np.diag(damping)
+    
+    latMax = np.arange(-90,90+0.1,0.1)[np.argmax(BSpline(latKnots, np.eye(n_latcp), latOrder)(np.arange(-90,90+0.1,0.1)),axis=0)]
+    latLambda = 1/np.cos(np.deg2rad(latMax))
+    latLambda[[0,-1]]=1e12
+    
+    L = np.array([[-1,1,0,0],[0,-1,1,0],[0,0,-1,1],[1,0,0,-1]])
+    LTL = np.zeros((4*n_tcp*n_latcp,4*n_tcp*n_latcp))
+    for i in range(n_latcp):
+        for t in range(n_tcp):
+            LTL[t+(i*4*n_tcp):t+4*n_tcp+(i*4*n_tcp):n_tcp,t+(i*4*n_tcp):t+4*n_tcp+(i*4*n_tcp):n_tcp] = L.T@L
+    R = dampingVal*LTL
+    # R = dampingVal*np.repeat(latLambda,4*n_tcp)[:,None]*LTL
+    
+    # Iterativaly solve the inverse problem
+    diff = 1e10
+    iteration = 0
+    m = None
+    
+    
+    while (diff>stop)&(iteration < 100):
+        print('Iteration:',iteration)
+    
+        m_s = np.linalg.lstsq((G_s*w[:,None]*ws[:,None]).T@(G_s*w[:,None]*ws[:,None])+R,(G_s*w[:,None]*ws[:,None]).T@(d_s*w*ws),rcond=None)[0]
+    
+        mNew    = M@m_s.reshape((n_latcp*4, n_tcp)).T
+        dm=[]
+        for i, tt in enumerate(time):
+            dm.append((G_g[i]@mNew[i, :]).flatten())
+        dm = np.hstack(dm)    
+        residuals = (d_s - dm)
+    
+        # if iteration==0:
+        #     sigma = noise(slat[ind], d_s,dm,w)        
+        # w = (1 - np.minimum(1,(residuals/(tukeyVal*sigma))**2))**2
+        
+        rmse = np.sqrt(np.average(residuals**2)     ) 
+        w = (1 - np.minimum(1,(residuals/(tukeyVal*rmse))**2))**2
+        
+        if m is not None:
+            diff = np.sqrt(np.mean((mNew-m)**2))/(1+np.sqrt(np.mean(mNew**2)))
+            print('Relative change model norm',diff)
+        m = mNew
+        iteration += 1
+    
+    normM = np.sqrt(np.average(m_s**2))
+    normR = np.sqrt(np.average(residuals**2,weights=w))
+    
+    # Add dayglow model and corrected image to the Dataset
+    model = np.full_like(d,np.nan)
+    model[ind]=dm
+    imgs['dgmodel'] = (['date','row','col'],model.reshape((n_t,len(imgs.row),len(imgs.col))))
+    imgs['dgimg'] = imgs['cimg']-imgs['dgmodel']
+        
+    
+    return imgs

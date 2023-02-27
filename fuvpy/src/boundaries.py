@@ -12,6 +12,7 @@ import xarray as xr
 
 from scipy.interpolate import BSpline,griddata
 from scipy.linalg import lstsq
+from scipy.sparse import csc_array
 
 import matplotlib.path as path
 
@@ -981,51 +982,373 @@ def calcFlux(ds,height=130):
     ds['auroralFlux'].attrs = {'long_name':'Auroral flux','unit':'MWb'}
     return ds
 
-def calcIntensity(wic,bm):
-    wic['shimg'].attrs = {'long_name': 'Counts', 'units': ''}
+def makeBoundaryModelBStest(df,stop=1e-3,tLeb=0,sLeb=0,tLpb=0,sLpb=0,tOrder = 3,tKnotSep = 10,max_iter=50,resample=False,return_norms=False):
+    '''
+    Function to make a spatiotemporal model of auroral boundaries using periodic B-splines.
+    Note: The periodic B-splines are presently hard coded. Update when scipy 1.10 is released!
+
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        Dataset with initial boundaries.
+    stop : float, optional
+        When to stop the iterations. Default is 0.001
+    eL1 : float, optional
+        1st order Tikhonov regularization for the equatorward boundary.
+        Default is 0
+    eL2 : float, optional
+        2nd order Tikhonov regularization for the equatorward boundary.
+        Default is 0
+    pL1 : float, optional
+        1st order Tikhonov regularization for the poleward boundary.
+        Default is 0
+    pL2 : float, optional
+        2nd order Tikhonov regularization for the epoleward boundary.
+        Default is 0        
+    tOrder : int, optinal
+        Order of the temporal B-spline. Default is 3
+    tKnotSep : int, optional
+        Approximate temporal knot separation in minutes. Default is 10.
+
+    Returns
+    -------
+    xarray.Dataset
+        Dataset with model boundaries.
+    tuple
+        Tuple with model and residual norms
+
+    '''
+    
+    # Make pandas dataframe
+    if resample:
+        df = df.reset_index().sample(frac=1,replace=True)
+    else:
+        df = df.reset_index()
+
+    # Start date and duration
+    date0 = df['date'].min()
+    duration = (df['date'].max()-date0)/ np.timedelta64(1, 'm')    
+    time=(df['date']-date0)/ np.timedelta64(1, 'm')
+    phi = np.deg2rad(15*df['mlt'].values)
+
+
+    #%% Eq boundary model
+    
+    # Equatorward boundary to radias then convert to primed coordinates
+    theta_eb = np.deg2rad(90-df['eb'].values) 
+    theta_eb1 = np.log(theta_eb)
+
+    # Index of finite data
+    ind = np.isfinite(theta_eb1)
+
+    # Temporal knots
+    tKnots = np.arange(0,duration+tKnotSep,tKnotSep)
+    tKnots = np.r_[np.repeat(tKnots[0],tOrder),tKnots, np.repeat(tKnots[-1],tOrder)]
+
+    # Number of temporal control points
+    n_tcp = len(tKnots)-tOrder-1
+
+    # Temporal design matix
+    Gtime = BSpline.design_matrix(time[ind],tKnots,tOrder)
+
+
+    # Spatial knots (extended)
+    sOrder = 3
+    mltKnots = np.arange(0,24,3)
+    sKnots = np.deg2rad(15*mltKnots)
+    sKnots = np.r_[sKnots-2*np.pi,sKnots,sKnots+2*np.pi]
+    sKnots = np.r_[np.repeat(sKnots[0],sOrder),sKnots, np.repeat(sKnots[-1],sOrder)]
+
+    # Number of spatial control points (extended)
+    n_scp = len(sKnots)-sOrder-1
+    
+    # Spatial design matrix (extended)
+    Gphi = BSpline.design_matrix(phi[ind], sKnots, sOrder)
+    
+    # Spatial design matrix (periodic)
+    n_pcp = len(mltKnots)
+    Gphi = Gphi[:,n_pcp:2*n_pcp]+Gphi[:,2*n_pcp:3*n_pcp]
+ 
+    # Combine to full design matrix
+    G_s = Gphi[:,np.repeat(np.arange(n_pcp),n_tcp)]*Gtime[:,np.tile(np.arange(n_tcp),n_pcp)]
+    
+   
+    
+    # 1st order Tikhonov regularization in time
+    tL = np.hstack((-np.identity(n_tcp-1),np.zeros((n_tcp-1,1))))+np.hstack((np.zeros((n_tcp-1,1)),np.identity(n_tcp-1)))
+    tLTL = np.zeros((n_tcp*n_pcp,n_tcp*n_pcp))
+    for i in range(n_pcp): tLTL[i*n_tcp:(i+1)*n_tcp,i*n_tcp:(i+1)*n_tcp] = tL.T@tL
+    
+    # 1st order Tikhonov regularization in mlt
+    sL = []
+    for i in range(n_pcp): sL.append(np.roll(np.r_[-1,1,np.repeat(0,n_pcp-2)],i))
+    sL=np.array(sL)
+    sLTL = np.zeros((n_pcp*n_tcp,n_pcp*n_tcp))
+    for t in range(n_tcp): sLTL[t:t+n_pcp*n_tcp:n_tcp,t:t+n_pcp*n_tcp:n_tcp] = sL.T@sL
+    
+    # Combined regularization
+    R = tLeb*tLTL + sLeb*sLTL
+     
+    # Initiate iterative weights
+    w = np.ones(theta_eb1[ind].shape)
+    w = csc_array(w).T
+    
+    # Iteratively estimation of model parameters
+    diff = 10000
+
+    m = None
+    iteration = 0
+    mtau = np.full_like(theta_eb1,np.nan)
+    while (diff > stop)&(iteration<max_iter):
+        print('Iteration:',iteration)
+        ms = lstsq((G_s*w).T.dot(G_s*w)+R,(G_s*w).T.dot(theta_eb1[ind]*w.toarray().squeeze()),lapack_driver='gelsy')[0]
+        mtau[ind]=G_s@ms
+
+        residuals = mtau[ind] - theta_eb1[ind]
+        rmse = np.sqrt(np.average(residuals**2,weights=w.toarray().squeeze()))
+
+        w[:] = np.minimum(0.5*rmse/np.abs(residuals),1)
+        if m is not None:
+            diff = np.sqrt(np.mean((ms - m)**2))/(1+np.sqrt(np.mean(ms**2)))
+            print('Relative change model norm', diff)
+
+        m = ms
+        iteration += 1
+
+
+    
+    # Temporal evaluation matrix
+    time_ev=(df['date'].drop_duplicates()-date0).values/ np.timedelta64(1, 'm')
+    Gtime = BSpline.design_matrix(time_ev, tKnots,tOrder).toarray()
+    
+    # Spatial evaluation matrix
+    phi_ev = np.arange(0,2*np.pi,2*np.pi/240)
+    Gphi = BSpline.design_matrix(phi_ev, sKnots, sOrder)
+    Gphi = Gphi[:,n_pcp:2*n_pcp]+Gphi[:,2*n_pcp:3*n_pcp].toarray()
+   
+    # return time_ev,Gtime,phi_ev,Gphi
+    # Combined evaluation matrix
+    # G_ev = Gphi[:,np.repeat(np.arange(n_pcp),n_tcp)][np.tile(np.arange(len(phi_ev)),len(time_ev)),:]*Gtime[:,np.tile(np.arange(n_tcp),n_pcp)][np.repeat(np.arange(len(time_ev)),len(phi_ev)),:]
+    G_ev = np.tile(np.repeat(Gphi,n_tcp,axis=1),(len(time_ev),1))*np.repeat(np.tile(Gtime,(1,n_pcp)),len(phi_ev),axis=0)
+    
+    tau1=G_ev.dot(m)
+
+    # Transform to unprimed
+    tau_eb  = np.exp(tau1)
+
+    ## DERIVATIVE
+    
+    mm = m.reshape((n_pcp,n_tcp))
+
+    # df/dt in primed
+    dt  =(tKnots[tOrder+1:-1]-tKnots[1:-tOrder-1])
+    dmdt = (mm[:,1:] - mm[:,:-1]) * tOrder / dt[None,:]
+    dtKnots=tKnots[1:-1]
+    n_dtcp=len(dtKnots)-(tOrder-1)-1
+    dMdt = BSpline(dtKnots, np.eye(n_dtcp), tOrder-1)(time_ev)
+
+    GdMdt = np.tile(np.repeat(Gphi,n_dtcp,axis=1),(len(time_ev),1))*np.repeat(np.tile(dMdt,(1,n_pcp)),len(phi_ev),axis=0)  
+    dtau1dt = GdMdt @ dmdt.flatten()
+    
+
+
+    # df/d(phi) in primed
+    mm = np.vstack((mm,mm[:1,:]))
+    dp =(sKnots[sOrder+1:-1]-sKnots[1:-sOrder-1])
+    dmdp = (mm[1:,:] - mm[:-1,:]) * sOrder / dp[n_pcp:2*n_pcp,None]
+    dpKnots=sKnots[1:-1]
+    n_dpcp=len(dpKnots)-(sOrder-1)-1
+
+    dGdp_temp = BSpline(dpKnots, np.eye(n_dpcp), sOrder-1)(phi_ev)
+    dGdp = dGdp_temp[:,n_pcp:2*n_pcp].copy()+dGdp_temp[:,2*n_pcp:3*n_pcp].copy()
+    
+    dGdtM = np.tile(np.repeat(dGdp,n_tcp,axis=1),(len(time_ev),1))*np.repeat(np.tile(Gtime,(1,n_pcp)),len(phi_ev),axis=0)  
+    dtau1dp = dGdtM @ dmdp.flatten()
+
+    # Transform to unprimed
+    dtau_dt_eb = np.exp(tau1)*(dtau1dt)
+    dtau_dp_eb = np.exp(tau1)*(dtau1dp)
+
+    # Temporal change of phi and theta
+    R_I = 6500e3
+    dphi_dt = -( dtau_dt_eb*dtau_dp_eb)/(np.sin(tau_eb)**2+(dtau_dp_eb)**2)
+    dtheta_dt = dtau_dt_eb*np.sin(tau_eb)**2/(np.sin(tau_eb)**2+(dtau_dp_eb)**2)
+
+    # Boundary velocity
+    u_phi = R_I*np.sin(tau_eb)*dphi_dt/60
+    u_theta = R_I*dtheta_dt/60
+
+        
+    #%% Poleward boundary model
+    theta_pb  = np.deg2rad(90-df['pb'].values)
+    theta_pb1 = theta_pb/np.exp(mtau)
+    theta_pb2 = np.log(theta_pb1)-np.log(1-theta_pb1)
+    
+    # Finite data points
+    ind = np.isfinite(theta_pb2)
+
+    # Temporal design matix
+    Gtime = BSpline.design_matrix(time[ind],tKnots,tOrder)
+
+    # Spatial knots (extended)
+    mltKnots = np.array([0,2,4,6,9,12,15,18,20,22])
+    sKnots = np.deg2rad(15*mltKnots)
+    sKnots = np.r_[sKnots-2*np.pi,sKnots,sKnots+2*np.pi]
+    sKnots = np.r_[np.repeat(sKnots[0],sOrder),sKnots, np.repeat(sKnots[-1],sOrder)]
+
+    # Number of spatial control points (extended)
+    n_scp = len(sKnots)-sOrder-1
+    
+    # Spatial design matrix (extended)
+    Gphi = BSpline.design_matrix(phi[ind],sKnots,sOrder)
+    
+    # Spatial design matrix (periodic)
+    n_pcp = len(mltKnots)
+    Gphi = Gphi[:,n_pcp:2*n_pcp]+Gphi[:,2*n_pcp:3*n_pcp]
+ 
+    # Combine to full design matrix
+    G_s = Gphi[:,np.repeat(np.arange(n_pcp),n_tcp)]*Gtime[:,np.tile(np.arange(n_tcp),n_pcp)]   
   
-    r = (90. - np.abs(bm['ocb']))
-    a = (bm.mlt.values - 6.)/12.*np.pi
-    bm['px'] =  r*np.cos(a)
-    bm['py'] =  r*np.sin(a)
+    # 1st order regularization in time
+    tL = np.hstack((-np.identity(n_tcp-1),np.zeros((n_tcp-1,1))))+np.hstack((np.zeros((n_tcp-1,1)),np.identity(n_tcp-1)))
+    tLTL = np.zeros((n_tcp*n_pcp,n_tcp*n_pcp))
+    for i in range(n_pcp): tLTL[i*n_tcp:(i+1)*n_tcp,i*n_tcp:(i+1)*n_tcp] = tL.T@tL
     
-    r = (90. - np.abs(bm['eqb']))
-    a = (bm.mlt.values - 6.)/12.*np.pi
-    bm['ex'] =  r*np.cos(a)
-    bm['ey'] =  r*np.sin(a)
+    # 1st order regularization in mlt
+    # sL = np.array([[-1,1,0,0,0,0,0,0],[0,-1,1,0,0,0,0,0],[0,0,-1,1,0,0,0,0],[0,0,0,-1,1,0,0,0],[0,0,0,0,-1,1,0,0],[0,0,0,0,0,-1,1,0],[0,0,0,0,0,0,-1,1],[1,0,0,0,0,0,0,-1]])
+    sL = []
+    for i in range(n_pcp): sL.append(np.roll(np.r_[-1,1,np.repeat(0,n_pcp-2)],i))
+    sL=np.array(sL)
+    sLTL = np.zeros((n_pcp*n_tcp,n_pcp*n_tcp))
+    for t in range(n_tcp): sLTL[t:t+n_pcp*n_tcp:n_tcp,t:t+n_pcp*n_tcp:n_tcp] = sL.T@sL
     
-    r = (90. - np.abs(wic['mlat']))
-    a = (wic.mlt.values - 6.)/12.*np.pi
-    wic['x'] =  r*np.cos(a)
-    wic['y'] =  r*np.sin(a)
-    
-    mc=[]
-    mc0=[]
-    mc6=[]
-    mc12=[]
-    mc18=[]
-    for t in range(len(bm.date)):
-        # Create an PB polygon
-        poly = path.Path(np.stack((bm.isel(date=t).px.values,bm.isel(date=t).py.values),axis=1))
+    # Combined regularization
+    R = tLpb*tLTL + sLpb*sLTL
 
-        # Identify gridcell with center inside the PB polygon
-        inpb = poly.contains_points(np.stack((wic.isel(date=t).x.values.flatten(),wic.isel(date=t).y.values.flatten()),axis=1))
+    # Initiate iterative weights
+    w = np.ones(theta_pb2[ind].shape)
+    w = csc_array(w).T
     
-        # Create an EB polygon
-        poly = path.Path(np.stack((bm.isel(date=t).ex.values,bm.isel(date=t).ey.values),axis=1))
+    # Iteratively estimation of model parameters
+    diff = 10000
+    m = None
+    mtau = np.full_like(theta_pb2,np.nan)
+    iteration = 0
+    while (diff > stop)&(iteration<max_iter):
+        print('Iteration:',iteration)
+        ms = lstsq((G_s*w).T.dot(G_s*w)+R,(G_s*w).T.dot(theta_pb2[ind]*w.toarray().squeeze()),lapack_driver='gelsy')[0]
+        mtau[ind]=G_s@ms
 
-        # Identify gridcell with center inside the EB polygon
-        ineb = poly.contains_points(np.stack((wic.isel(date=t).x.values.flatten(),wic.isel(date=t).y.values.flatten()),axis=1))
+        residuals = mtau[ind] - theta_pb2[ind]
+        rmse = np.sqrt(np.average(residuals**2,weights=w.toarray().squeeze()))
+
+        w[:] = np.minimum(1.5*rmse/np.abs(residuals),1)
+        if m is not None:
+            diff = np.sqrt(np.mean((ms - m)**2))/(1+np.sqrt(np.mean(ms**2)))
+            print('Relative change model norm', diff)
+
+        m = ms
+        iteration += 1
+
+
+    # Temporal evaluation matrix
+    M = BSpline(tKnots, np.eye(n_tcp), tOrder)(time_ev)
     
-        mc.append(np.nanmedian(wic.isel(date=t).shimg.values.flatten()[ineb & ~inpb]))
-        mc0.append(np.nanmedian(wic.isel(date=t).shimg.values.flatten()[ineb & ~inpb & ((wic.isel(date=t)['mlt'].values.flatten()<3)|(wic.isel(date=t)['mlt'].values.flatten()>21))]))
-        mc6.append(np.nanmedian(wic.isel(date=t).shimg.values.flatten()[ineb & ~inpb & ((wic.isel(date=t)['mlt'].values.flatten()>3)&(wic.isel(date=t)['mlt'].values.flatten()<9))]))
-        mc12.append(np.nanmedian(wic.isel(date=t).shimg.values.flatten()[ineb & ~inpb & ((wic.isel(date=t)['mlt'].values.flatten()>9)&(wic.isel(date=t)['mlt'].values.flatten()<15))]))
-        mc18.append(np.nanmedian(wic.isel(date=t).shimg.values.flatten()[ineb & ~inpb & ((wic.isel(date=t)['mlt'].values.flatten()>15)&(wic.isel(date=t)['mlt'].values.flatten()<21))]))
+    # Spatial evaluation matrix
+    G = BSpline(sKnots, np.eye(n_scp), sOrder)(phi_ev)
+    G = G[:,n_pcp:2*n_pcp]+G[:,2*n_pcp:3*n_pcp]
+   
     
-    bm=bm.assign({'median':('date',np.array(mc)),
-                  'median00':('date',np.array(mc0)),
-                  'median06':('date',np.array(mc6)),
-                  'median12':('date',np.array(mc12)),
-                  'median18':('date',np.array(mc18))})
-    return bm
+    # Combined evaluation matrix
+    G_ev = np.tile(np.repeat(G,n_tcp,axis=1),(len(time_ev),1))*np.repeat(np.tile(M,(1,n_pcp)),len(phi_ev),axis=0)
+    
+    tau2=G_ev@m
+
+    # Transform to unprimed
+    tau1 = 1/(1+np.exp(-1*tau2))
+    tau_pb  = tau_eb*tau1
+
+       
+    ## Derivative
+    
+    mm = m.reshape((n_pcp,n_tcp))
+
+    # df/dt in double primed
+    dt  =(tKnots[tOrder+1:-1]-tKnots[1:-tOrder-1])
+    dmdt = (mm[:,1:] - mm[:,:-1]) * tOrder / dt[None,:]
+    dtKnots=tKnots[1:-1]
+    n_dtcp=len(dtKnots)-(tOrder-1)-1
+    dMdt = BSpline(dtKnots, np.eye(n_dtcp), tOrder-1)(time_ev)
+
+    GdMdt = np.tile(np.repeat(G,n_dtcp,axis=1),(len(time_ev),1))*np.repeat(np.tile(dMdt,(1,n_pcp)),len(phi_ev),axis=0)  
+    dtau2dt = GdMdt @ dmdt.flatten()
+    
+
+
+    # df/d(phi) in double primed
+    mm = np.vstack((mm,mm[:1,:]))
+    dp =(sKnots[sOrder+1:-1]-sKnots[1:-sOrder-1])
+    dmdp = (mm[1:,:] - mm[:-1,:]) * sOrder / dp[n_pcp:2*n_pcp,None]
+    dpKnots=sKnots[1:-1]
+    n_dpcp=len(dpKnots)-(sOrder-1)-1
+
+    dGdp_temp = BSpline(dpKnots, np.eye(n_dpcp), sOrder-1)(phi_ev)
+    dGdp = dGdp_temp[:,n_pcp:2*n_pcp].copy()+dGdp_temp[:,2*n_pcp:3*n_pcp].copy()
+    
+    dGdtM = np.tile(np.repeat(dGdp,n_tcp,axis=1),(len(time_ev),1))*np.repeat(np.tile(M,(1,n_pcp)),len(phi_ev),axis=0)  
+    dtau2dp = dGdtM @ dmdp.flatten()
+
+    # # Transform derivatives to primed
+    dtau1dt = (np.exp(-tau2)/(np.exp(-tau2)+1)**2)*(dtau2dt)
+    dtau1dp = (np.exp(-tau2)/(np.exp(-tau2)+1)**2)*(dtau2dp)
+
+    # Transform derivatives to unprimed
+    dtaudt = tau_eb*dtau1dt + dtau_dt_eb*tau1
+    dtaudp = tau_eb*dtau1dp + dtau_dp_eb*tau1
+
+    # Transform from "wrapped" ionosphere to spherical ionosphere
+    dphidt = -( dtaudt*dtaudp)/(np.sin(tau_pb)**2+(dtaudp)**2)
+    dthetadt = dtaudt*np.sin(tau_pb)**2/(np.sin(tau_pb)**2+(dtaudp)**2)
+
+    # Boundary velocity
+    v_phi = R_I*np.sin(tau_pb)*dphidt/60
+    v_theta = R_I*dthetadt/60
+
+    # Reshape modelled values
+    tau_eb =  tau_eb.reshape((len(time_ev),len(phi_ev)))
+    tau_pb = tau_pb.reshape((len(time_ev),len(phi_ev)))
+    
+    u_phi =  u_phi.reshape((len(time_ev),len(phi_ev)))
+    u_theta = u_theta.reshape((len(time_ev),len(phi_ev)))
+    
+    v_phi =  v_phi.reshape((len(time_ev),len(phi_ev)))
+    v_theta = v_theta.reshape((len(time_ev),len(phi_ev)))
+
+    
+    # Make Dataset with modelled boundary locations and velocities
+    ds2 = xr.Dataset(
+    data_vars=dict(
+        pb=(['date','mlt'], 90-np.rad2deg(tau_pb)),
+        eb=(['date','mlt'], 90-np.rad2deg(tau_eb)),
+        v_phi=(['date','mlt'], v_phi),
+        v_theta=(['date','mlt'], v_theta),
+        u_phi=(['date','mlt'], u_phi),
+        u_theta=(['date','mlt'], u_theta),
+        dtaudphi = (['date','mlt'], dtaudp.reshape((len(time_ev),len(phi_ev)))),
+        ),
+    coords=dict(
+        date = df['date'].drop_duplicates().values,
+        mlt = np.rad2deg(phi_ev)/15
+    ),
+    )
+
+    # Add attributes
+    ds2['mlt'].attrs = {'long_name': 'Magnetic local time','unit':'hrs'}
+    ds2['pb'].attrs = {'long_name': 'Open-closed boundary','unit':'deg'}
+    ds2['eb'].attrs = {'long_name': 'Equatorward boundary','unit':'deg'}
+    ds2['v_phi'].attrs = {'long_name': '$V_\\phi$','unit':'m/s'}
+    ds2['v_theta'].attrs = {'long_name': '$V_\\theta$','unit':'m/s'}
+    ds2['u_phi'].attrs = {'long_name': '$U_\\phi$','unit':'m/s'}
+    ds2['u_theta'].attrs = {'long_name': '$U_\\theta$','unit':'m/s'}
+    return ds2
