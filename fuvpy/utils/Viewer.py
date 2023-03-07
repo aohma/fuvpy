@@ -56,7 +56,10 @@ def datetime_to_wictime(datetime):
     minute= int(time[3:5])
     return f'wic{year}{DOY:03d}{hour:02d}{minute:02d}.idl'
 def wictime_to_datetime(wic):
-    wic= wic.split('wic')[-1].split('.idl')[0]
+    if wic.endswith('.idl'):
+        end= '.idl'
+        wic= wic.split('wic')[-1].split(end)[0]
+    
     year= wic[:4]
     DOY= wic[4:7]
     hour= wic[7:9]
@@ -208,7 +211,7 @@ class Visualise():
         self.cbars= [False]*len(np.unique(cax_association))
         self.figure= fig
     def show_image(self, file, axis, crange=False, cmap=False, cbar_orientation=False, 
-                   in_put='img', lt_val='mlt', lat_val='mlat', date=0):
+                   in_put='img', lt_val='mlt', lat_val='mlat', date=0, title_y=-0.1):
         """
         For plotting the data onto the polar plots and enabling the interactive features
         of the visualisation tool. Can be used continually each time data wants to be plotted
@@ -244,7 +247,10 @@ class Visualise():
             Only used when input is an idl file. When using string or datetime will 
             select where the date in the file matches the date argument. Using
             an integer will select the date at that index.
-            ie date=0 will pick the first date in the file. Default is 0
+            ie date=0 will pick the first date in the file. The default is 0.
+        title_y: float, optional
+            y coordinate for title of subplot, which is the date of the file.
+            The default is -0.1.
         Returns
         -------
         Image: matplotlib Polycollection
@@ -254,8 +260,8 @@ class Visualise():
 
         """
         axis.ax.format_coord= axis.make_format(lt_val, lat_val)
-        if type(file)==str:
-            if file.endswith('.idl'):
+        if isinstance(file, (str, np.str_)):
+            if file.endswith('.idl') or file.endswith('.sav'):
                 if isinstance(date, int):
                     axis.image_dat= fuv.readImg(file).isel(date = date).rename({in_put:'data', 
                                                                              lt_val:'lt', lat_val:'lat'})
@@ -345,7 +351,7 @@ class Visualise():
                     if ax.cax_number== axis.cax_number and ax.image:
                         ax.image.set_clim(crange)
         try:
-            axis.ax.set_title(image.date.values.astype('datetime64[s]').tolist(), y=0.1)
+            axis.ax.set_title(image.date.values.astype('datetime64[s]').tolist(), y=title_y)
         except AttributeError:
             UserWarning('Failed to use date in file to make subplot title. AttributeError')
         axis.image= im
@@ -370,17 +376,19 @@ class Visualise():
             cbar=self.cbars[cax_number]
             if cbar.orientation=='horizontal':
                 crange=caxes[bools_cax][0].get_xlim()
+                coord= ix
             elif cbar.orientation=='vertical':
                 crange=caxes[bools_cax][0].get_ylim()
+                coord= iy
             caxes[bools_cax][0].clear()
-            if ix<sum(crange)/2:
+            if coord<sum(crange)/2:
                 for ax in axes:
                     if ax.cax_number==cax_number:
-                        ax.image.set_clim(round(ix, 0), crange[-1])
-            if ix>=sum(crange)/2:
+                        ax.image.set_clim(round(coord, 0), crange[-1])
+            if coord>=sum(crange)/2:
                 for ax in axes:
                     if ax.cax_number== cax_number:
-                        ax.image.set_clim(crange[0], round(ix, 0))
+                        ax.image.set_clim(crange[0], round(coord, 0))
             try:
                 if np.array(axes)[np.array([marker.axes==ax.ax for ax in axes])][0].cax_number== cax_number:
                     profile1[0].set_clim(crange)
