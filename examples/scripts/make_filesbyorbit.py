@@ -56,5 +56,4 @@ def background_removal(orbits):
             
             df = wic[['img','dgimg','shimg','mlat','mlt']].to_dataframe().dropna(subset='dgimg')
             df.to_hdf(outpath+'wic_or'+str(orbit).zfill(4)+'.h5','wic',format='table',append=True,data_columns=True)     
-        except:
-            print('I said "no no no"')
+        except Exception as e: print(e)
