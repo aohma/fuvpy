@@ -139,7 +139,7 @@ def initial_boundaries(orbits):
         try:
             imgs = xr.load_dataset(inpath+'wic_or'+str(orbit).zfill(4)+'.nc')
             
-            bi = initial_boundaries(imgs)
+            bi = boundary_detection(imgs)
             bi['orbit']=orbit
             bi.to_hdf(outpath+'initial_boundaries.h5','initial',format='table',append=True,data_columns=True)
         except Exception as e: print(e)
