@@ -7,7 +7,9 @@ Created on Tue Mar  7 10:02:51 2023
 """
 
 import glob
+import numpy as np
 import pandas as pd
+import xarray as xr
 import fuvpy as fuv
 
 def make_wicfiles(orbit,path):
@@ -57,3 +59,90 @@ def background_removal(orbits):
             df = wic[['img','dgimg','shimg','mlat','mlt']].to_dataframe().dropna(subset='dgimg')
             df.to_hdf(outpath+'wic_or'+str(orbit).zfill(4)+'.h5','wic',format='table',append=True,data_columns=True)     
         except Exception as e: print(e)
+        
+def boundary_detection(imgs):
+
+
+    thresholds = [100,150,200] # Peak threshold in counts
+    sigma = 300
+    
+    R_E = 6371 # Earth radius (km)
+    R_I = R_E+130 # Assumed emission radius (km)
+    km_per_lat = np.pi*R_I/180
+    
+    
+    # Evaluation grid
+    clat_ev = np.arange(0.5,41,0.5)
+    mlt_ev = np.arange(0.5,24,1)
+    
+    r_ev = km_per_lat*(np.abs(clat_ev))
+    a_ev = (mlt_ev- 6.)/12.*np.pi
+    x_ev =  r_ev[:,None]*np.cos(a_ev[None,:])
+    y_ev =  r_ev[:,None]*np.sin(a_ev[None,:])
+
+    #%% Model test
+    dfs=[]
+    for t in range(len(imgs.date)):
+        print('■', end='', flush=True)
+        img = imgs.isel(date=t)
+    
+        
+        # cartesian projection
+        r = km_per_lat*(90. - np.abs(img['mlat'].values))
+        a = (img['mlt'].values - 6.)/12.*np.pi
+        x =  r*np.cos(a)
+        y =  r*np.sin(a)
+        d = img['shimg'].values
+        
+        
+        # Make latitudinal intensity profiles 
+        d_ev = np.full_like(x_ev,np.nan)
+        for i in range(len(clat_ev)):
+            for j in range(len(mlt_ev)):
+                ind = np.sqrt((x_ev[i,j]-x)**2+(y_ev[i,j]-y)**2)<sigma
+                if np.sum(ind)>0: # non-zero weights
+                    if (r_ev[i]>np.min(r[ind]))&(r_ev[i]<np.max(r[ind])): # Only between of pixels with non-zero weights
+                        d_ev[i,j]=np.median(d[ind])
+    
+        for i,lt in enumerate(mlt_ev): # Find peaks in each intensity profile
+            max_colat = 35+10*np.cos(np.pi*lt/12)
+            dp = d_ev[:,i]
+            
+            for j in range(len(thresholds)):
+                threshold = thresholds[j]
+                pb = []
+                eb = []
+                for k in range(1,len(dp)):
+                    if (dp[k-1]<threshold)&(dp[k]>threshold)&np.isfinite(dp[[k-1,k]]).all()&(clat_ev[[k-1,1]]<max_colat).all():
+                        pb.append(np.average(clat_ev[[k-1,k]],weights=abs(dp[[k-1,k]]-threshold)))
+                        
+                    if (dp[k-1]>threshold)&(dp[k]<threshold)&np.isfinite(dp[[k-1,k]]).all()&(clat_ev[[k-1,1]]<max_colat).all():
+                        eb.append(np.average(clat_ev[[k-1,k]],weights=abs(dp[[k-1,k]]-threshold)))
+            
+                df = pd.DataFrame(np.nan,index=[0],columns=['pb','eb'])
+                df[['date','mlt','lim']]=[img.date.values,lt,threshold]
+
+                if len(pb)>0: df.loc[0,'pb']=90-pb[0]
+                if len(eb)>0: df.loc[0,'eb']=90-eb[-1]
+                
+                dfs.append(df.set_index(['date','mlt','lim']))
+
+    df = pd.concat(dfs)
+    return df
+
+
+def initial_boundaries(orbits):
+    inpath = '/mnt/5fa6bccc-fa9d-4efc-9ddc-756f65699a0a/aohma/fuv/wic/'
+    outpath = '/mnt/5fa6bccc-fa9d-4efc-9ddc-756f65699a0a/aohma/fuv/boundaries/'
+    
+    for orbit in orbits:
+        try:
+            imgs = xr.load_dataset(inpath+'wic_or'+str(orbit).zfill(4)+'.nc')
+            
+            bi = initial_boundaries(imgs)
+            bi['orbit']=orbit
+            bi.to_hdf(outpath+'initial_boundaries.h5','initial',format='table',append=True,data_columns=True)
+        except Exception as e: print(e)
+    
+
+    
