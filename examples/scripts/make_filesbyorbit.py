@@ -55,9 +55,9 @@ def background_removal(orbits):
             wic = wic.sel(date=wic.hemisphere.date[wic.hemisphere=='north']) # Remove SH
             wic = fuv.makeBSmodel(wic,sKnots=[-3.5,-0.25,0,0.25,1.5,3.5],stop=0.01,n_tKnots=5,minlat=-90,tukeyVal=5,dzalim=75,dampingVal=1e-2)
             wic = fuv.makeSHmodel(wic,4,4,n_tKnots=5,stop=0.01,tukeyVal=5,dampingVal=1e-4)
-            
-            df = wic[['img','dgimg','shimg','mlat','mlt']].to_dataframe().dropna(subset='dgimg')
-            df.to_hdf(outpath+'wic_or'+str(orbit).zfill(4)+'.h5','wic',format='table',append=True,data_columns=True)     
+            wic.to_netcdf(outpath+'wic_or'+str(orbit).zfill(4)+'.nc') 
+            # df = wic[['img','dgimg','shimg','mlat','mlt']].to_dataframe().dropna(subset='dgimg')
+            # df.to_hdf(outpath+'wic_or'+str(orbit).zfill(4)+'.h5','wic',format='table',append=True,data_columns=True)     
         except Exception as e: print(e)
         
 def boundary_detection(imgs):
