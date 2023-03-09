@@ -6,6 +6,7 @@ Created on Tue Mar  7 10:02:51 2023
 @author: aohma
 """
 
+import os
 import glob
 import numpy as np
 import pandas as pd
@@ -13,6 +14,7 @@ import xarray as xr
 import fuvpy as fuv
 
 import matplotlib.path as mplpath
+import matplotlib.pyplot as plt
 
 from scipy.interpolate import BSpline
 from scipy.linalg import lstsq
@@ -328,7 +330,64 @@ def final_bondaries(orbits):
             bm['orbit']=orbit
             bm = calcIntensity(imgs, bm,tVal=1e2,sVal=1e-1)
             bm[['pb','eb','v_phi','v_theta','u_phi','u_theta','isglobal','orbit','rmse','I']].to_hdf(bpath+'final_boundaries.h5','final',format='table',append=True,data_columns=True)
-        except Exception as e: print(e)       
-     
+        except Exception as e: print(e)
+        
+def makeGIFs(orbits):
+    wicpath = '/mnt/5fa6bccc-fa9d-4efc-9ddc-756f65699a0a/aohma/fuv/wic/'
+    bpath = '/mnt/5fa6bccc-fa9d-4efc-9ddc-756f65699a0a/aohma/fuv/boundaries/'
+    outpath = '/mnt/5fa6bccc-fa9d-4efc-9ddc-756f65699a0a/aohma/fuv/fig/'
+    minlat = 50
+
+
+    for orbit in orbits:
+        try:
+            wic = xr.load_dataset(wicpath+'wic_or'+str(orbit).zfill(4)+'.nc')
+            wic['shimg'].attrs = {'long_name': 'Counts', 'units': ''}
+            
+            bi = pd.read_hdf(bpath+'initial_boundaries.h5',key='initial',where='orbit=="{}"'.format(orbit))
+            bf = pd.read_hdf(bpath+'final_boundaries.h5',key='final',where='orbit=="{}"'.format(orbit))
+            bi = bi.reset_index().set_index('date')
+            bf = bf.reset_index().set_index('date')
+          
+            
+            r = (90. - np.abs(bf['pb']))/(90. - minlat)
+            a = (bf.mlt.values - 6.)/12.*np.pi
+            bf['px'] =  r*np.cos(a)
+            bf['py'] =  r*np.sin(a)
+            
+            r = (90. - np.abs(bf['eb']))/(90. - minlat)
+            a = (bf.mlt.values - 6.)/12.*np.pi
+            bf['ex'] =  r*np.cos(a)
+            bf['ey'] =  r*np.sin(a)
+            
+            fig,ax = plt.subplots(figsize=(5,5))
+            ax.axis('off')
+            pax = fuv.pp(ax,minlat=minlat)
+            
+            for i,t in enumerate(wic.date):
+                ax.set_title('Orbit: '+str(orbit).zfill(4)+'   '+t.dt.strftime('%Y-%m-%d').values.tolist()+' '+t.dt.strftime('%H:%M:%S').values.tolist())
+                        
+                pax.scatter(wic.sel(date=t)['mlat'].values,wic.sel(date=t)['mlt'].values,c=wic.sel(date=t)['shimg'].values,s=2,alpha=0.5,vmin=0,vmax=500,cmap='Greens')
+                try:
+                    alpha = 1 if bf.loc[t.values,'I'].quantile(0.25)>50 else 0.2
+                    linestyle = '-' if bf.loc[t.values,'isglobal'].all() else ':'
+                    pax.scatter(bi.loc[t.values,'pb'].values,bi.loc[t.values,'mlt'].values,s=1,color='C7')
+                    pax.scatter(bi.loc[t.values,'eb'].values,bi.loc[t.values,'mlt'].values,s=1,color='C6')
+                    pax.plot(bf.loc[t.values,'pb'].values,bf.loc[t.values,'mlt'].values,color='C3',alpha=alpha,linestyle=linestyle)
+                    pax.plot(bf.loc[t.values,'eb'].values,bf.loc[t.values,'mlt'].values,color='C1',alpha=alpha,linestyle=linestyle)
+                except:
+                    print('No boundary')
+                    pass
+                
+                plt.savefig(outpath + 'temp/wic'+str(i).zfill(4)+'.png',bbox_inches='tight',dpi=150)
+                
+                ax.collections.clear()
+                ax.lines.clear()
+                
+                
+            os.system('convert '+outpath+'temp/wic*.png '+outpath+'imgs_or'+str(orbit).zfill(4)+'.gif')
+            # os.system('convert '+ospath+'fig/temp/binary*.png '+ospath+'fig/oval_'+e+'.gif')
+            os.system('rm '+outpath+'fig/temp/*.png')
+        except Exception as e: print(e)
 
     
