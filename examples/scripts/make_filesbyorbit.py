@@ -313,21 +313,22 @@ def final_bondaries(orbits):
 
 
     for orbit in orbits:
-        imgs = xr.load_dataset(wicpath+'wic_or'+str(orbit).zfill(4)+'.nc')
-        bi = pd.read_hdf(bpath+'initial_boundaries.h5',key='initial',where='orbit=="{}"'.format(orbit))
-        
-        # Only images with identified initial boundaries
-        imgs = imgs.sel(date=bi.reset_index().date.unique())
-        
-        bm = fuv.makeBoundaryModelBStest(bi,tKnotSep=5,tLeb=1e-1,sLeb=1e-1,tLpb=1e-1,sLpb=1e-1,resample=False)
-        isglobal = dataCoverage(imgs)
-        bm['isglobal'] = ('date',isglobal)
-
-        bm = bm.to_dataframe()
-        bm['orbit']=orbit
-        bm = calcIntensity(imgs, bm,tVal=1e2,sVal=1e-1)
-        bm[['pb','eb','v_phi','v_theta','u_phi','u_theta','isglobal','orbit','rmse','I']].to_hdf(bpath+'final_boundaries.h5','final',format='table',append=True,data_columns=True)
-        
+        try:
+            imgs = xr.load_dataset(wicpath+'wic_or'+str(orbit).zfill(4)+'.nc')
+            bi = pd.read_hdf(bpath+'initial_boundaries.h5',key='initial',where='orbit=="{}"'.format(orbit))
+            
+            # Only images with identified initial boundaries
+            imgs = imgs.sel(date=bi.reset_index().date.unique())
+            
+            bm = fuv.makeBoundaryModelBStest(bi,tKnotSep=5,tLeb=1e-1,sLeb=1e-1,tLpb=1e-1,sLpb=1e-1,resample=False)
+            isglobal = dataCoverage(imgs)
+            bm['isglobal'] = ('date',isglobal)
+    
+            bm = bm.to_dataframe()
+            bm['orbit']=orbit
+            bm = calcIntensity(imgs, bm,tVal=1e2,sVal=1e-1)
+            bm[['pb','eb','v_phi','v_theta','u_phi','u_theta','isglobal','orbit','rmse','I']].to_hdf(bpath+'final_boundaries.h5','final',format='table',append=True,data_columns=True)
+        except Exception as e: print(e)       
      
 
     
