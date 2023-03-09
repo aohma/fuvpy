@@ -12,6 +12,11 @@ import pandas as pd
 import xarray as xr
 import fuvpy as fuv
 
+import matplotlib.path as mplpath
+
+from scipy.interpolate import BSpline
+from scipy.linalg import lstsq
+
 def make_wicfiles(orbit,path):
     '''
     Make a dataframe with date, wic filename and orbit number
@@ -143,6 +148,186 @@ def initial_boundaries(orbits):
             bi['orbit']=orbit
             bi.to_hdf(outpath+'initial_boundaries.h5','initial',format='table',append=True,data_columns=True)
         except Exception as e: print(e)
+
+def dataCoverage(imgs):
+    lt = np.arange(0.5,24)
+    lat = 90-(30+10*np.cos(np.pi*lt/12))
     
+    isglobal=[]
+    for t in range(len(imgs.date)):
+        img=imgs.isel(date=t)
+        count = np.zeros_like(lt)
+        for i in range(len(lt)):
+            count[i]=np.sum((img['mlt'].values>(lt[i]-0.5))&(img['mlt'].values<(lt[i]+0.5))&(img['mlat'].values<lat[i]))
+        isglobal.append((count>0).all()) 
+    return np.array(isglobal)
+    
+def calcIntensity(wic,bm,tKnotSep=10,tVal=0,sVal=0):
+    bm=bm.reset_index().set_index('date')
+    wic['shimg'].attrs = {'long_name': 'Counts', 'units': ''}
+  
+    a = (bm.mlt.values - 6.)/12.*np.pi
+    
+    r = (90. - np.abs(bm['pb']))
+    bm['px'] =  r*np.cos(a)
+    bm['py'] =  r*np.sin(a)
+    
+    r = (90. - np.abs(bm['eb']))
+    bm['ex'] =  r*np.cos(a)
+    bm['ey'] =  r*np.sin(a)
+    
+    r = 35+10*np.cos(np.pi*bm.mlt.values/12)
+    bm['lx'] =  r*np.cos(a)
+    bm['ly'] =  r*np.sin(a)
+    
+    r = (90. - np.abs(wic['mlat']))
+    a = (wic.mlt.values - 6.)/12.*np.pi
+    wic['x'] =  r*np.cos(a)
+    wic['y'] =  r*np.sin(a)
+    
+    dfs = []
+    rmse = []
+    for t in wic.date:
+        # Create an PB polygon
+        poly = mplpath.Path(bm.loc[t.values,['px','py']].values)
+
+        # Identify gridcell with center inside the PB polygon
+        inpb = poly.contains_points(np.stack((wic.sel(date=t).x.values.flatten(),wic.sel(date=t).y.values.flatten()),axis=1))
+    
+        # Create an EB polygon
+        poly = mplpath.Path(bm.loc[t.values,['ex','ey']].values)
+
+        # Identify gridcell with center inside the EB polygon
+        ineb = poly.contains_points(np.stack((wic.sel(date=t).x.values.flatten(),wic.sel(date=t).y.values.flatten()),axis=1))
+    
+        # Create an minlat polygon
+        poly = mplpath.Path(bm.loc[t.values,['lx','ly']].values)
+
+        # Identify gridcell with center inside the EB polygon
+        incap = poly.contains_points(np.stack((wic.sel(date=t).x.values.flatten(),wic.sel(date=t).y.values.flatten()),axis=1))
+    
+    
+        df = pd.DataFrame()
+        df['mlat'] = wic.sel(date=t)['mlat'].values.flatten()[ineb & ~inpb]
+        df['mlt'] = wic.sel(date=t)['mlt'].values.flatten()[ineb & ~inpb]
+        df['I'] = wic.sel(date=t)['shimg'].values.flatten()[ineb & ~inpb]
+        df['date'] = wic.sel(date=t).date.values
+        
+        dfs.append(df)
+        
+        rmse.append(np.sqrt(np.nanmean(wic.sel(date=t)['shimg'].values.flatten()[incap & ~(ineb & ~ inpb)]**2)))
+    
+    df = pd.concat(dfs).reset_index()
+
+    # ADD RMSE TO BM
+    bm = bm.reset_index().set_index(['date','mlt']).to_xarray().sortby(['date','mlt'])
+    bm['rmse'] = ('date',rmse)
+    bm = bm.to_dataframe().reset_index().set_index('date')
+
+    tOrder=3
+    
+
+
+    # Start date and duration
+    date0 = df['date'].min()
+    duration = (df['date'].max()-date0)/ np.timedelta64(1, 'm')    
+    time=(df['date']-date0)/ np.timedelta64(1, 'm')
+    phi = np.deg2rad(15*df['mlt'].values)
+
+
+    #%% Eq boundary model
+    
+    # Equatorward boundary to radias then convert to primed coordinates
+    d = df['I'].values
+
+    # Index of finite data
+    ind = np.isfinite(d)
+
+    # Temporal knots
+    tKnots = np.arange(0,duration+tKnotSep,tKnotSep)
+    tKnots = np.r_[np.repeat(tKnots[0],tOrder),tKnots, np.repeat(tKnots[-1],tOrder)]
+
+    # Number of temporal control points
+    n_tcp = len(tKnots)-tOrder-1
+
+    # Temporal design matix
+    Gtime = BSpline.design_matrix(time[ind],tKnots,tOrder)
+
+
+    # Spatial knots (extended)
+    sOrder = 3
+    mltKnots = np.arange(0,24,2)
+    sKnots = np.deg2rad(15*mltKnots)
+    sKnots = np.r_[sKnots-2*np.pi,sKnots,sKnots+2*np.pi]
+    sKnots = np.r_[np.repeat(sKnots[0],sOrder),sKnots, np.repeat(sKnots[-1],sOrder)]
+    
+    # Spatial design matrix (extended)
+    Gphi = BSpline.design_matrix(phi[ind], sKnots, sOrder)
+    
+    # Spatial design matrix (periodic)
+    n_pcp = len(mltKnots)
+    Gphi = Gphi[:,n_pcp:2*n_pcp]+Gphi[:,2*n_pcp:3*n_pcp]
+ 
+    # Combine to full design matrix
+    G_s = Gphi[:,np.repeat(np.arange(n_pcp),n_tcp)]*Gtime[:,np.tile(np.arange(n_tcp),n_pcp)]
+    
+   
+    
+    # 1st order Tikhonov regularization in time
+    tL = np.hstack((-np.identity(n_tcp-1),np.zeros((n_tcp-1,1))))+np.hstack((np.zeros((n_tcp-1,1)),np.identity(n_tcp-1)))
+    tLTL = np.zeros((n_tcp*n_pcp,n_tcp*n_pcp))
+    for i in range(n_pcp): tLTL[i*n_tcp:(i+1)*n_tcp,i*n_tcp:(i+1)*n_tcp] = tL.T@tL
+    
+    # 1st order Tikhonov regularization in mlt
+    sL = []
+    for i in range(n_pcp): sL.append(np.roll(np.r_[-1,1,np.repeat(0,n_pcp-2)],i))
+    sL=np.array(sL)
+    sLTL = np.zeros((n_pcp*n_tcp,n_pcp*n_tcp))
+    for t in range(n_tcp): sLTL[t:t+n_pcp*n_tcp:n_tcp,t:t+n_pcp*n_tcp:n_tcp] = sL.T@sL
+    
+    # Combined regularization
+    R = tVal*tLTL + sVal*sLTL
+     
+    # Solve
+    m = lstsq((G_s).T.dot(G_s)+R,(G_s).T.dot(d[ind]),lapack_driver='gelsy')[0]
+    
+    # Temporal evaluation matrix
+    time_ev=(df['date'].drop_duplicates()-date0).values/ np.timedelta64(1, 'm')
+    Gtime = BSpline.design_matrix(time_ev, tKnots,tOrder).toarray()
+    
+    # Spatial evaluation matrix
+    phi_ev = np.arange(0,2*np.pi,2*np.pi/240)
+    Gphi = BSpline.design_matrix(phi_ev, sKnots, sOrder)
+    Gphi = Gphi[:,n_pcp:2*n_pcp]+Gphi[:,2*n_pcp:3*n_pcp].toarray()
+   
+    G_ev = np.tile(np.repeat(Gphi,n_tcp,axis=1),(len(time_ev),1))*np.repeat(np.tile(Gtime,(1,n_pcp)),len(phi_ev),axis=0)
+    
+    dm=G_ev.dot(m)
+    bm['I']=dm
+    bm = bm.reset_index().set_index(['date','mlt'])
+    return bm    
+    
+def final_bondaries(orbits):
+    wicpath = '/mnt/5fa6bccc-fa9d-4efc-9ddc-756f65699a0a/aohma/fuv/wic/'
+    bpath = '/mnt/5fa6bccc-fa9d-4efc-9ddc-756f65699a0a/aohma/fuv/boundaries/'
+
+
+    for orbit in orbits:
+        imgs = xr.load_dataset(wicpath+'wic_or'+str(orbit).zfill(4)+'.nc')
+        bi = pd.read_hdf(bpath+'initial_boundaries.h5',key='initial',where='orbit=="{}"'.format(orbit))
+        
+        # Only images with identified initial boundaries
+        imgs = imgs.sel(date=bi.reset_index().date.unique())
+        
+        bm = fuv.makeBoundaryModelBStest(bi,tKnotSep=5,tLeb=1e-1,sLeb=1e-1,tLpb=1e-1,sLpb=1e-1,resample=False)
+        isglobal = dataCoverage(imgs)
+        bm['isglobal'] = ('date',isglobal)
+
+        bm = bm.to_dataframe()
+        bm['orbit']=orbit
+        bm = calcIntensity(imgs, bm,tVal=1e2,sVal=1e-1)
+        bm[['pb','eb','v_phi','v_theta','u_phi','u_theta','isglobal','orbit','rmse','I']].to_hdf(bpath+'final_boundaries.h5','final',format='table',append=True,data_columns=True)
+        
+     
 
     
