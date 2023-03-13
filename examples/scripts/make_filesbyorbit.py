@@ -387,7 +387,7 @@ def makeGIFs(orbits):
                 
             os.system('convert '+outpath+'temp/wic*.png '+outpath+'imgs_or'+str(orbit).zfill(4)+'.gif')
             # os.system('convert '+ospath+'fig/temp/binary*.png '+ospath+'fig/oval_'+e+'.gif')
-            os.system('rm '+outpath+'fig/temp/*.png')
+            os.system('rm '+outpath+'temp/*.png')
         except Exception as e: print(e)
 
     
