@@ -210,7 +210,7 @@ def _reflatWIC(wic,inImg='img',outImg='img'):
     else:
         flat = flatfields[:,1]
 
-    background=np.nanmedian((wic[inImg]/flat[None,:,None]).values[wic['bad'].values&(wic['sza'].values>100|np.isnan(wic['sza'].values))])
+    background=np.nanmedian((wic[inImg]/flat[None,:,None]).values[wic['sza'].values>100|(np.isnan(wic['sza'].values)&(wic['img'].values>0))])
     if np.isnan(background): background=450 # Set a reasonable value if no background pixels are available
     wic[outImg]=((wic[inImg].copy()/flat[None,:,None]-background)*flat[None,:,None]+background)
     return wic
