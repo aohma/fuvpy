@@ -119,6 +119,10 @@ def readImg(filenames, dzalim = 80, minlat = 0, hemisphere = None, reflat=True):
     # Add a boolerian field to flag bad pixels in the detector
     imgs = _badPixels(imgs)
 
+    # Zero values pixels in WIC are really NaNs
+    if (imgs['id']=='WIC'):
+        imgs['img']  = xr.where(imgs['img'] <= 0,np.nan,imgs['img'])
+
     # Reapply WIC's flat field
     if (imgs['id']=='WIC')&reflat:
         imgs=_reflatWIC(imgs)
