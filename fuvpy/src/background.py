@@ -21,7 +21,7 @@ from fuvpy.utils.sunlight import subsol
 from fuvpy.polplot import sdarngrid,bin_number
 
 
-def makeBSmodel(imgs,inImg='img',sOrder=3,dampingVal=0,tukeyVal=5,stop=1e-3,minlat=-90,dzalim=75,sKnots=None,n_tKnots=2,tOrder=2,returnNorms=False):
+def makeBSmodel(imgs,inImg='img',sOrder=3,dampingVal=0,tukeyVal=5,stop=1e-3,sKnots=None,n_tKnots=2,tOrder=2,returnNorms=False):
     '''
     Function to model the FUV dayglow and subtract it from the input image
 
@@ -43,10 +43,6 @@ def makeBSmodel(imgs,inImg='img',sOrder=3,dampingVal=0,tukeyVal=5,stop=1e-3,minl
         Default is 5
     stop : float, optional
         When to stop the iteration. The default is 0.001.
-    minlat : float, optional
-        Lower glat boundary to include in the model. The default is -90.
-    dzalim : float, optional
-        Maximum viewing angle to include. The default is 75.
     sKnots : array like, optional
         Location of the spatial Bspline knots. The default is None (default is used).
     n_tKnots : int, optional
@@ -88,8 +84,12 @@ def makeBSmodel(imgs,inImg='img',sOrder=3,dampingVal=0,tukeyVal=5,stop=1e-3,minl
     n_s = fraction.shape[1]
 
     # Temporal knots
-    tKnots = np.linspace(time[0], time[-1], n_tKnots)
-    tKnots = np.r_[np.repeat(tKnots[0],tOrder),tKnots, np.repeat(tKnots[-1],tOrder)]
+    if n_t==1:
+        tKnots = np.linspace(time[0], time[-1]+1, n_tKnots)
+        tOrder = 0
+    else:
+        tKnots = np.linspace(time[0], time[-1], n_tKnots)
+        tKnots = np.r_[np.repeat(tKnots[0],tOrder),tKnots, np.repeat(tKnots[-1],tOrder)]
 
     # Number of control points
     n_tcp = len(tKnots)-tOrder-1
@@ -113,7 +113,7 @@ def makeBSmodel(imgs,inImg='img',sOrder=3,dampingVal=0,tukeyVal=5,stop=1e-3,minl
     G_s=np.vstack(G_s)
 
     # Index of data to use in model
-    ind = (imgs['sza'].stack(z=('row','col')).values >= 0) & (imgs['dza'].stack(z=('row','col')).values <= dzalim) & (imgs['glat'].stack(z=('row','col')).values >= minlat) & (np.isfinite(imgs['mlat'].stack(z=('row','col')).values)) & (np.isfinite(imgs[inImg].stack(z=('row','col')).values)) & imgs['bad'].stack(z=('row','col')).values[None,:] & (fraction>sKnots[0]) & (fraction<sKnots[-1])
+    ind = (imgs['sza'].stack(z=('row','col')).values >= 0) & (np.isfinite(imgs[inImg].stack(z=('row','col')).values)) & (fraction>sKnots[0]) & (fraction<sKnots[-1])
 
     # Spatial weights
     ws = np.full_like(fraction,np.nan)
@@ -140,8 +140,8 @@ def makeBSmodel(imgs,inImg='img',sOrder=3,dampingVal=0,tukeyVal=5,stop=1e-3,minl
     while (diff>stop)&(iteration < 100):
         print('Iteration:',iteration)
 
-        m_s = np.linalg.lstsq((G_s[ind,:]*w[ind,None]*ws[ind,None]).T@(G_s[ind,:]*w[ind,None]*ws[ind,None])+R,(G_s[ind,:]*w[ind,None]*ws[ind,None]).T@(d_s[ind]*w[ind]*ws[ind]),rcond=None)[0]
-
+        # m_s = np.linalg.lstsq((G_s[ind,:]*w[ind,None]*ws[ind,None]).T@(G_s[ind,:]*w[ind,None]*ws[ind,None])+R,(G_s[ind,:]*w[ind,None]*ws[ind,None]).T@(d_s[ind]*w[ind]*ws[ind]),rcond=None)[0]
+        m_s = lstsq((G_s[ind,:]*w[ind,None]*ws[ind,None]).T@(G_s[ind,:]*w[ind,None]*ws[ind,None])+R,(G_s[ind,:]*w[ind,None]*ws[ind,None]).T@(d_s[ind]*w[ind]*ws[ind]),lapack_driver='gelsy')[0]
         mNew    = M@m_s.reshape((n_scp, n_tcp)).T
         dm=[]
         for i, tt in enumerate(time):
@@ -172,7 +172,7 @@ def makeBSmodel(imgs,inImg='img',sOrder=3,dampingVal=0,tukeyVal=5,stop=1e-3,minl
     imgs['dgsigma'] = (['date','row','col'],(sigma).reshape((n_t,len(imgs.row),len(imgs.col))))
 
     # Remove pixels outside model scope
-    ind = (imgs.sza>=0)& (imgs.dza <= dzalim) & (imgs.glat >= minlat) & np.isfinite(imgs.mlat)& imgs.bad 
+    ind = (imgs.sza>=0)
     imgs['dgmodel'] = xr.where(~ind,np.nan,imgs['dgmodel'])
     imgs['dgimg'] = xr.where(~ind,np.nan,imgs['dgimg'])
     imgs['dgweight'] = xr.where(~ind,np.nan,imgs['dgweight'])
@@ -189,7 +189,7 @@ def makeBSmodel(imgs,inImg='img',sOrder=3,dampingVal=0,tukeyVal=5,stop=1e-3,minl
     else:
         return imgs
 
-def makeBSmodelTest(imgs,inImg='img',sOrder=3,dampingVal=0,tukeyVal=5,stop=1e-3,minlat=-90,dzalim=75,sKnots=None,n_tKnots=2,tOrder=2,returnNorms=False):
+def makeBSmodelTest(imgs,inImg='img',dampingVal=0,tukeyVal=5,stop=1e-3,sKnots=None,sOrder=3,n_tKnots=2,tOrder=2,returnNorms=False):
     '''
     Function to model the FUV dayglow and subtract it from the input image. Testing scipy.sparse
 
@@ -211,10 +211,6 @@ def makeBSmodelTest(imgs,inImg='img',sOrder=3,dampingVal=0,tukeyVal=5,stop=1e-3,
         Default is 5
     stop : float, optional
         When to stop the iteration. The default is 0.001.
-    minlat : float, optional
-        Lower glat boundary to include in the model. The default is -90.
-    dzalim : float, optional
-        Maximum viewing angle to include. The default is 75.
     sKnots : array like, optional
         Location of the spatial Bspline knots. The default is None (default is used).
     n_tKnots : int, optional
@@ -254,12 +250,15 @@ def makeBSmodelTest(imgs,inImg='img',sOrder=3,dampingVal=0,tukeyVal=5,stop=1e-3,
     n_c = len(imgs.col)
 
     # Index of data to use in model
-    ind = (imgs['sza'].stack(z=('date','row','col')).values >= 0) & (imgs['dza'].stack(z=('date','row','col')).values <= dzalim) & (imgs['glat'].stack(z=('date','row','col')).values >= minlat) & (np.isfinite(imgs[inImg].stack(z=('date','row','col')).values)) & imgs['bad'].stack(z=('row','col')).values[np.tile(np.arange(n_r*n_c),n_t)] & (fraction>sKnots[0]) & (fraction<sKnots[-1])
-
+    ind = (imgs['sza'].stack(z=('date','row','col')).values >= 0) & (np.isfinite(imgs[inImg].stack(z=('date','row','col')).values)) & (fraction>sKnots[0]) & (fraction<sKnots[-1])
 
     # Temporal knots
-    tKnots = np.linspace(time[0], time[-1], n_tKnots)
-    tKnots = np.r_[np.repeat(tKnots[0],tOrder),tKnots, np.repeat(tKnots[-1],tOrder)]
+    if n_t==1:
+        tKnots = np.linspace(time[0], time[-1]+1, n_tKnots)
+        tOrder = 0
+    else:
+        tKnots = np.linspace(time[0], time[-1], n_tKnots)
+        tKnots = np.r_[np.repeat(tKnots[0],tOrder),tKnots, np.repeat(tKnots[-1],tOrder)]
 
     # Number of control points
     n_tcp = len(tKnots)-tOrder-1
@@ -309,7 +308,7 @@ def makeBSmodelTest(imgs,inImg='img',sOrder=3,dampingVal=0,tukeyVal=5,stop=1e-3,
         if iteration<=1:
             sigma = np.full_like(dm,np.nan)
             sigma[ind] = _noiseModel(fraction[ind], d,dm[ind], w.toarray().squeeze()*ws.toarray().squeeze(),sKnots)
-        w[:] = (1 - np.minimum(1,(residuals/(tukeyVal*sigma))**2))**2
+        w[:] = (1 - np.minimum(1,(residuals/(tukeyVal*sigma[ind]))**2))**2
 
         if m is not None:
             diff = np.sqrt(np.mean((mNew-m)**2))/(1+np.sqrt(np.mean(mNew**2)))
@@ -329,7 +328,7 @@ def makeBSmodelTest(imgs,inImg='img',sOrder=3,dampingVal=0,tukeyVal=5,stop=1e-3,
     imgs['dgsigma'] = (['date','row','col'],(sigma).reshape((n_t,n_r,n_c)))
 
     # Remove pixels outside model scope
-    ind = (imgs.sza>=0)& (imgs.dza <= dzalim) & (imgs.glat >= minlat) & imgs.bad
+    ind = (imgs.sza>=0)
     imgs['dgmodel'] = xr.where(~ind,np.nan,imgs['dgmodel'])
     imgs['dgimg'] = xr.where(~ind,np.nan,imgs['dgimg'])
     # imgs['dgweight'] = xr.where(~ind,np.nan,imgs['dgweight'])

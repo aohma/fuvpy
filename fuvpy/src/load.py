@@ -16,7 +16,7 @@ from datetime import datetime
 from scipy.io import idl
 
 
-def readImg(filenames, dzalim = 80, minlat = 0, hemisphere = None, reflat=True):
+def readImg(filenames, dzalim = 80, hemisphere = None, reflat=True, remove_bad=True):
     '''
     Load FUV images into a xarray.Dataset
 
@@ -26,8 +26,6 @@ def readImg(filenames, dzalim = 80, minlat = 0, hemisphere = None, reflat=True):
         Path to one or several auroral fuv images stored in .idl or .sav files
     dzalim : float, optional
         Upper limit of the satellite zenith angle (viewing angle). The default is 80.
-    minlat : float, optional
-        Minimum abs(mlat) to include. The default is 0 (magnetic equator).
     hemisphere : str, optional
         Which hemisphere to include. 'north','south' and None.
         Default is None (automatically detected).
@@ -63,6 +61,8 @@ def readImg(filenames, dzalim = 80, minlat = 0, hemisphere = None, reflat=True):
     for i in range(len(filenames)):
         imageinfo = idl.readsav(filenames[i])['imageinfo']
 
+        inst_id = imageinfo['inst_id'][0].strip().decode('utf8')
+
         # Read *.idl/*.sav files
         img = xr.Dataset({
         'img': (['row','col'],imageinfo['image'][0]),
@@ -76,53 +76,33 @@ def readImg(filenames, dzalim = 80, minlat = 0, hemisphere = None, reflat=True):
         })
         img = img.expand_dims(date=[pd.to_datetime(_timestampImg(imageinfo['time'][0]))])
 
+        coordinates = ['mlat','mlon','mlt','glat','glon','sza','dza']
+        fillvals = [-1e+31,-1e+31,-1e+31,-1e+31,-1e+31,-1,-1]
+
         # Replace fill values with np.nan
-        img['mlat'] = xr.where(img['mlat']==-1e+31,np.nan,img['mlat'])
-        img['mlon'] = xr.where(img['mlon']==-1e+31,np.nan,img['mlon'])
-        img['mlt']  = xr.where(img['mlt'] ==-1e+31,np.nan,img['mlt'])
-        img['glat'] = xr.where(img['glat']==-1e+31,np.nan,img['glat'])
-        img['glon'] = xr.where(img['glon']==-1e+31,np.nan,img['glon'])
-        img['sza']  = xr.where(img['sza']==-1,np.nan,img['sza'])
-        img['dza']  = xr.where(img['dza']==-1,np.nan,img['dza'])
-
-        # Set mlat/mlt to np.nan where when it is outside the requested range
-        img['mlt']  = xr.where(img['dza'] > dzalim,np.nan,img['mlt'])
-        img['mlat'] = xr.where(img['dza'] > dzalim,np.nan,img['mlat'])
-
-        img['mlt']  = xr.where((img['mlat'] > 90) | (img['mlat'] < -90),np.nan,img['mlt'])
-        img['mlat'] = xr.where((img['mlat'] > 90) | (img['mlat'] < -90),np.nan,img['mlat'])
-
-        img['mlt']  = xr.where(img['glat']==0,np.nan,img['mlt'])
-        img['mlat'] = xr.where(img['glat']==0,np.nan,img['mlat'])
+        for coordinate,fillval in zip(coordinates, fillvals):
+            img[coordinate] = xr.where(img[coordinate]==fillval,np.nan,img[coordinate])
 
         # Select hemisphere
         if hemisphere =='south' or (hemisphere is None and np.nanmedian(img['mlat'])<0):
             img=img.assign({'hemisphere': 'south'})
-            img['mlt']  = xr.where(img['mlat'] > 0,np.nan,img['mlt'])
-            img['mlat'] = xr.where(img['mlat'] > 0,np.nan,img['mlat'])
         elif hemisphere == 'north' or (hemisphere is None and np.nanmedian(img['mlat'])>0):
             img=img.assign({'hemisphere': 'north'})
-            img['mlt']  = xr.where(img['mlat'] < 0,np.nan,img['mlt'])
-            img['mlat'] = xr.where(img['mlat'] < 0,np.nan,img['mlat'])
         else:
             img=img.assign({'hemisphere': 'na'})
 
-        img['mlat'] = np.abs(img['mlat'])
-        img['mlt']  = xr.where(img['mlat'] < minlat,np.nan,img['mlt'])
-        img['mlat'] = xr.where(img['mlat'] < minlat,np.nan,img['mlat'])
+        # coordinates to include
+        ind = (img['dza'] < dzalim) & (img['mlat'] < 90) & (img['mlat'] > -90) & (img['glat']!=0)
+        if inst_id=='WIC': ind = ind & (img['img'] > 0) # Zero-valued pixels in WIC are actually NaNs
+        if remove_bad: ind = ind & ~_badPixels(inst_id) # Ignore bad parts of the detectors
+
+        for coordinate in coordinates:
+            img[coordinate] = xr.where(~ind,np.nan,img[coordinate])
 
         imgs.append(img)
 
     imgs = xr.concat(imgs, dim='date')
     imgs = imgs.assign({'id':  imageinfo['inst_id'][0].strip().decode('utf8')})
-
-    # Add a boolerian field to flag bad pixels in the detector
-    imgs = _badPixels(imgs)
-
-    # Zero values pixels in WIC are really NaNs
-    if (imgs['id']=='WIC'):
-        imgs['mlat'] = xr.where(imgs['img'] <= 0,np.nan,imgs['mlat'])
-        imgs['mlt']  = xr.where(imgs['img'] <= 0,np.nan,imgs['mlt'])
 
     # Reapply WIC's flat field
     if (imgs['id']=='WIC')&reflat:
@@ -163,48 +143,46 @@ def _timestampImg(timestamp):
 
     return time
 
-def _badPixels(imgs):
+def _badPixels(inst_id):
     '''
-    Add a data field with index of problematic pixels in the different detectors.
+    Index of problematic pixels in the different detectors.
     The exact number will depent on the datetime, so this static approach is an approximation.
     Work could be done to get this function more accurate.
 
     Parameters
     ----------
-    imgs : xarray.Dataset
-        Dataset with the FUV images.
+    inst_id : str
+        id of the FUV detector.
 
     Returns
     -------
-    imgs : xarray.Dataset
-        FUV dataset with a new field imgs['bad'], containing the
-        logical indices of bad pixels (False is bad).
+    ind : np.array
+        logical indices of bad pixels (True is bad).
     '''
 
-    if imgs['id'] == 'WIC':
-        ind=np.ones((256,256),dtype=bool)
-        ind[230:,:] = False # Broken boom shades the upper rows of WIC (after what date?)
-        ind[:2,:] = False #
-    elif imgs['id'] == 'SI13': #
-        ind = np.ones((128,128),dtype=bool)
-        ind[:8,:] = False
-        ind[120:,:] = False
-    elif imgs['id'] == 'VIS':
-        ind = np.ones((256,256),dtype=bool)
-        ind[:,:4]=False
+    if inst_id == 'WIC':
+        ind=np.zeros((256,256),dtype=bool)
+        ind[230:,:] = True # Broken boom shades the upper rows of WIC (after what date?)
+        ind[:2,:] = True #
+    elif inst_id == 'SI13': #
+        ind = np.zeros((128,128),dtype=bool)
+        ind[:8,:] = True
+        ind[120:,:] = True
+    elif inst_id == 'VIS':
+        ind = np.zeros((256,256),dtype=bool)
+        ind[:,:4]=True
         # The corner of VIS Earth have an intensity dropoff
-        for jj in range(25): ind[-1-jj,:25-jj] = False
-        for jj in range(25): ind[-1-jj,-25+jj:] = False
-        for jj in range(25): ind[jj,-25+jj:] = False
-        for jj in range(25): ind[jj,:25-jj] = False
-    elif imgs['id']=='UVI': # No known problems
-        ind = np.ones((228,200),dtype=bool)
-    elif imgs['id']=='SI12': #
-        ind = np.ones((128,128),dtype=bool)
-        ind[118:,:] = False # Broken boom shades the upper rows of WIC (after what date?)
-        ind[:13,:] = False
-    imgs = imgs.assign({'bad':(['row','col'],ind)})
-    return imgs
+        for jj in range(25): ind[-1-jj,:25-jj] = True
+        for jj in range(25): ind[-1-jj,-25+jj:] = True
+        for jj in range(25): ind[jj,-25+jj:] = True
+        for jj in range(25): ind[jj,:25-jj] = True
+    elif inst_id=='UVI': # No known problems
+        ind = np.zeros((228,200),dtype=bool)
+    elif inst_id=='SI12': #
+        ind = np.zeros((128,128),dtype=bool)
+        ind[118:,:] = True # Broken boom shades the upper rows of WIC (after what date?)
+        ind[:13,:] = True
+    return ind
 
 def _reflatWIC(wic,inImg='img',outImg='img'):
     '''
