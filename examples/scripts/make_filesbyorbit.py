@@ -60,7 +60,7 @@ def background_removal(orbits):
         try:
             wic = fuv.readImg((files['path']+files['wicfile']).tolist(),dzalim=75) # Load
             wic = wic.sel(date=wic.hemisphere.date[wic.hemisphere=='north']) # Remove SH
-            wic = fuv.makeBSmodel(wic,sKnots=[-3.5,-0.25,0,0.25,1.5,3.5],stop=0.01,n_tKnots=5,minlat=-90,tukeyVal=5,dzalim=75,dampingVal=1e-2)
+            wic = fuv.makeBSmodel(wic,sKnots=[-3.5,-0.25,0,0.25,1.5,3.5],stop=0.01,n_tKnots=5,tukeyVal=5,dampingVal=1e-3)
             wic = fuv.makeSHmodel(wic,4,4,n_tKnots=5,stop=0.01,tukeyVal=5,dampingVal=1e-4)
             wic.to_netcdf(outpath+'wic_or'+str(orbit).zfill(4)+'.nc')
             # df = wic[['img','dgimg','shimg','mlat','mlt']].to_dataframe().dropna(subset='dgimg')
