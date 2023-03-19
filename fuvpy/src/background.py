@@ -275,9 +275,10 @@ def makeBSmodelTest(imgs,inImg='img',dampingVal=0,tukeyVal=5,stop=1e-3,sKnots=No
     # Spatial weights
     ws = []
     for i in range(n_t):
-        count,bin_edges,bin_number=binned_statistic(fraction[i*(n_r*n_c):(i+1)*(n_r*n_c)][ind[i*(n_r*n_c):(i+1)*(n_r*n_c)]],None,statistic=
-    'count',bins=np.arange(sKnots[0],sKnots[-1]+0.1,0.1))
-        ws.extend(1/np.maximum(1,count[bin_number-1]))
+        if np.sum(ind[i*(n_r*n_c):(i+1)*(n_r*n_c)])>0:
+            count,bin_edges,bin_number=binned_statistic(fraction[i*(n_r*n_c):(i+1)*(n_r*n_c)][ind[i*(n_r*n_c):(i+1)*(n_r*n_c)]],None,statistic=
+            'count',bins=np.arange(sKnots[0],sKnots[-1]+0.1,0.1))
+            ws.extend(1/np.maximum(1,count[bin_number-1]))
     ws = csc_array(ws).T
 
     # Make everything flat
@@ -366,7 +367,7 @@ def _noiseModel(fraction,d,dm,w,sKnots):
     return rmseFit
 
 
-def makeSHmodel(imgs,Nsh,Msh,dampingVal=0,tukeyVal=5,stop=1e-3,minlat=0,n_tKnots=2,tOrder=2,returnNorms=False):
+def makeSHmodel(imgs,Nsh,Msh,dampingVal=0,tukeyVal=5,stop=1e-3,n_tKnots=2,tOrder=2,returnNorms=False):
     '''
     Function to model the FUV residual background and subtract it from the input image
 
@@ -388,8 +389,6 @@ def makeSHmodel(imgs,Nsh,Msh,dampingVal=0,tukeyVal=5,stop=1e-3,minlat=0,n_tKnots
         Default is 5
     stop : float, optional
         When to stop the iteration. The default is 0.001.
-    minlat : float, optional
-        Minimum geographic latitude to include
     n_tKnots : int, optional
         Number of temporal knots, equally spaced between the endpoints. The default is 2 (only knots at endpoints)
     tOrder: int, optional
@@ -466,7 +465,7 @@ def makeSHmodel(imgs,Nsh,Msh,dampingVal=0,tukeyVal=5,stop=1e-3,minlat=0,n_tKnots
     G_s = G_s.reshape(-1,G_s.shape[2])
 
     # Data
-    ind = (np.isfinite(d))&(glat>0)&(imgs['bad'].values.flatten())[None,:]
+    ind = (np.isfinite(d))&(glat>0)
 
     # Spatial weights
     grid,mltres=sdarngrid(5,5,minlat//5*5) # Equal area grid
@@ -521,7 +520,7 @@ def makeSHmodel(imgs,Nsh,Msh,dampingVal=0,tukeyVal=5,stop=1e-3,minlat=0,n_tKnots
     imgs['shweight'] = (['date','row','col'],(w).reshape((n_t,len(imgs.row),len(imgs.col))))
 
     # Remove pixels outside model scope
-    ind = (imgs.glat >= minlat) & imgs.bad & np.isfinite(imgs['dgsigma'])
+    ind = (imgs.glat >= 0) & np.isfinite(imgs['dgsigma'])
     imgs['shmodel'] = xr.where(~ind,np.nan,imgs['shmodel'])
     imgs['shimg'] = xr.where(~ind,np.nan,imgs['shimg'])
     imgs['shweight'] = xr.where(~ind,np.nan,imgs['shweight'])
