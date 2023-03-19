@@ -121,7 +121,8 @@ def readImg(filenames, dzalim = 80, minlat = 0, hemisphere = None, reflat=True):
 
     # Zero values pixels in WIC are really NaNs
     if (imgs['id']=='WIC'):
-        imgs['img']  = xr.where(imgs['img'] <= 0,np.nan,imgs['img'])
+        imgs['mlat'] = xr.where(imgs['img'] <= 0,np.nan,imgs['mlat'])
+        imgs['mlt']  = xr.where(imgs['img'] <= 0,np.nan,imgs['mlt'])
 
     # Reapply WIC's flat field
     if (imgs['id']=='WIC')&reflat:
