@@ -118,9 +118,10 @@ def makeBSmodel(imgs,inImg='img',sOrder=3,dampingVal=0,tukeyVal=5,stop=1e-3,sKno
     # Spatial weights
     ws = np.full_like(fraction,np.nan)
     for i in range(len(fraction)):
-        count,bin_edges,bin_number=binned_statistic(fraction[i,ind[i,:]],fraction[i,ind[i,:]],statistic=
-    'count',bins=np.arange(sKnots[0],sKnots[-1]+0.1,0.1))
-        ws[i,ind[i,:]]=1/np.maximum(1,count[bin_number-1])
+        if np.sum(ind[i,:])>0:
+            count,bin_edges,bin_number=binned_statistic(fraction[i,ind[i,:]],fraction[i,ind[i,:]],statistic=
+            'count',bins=np.arange(sKnots[0],sKnots[-1]+0.1,0.1))
+            ws[i,ind[i,:]]=1/np.maximum(1,count[bin_number-1])
 
     # Make everything flat
     d_s = imgs[inImg].stack(z=('row','col')).values.flatten()
@@ -468,7 +469,7 @@ def makeSHmodel(imgs,Nsh,Msh,dampingVal=0,tukeyVal=5,stop=1e-3,n_tKnots=2,tOrder
     ind = (np.isfinite(d))&(glat>0)
 
     # Spatial weights
-    grid,mltres=sdarngrid(5,5,minlat//5*5) # Equal area grid
+    grid,mltres=sdarngrid(5,5,np.nanmin(glat)//5*5) # Equal area grid
     ws = np.full(glat.shape,np.nan)
     for i in range(len(glat)):
         gbin = bin_number(grid,glat[i,ind[i]],imgs['glon'].stack(z=('row','col')).values[i,ind[i]]/15)
