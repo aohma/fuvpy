@@ -1106,7 +1106,7 @@ def makeBoundaryModelBStest(df,stop=1e-3,tLeb=0,sLeb=0,tLpb=0,sLpb=0,tOrder = 3,
         mtau[ind]=G_s@ms
 
         residuals = mtau[ind] - theta_eb1[ind]
-        rmse = np.sqrt(np.average(residuals**2,weights=w.toarray().squeeze()))
+        if iteration == 0: rmse = np.sqrt(np.average(residuals**2))
 
         w[:] = np.minimum(0.5*rmse/np.abs(residuals),1)
         if m is not None:
