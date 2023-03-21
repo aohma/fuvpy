@@ -376,10 +376,8 @@ def makeGIFs(orbits):
                     pax.scatter(bi.loc[t.values,'eb'].values,bi.loc[t.values,'mlt'].values,s=1,color='C6')
                     pax.plot(bf.loc[t.values,'pb'].values,bf.loc[t.values,'mlt'].values,color='C3',alpha=alpha,linestyle=linestyle)
                     pax.plot(bf.loc[t.values,'eb'].values,bf.loc[t.values,'mlt'].values,color='C1',alpha=alpha,linestyle=linestyle)
-                except:
-                    print('No boundary')
-                    pass
-
+                except Exception as e: print(e)
+                
                 plt.savefig(outpath + 'temp/wic'+str(i).zfill(4)+'.png',bbox_inches='tight',dpi=150)
 
                 ax.collections.clear()

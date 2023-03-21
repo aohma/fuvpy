@@ -12,7 +12,7 @@ import time as timing
 
 from scipy.interpolate import BSpline
 from scipy.optimize import curve_fit
-from scipy.stats import binned_statistic
+from scipy.stats import binned_statistic,binned_statistic_2d
 from scipy.sparse import csc_array
 from scipy.linalg import lstsq
 
@@ -115,13 +115,16 @@ def makeBSmodel(imgs,inImg='img',sOrder=3,dampingVal=0,tukeyVal=5,stop=1e-3,sKno
     # Index of data to use in model
     ind = (imgs['sza'].stack(z=('row','col')).values >= 0) & (np.isfinite(imgs[inImg].stack(z=('row','col')).values)) & (fraction>sKnots[0]) & (fraction<sKnots[-1])
 
-    # Spatial weights
-    ws = np.full_like(fraction,np.nan)
-    for i in range(len(fraction)):
-        if np.sum(ind[i,:])>0:
-            count,bin_edges,bin_number=binned_statistic(fraction[i,ind[i,:]],fraction[i,ind[i,:]],statistic=
-            'count',bins=np.arange(sKnots[0],sKnots[-1]+0.1,0.1))
-            ws[i,ind[i,:]]=1/np.maximum(1,count[bin_number-1])
+    # # Spatial weights
+    # ws = np.full_like(fraction,np.nan)
+    # for i in range(len(fraction)):
+    #     if np.sum(ind[i,:])>0:
+    #         count,bin_edges,bin_number=binned_statistic(fraction[i,ind[i,:]],fraction[i,ind[i,:]],statistic=
+    #         'count',bins=np.arange(sKnots[0],sKnots[-1]+0.1,0.1))
+    #         ws[i,ind[i,:]]=1/np.maximum(1,count[bin_number-1])
+
+    # TEST WITH NORMAL DIST
+    ws = 1/np.exp(-0.5*(fraction/1.5)**2)
 
     # Make everything flat
     d_s = imgs[inImg].stack(z=('row','col')).values.flatten()
@@ -190,7 +193,7 @@ def makeBSmodel(imgs,inImg='img',sOrder=3,dampingVal=0,tukeyVal=5,stop=1e-3,sKno
     else:
         return imgs
 
-def makeBSmodelTest(imgs,inImg='img',dampingVal=0,tukeyVal=5,stop=1e-3,sKnots=None,sOrder=3,n_tKnots=2,tOrder=2,returnNorms=False):
+def makeBSmodelTest(imgs,inImg='img',dampingVal=0,tukeyVal=5,stop=1e-3,sKnots=None,sOrder=3,n_tKnots=2,tOrder=2,returnNorms=False,maxIter=100):
     '''
     Function to model the FUV dayglow and subtract it from the input image. Testing scipy.sparse
 
@@ -273,15 +276,31 @@ def makeBSmodelTest(imgs,inImg='img',dampingVal=0,tukeyVal=5,stop=1e-3,sKnots=No
 
     G = Gfrac[:,np.repeat(np.arange(n_scp),n_tcp)]*Gtime[:,np.tile(np.arange(n_tcp),n_scp)]
 
-    # Spatial weights
-    ws = []
-    for i in range(n_t):
-        if np.sum(ind[i*(n_r*n_c):(i+1)*(n_r*n_c)])>0:
-            count,bin_edges,bin_number=binned_statistic(fraction[i*(n_r*n_c):(i+1)*(n_r*n_c)][ind[i*(n_r*n_c):(i+1)*(n_r*n_c)]],None,statistic=
-            'count',bins=np.arange(sKnots[0],sKnots[-1]+0.1,0.1))
-            ws.extend(1/np.maximum(1,count[bin_number-1]))
-    ws = csc_array(ws).T
-
+    # # Spatial weights
+    # ws = []
+    # for i in range(n_t):
+    #     if np.sum(ind[i*(n_r*n_c):(i+1)*(n_r*n_c)])>0:
+    #         count,bin_edges,bin_number=binned_statistic(fraction[i*(n_r*n_c):(i+1)*(n_r*n_c)][ind[i*(n_r*n_c):(i+1)*(n_r*n_c)]],None,statistic=
+    #         'count',bins=np.arange(sKnots[0],sKnots[-1]+0.1,0.1))
+    #         ws.extend(1/np.maximum(1,count[bin_number-1]))
+    # ws = csc_array(ws).T
+    # ws[:]=1
+    
+    # # TEST DIRECT SPATIAL WEIGHTS
+    # count,time_edges,fraction_edges,bin_number=binned_statistic_2d(time[np.arange(n_t).repeat(n_r*n_c)][ind],fraction[ind],None,statistic=
+    # 'count',bins=(np.append(time,time[-1]+1),np.arange(sKnots[0],sKnots[-1]+0.5,0.5)),expand_binnumbers=True)
+    # # ws = csc_array(1/count[bin_number[0,:]-1,bin_number[1,:]-1]).T
+    # ws = csc_array((np.sum(count,axis=1)[:,None]/count)[bin_number[0,:]-1,bin_number[1,:]-1]).T
+    # ws[:]=1
+    
+    
+    # # TEST WITH ONLY FRACTION
+    # count,bin_edges,bin_number=binned_statistic(fraction[ind],None,statistic='count',bins=np.arange(sKnots[0],sKnots[-1]+0.1,0.1))
+    # ws = csc_array(1/count[bin_number-1]).T
+    
+    # TEST WITH NORMAL DIST
+    ws = csc_array(1/np.exp(-0.5*(fraction[ind]/1.5)**2)).T
+    
     # Make everything flat
     d = imgs[inImg].stack(z=('date','row','col')).values[ind]
 
@@ -300,7 +319,7 @@ def makeBSmodelTest(imgs,inImg='img',dampingVal=0,tukeyVal=5,stop=1e-3,sKnots=No
     iteration = 0
     dm = np.full((n_t*n_r*n_c),np.nan)
     m = None
-    while (diff>stop)&(iteration < 100):
+    while (diff>stop)&(iteration < maxIter):
         print('Iteration:',iteration)
         mNew = lstsq((G*w*ws).T.dot(G*w*ws)+R,(G*w*ws).T.dot(d*w.toarray().squeeze()*ws.toarray().squeeze()),lapack_driver='gelsy')[0]
 
