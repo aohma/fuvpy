@@ -379,7 +379,7 @@ def final_bondaries(orbits):
             # Only images with identified initial boundaries
             imgs = imgs.sel(date=bi.reset_index().date.unique())
 
-            bm = fuv.makeBoundaryModelBStest(bi,tKnotSep=5,tLeb=1e-1,sLeb=1e-1,tLpb=1e-1,sLpb=1e-1,resample=False)
+            bm = fuv.makeBoundaryModelBStest(bi,tKnotSep=5,tLeb=1e-1,sLeb=1e-3,tLpb=1e-1,sLpb=1e-3,resample=False)
             isglobal = dataCoverage(imgs)
             bm['isglobal'] = ('date',isglobal)
 
