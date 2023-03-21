@@ -309,6 +309,63 @@ def calcIntensity(wic,bm,tKnotSep=10,tVal=0,sVal=0):
     bm = bm.reset_index().set_index(['date','mlt'])
     return bm
 
+def calcRMSE(wic,bm):
+    bm=bm.reset_index().set_index('date')
+    wic['shimg'].attrs = {'long_name': 'Counts', 'units': ''}
+
+    a = (bm.mlt.values - 6.)/12.*np.pi
+
+    r = (90. - np.abs(bm['pb']))
+    bm['px'] =  r*np.cos(a)
+    bm['py'] =  r*np.sin(a)
+
+    r = (90. - np.abs(bm['eb']))
+    bm['ex'] =  r*np.cos(a)
+    bm['ey'] =  r*np.sin(a)
+
+    r = 35+10*np.cos(np.pi*bm.mlt.values/12)
+    bm['lx'] =  r*np.cos(a)
+    bm['ly'] =  r*np.sin(a)
+
+    r = (90. - np.abs(wic['mlat']))
+    a = (wic.mlt.values - 6.)/12.*np.pi
+    wic['x'] =  r*np.cos(a)
+    wic['y'] =  r*np.sin(a)
+
+    rmse_in  = []
+    rmse_out = []
+    for t in wic.date:
+        # Create an PB polygon
+        poly = mplpath.Path(bm.loc[t.values,['px','py']].values)
+
+        # Identify gridcell with center inside the PB polygon
+        inpb = poly.contains_points(np.stack((wic.sel(date=t).x.values.flatten(),wic.sel(date=t).y.values.flatten()),axis=1))
+
+        # Create an EB polygon
+        poly = mplpath.Path(bm.loc[t.values,['ex','ey']].values)
+
+        # Identify gridcell with center inside the EB polygon
+        ineb = poly.contains_points(np.stack((wic.sel(date=t).x.values.flatten(),wic.sel(date=t).y.values.flatten()),axis=1))
+
+        # Create an minlat polygon
+        poly = mplpath.Path(bm.loc[t.values,['lx','ly']].values)
+
+        # Identify gridcell with center inside the EB polygon
+        incap = poly.contains_points(np.stack((wic.sel(date=t).x.values.flatten(),wic.sel(date=t).y.values.flatten()),axis=1))
+
+        rmse_in.append(np.sqrt(np.nanmean(wic.sel(date=t)['shimg'].values.flatten()[ineb & ~inpb]**2)))
+        rmse_out.append(np.sqrt(np.nanmean(wic.sel(date=t)['shimg'].values.flatten()[incap & ~(ineb & ~ inpb)]**2)))
+
+    
+
+    # ADD RMSE TO BM
+    bm = bm.reset_index().set_index(['date','mlt']).to_xarray().sortby(['date','mlt'])
+    bm['rmse_in'] = ('date',rmse_in)
+    bm['rmse_out'] = ('date',rmse_out)
+    bm = bm.to_dataframe().reset_index().set_index(['date','mlt'])
+
+    return bm
+
 def final_bondaries(orbits):
     wicpath = '/mnt/5fa6bccc-fa9d-4efc-9ddc-756f65699a0a/aohma/fuv/wic/'
     bpath = '/mnt/5fa6bccc-fa9d-4efc-9ddc-756f65699a0a/aohma/fuv/boundaries/'
@@ -328,8 +385,8 @@ def final_bondaries(orbits):
 
             bm = bm.to_dataframe()
             bm['orbit']=orbit
-            bm = calcIntensity(imgs, bm,tVal=1e2,sVal=1e-1)
-            bm[['pb','eb','v_phi','v_theta','u_phi','u_theta','isglobal','orbit','rmse','I']].to_hdf(bpath+'final_boundaries.h5','final',format='table',append=True,data_columns=True)
+            bm = calcRMSE(imgs, bm)
+            bm[['pb','eb','v_phi','v_theta','u_phi','u_theta','isglobal','orbit','rmse_in','rmse_out']].to_hdf(bpath+'final_boundaries.h5','final',format='table',append=True,data_columns=True)
         except Exception as e: print(e)
 
 def makeGIFs(orbits):
