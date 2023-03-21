@@ -151,7 +151,7 @@ def initial_boundaries(orbits):
             bi.to_hdf(outpath+'initial_boundaries.h5','initial',format='table',append=True,data_columns=True)
         except Exception as e: print(e)
 
-def dataCoverage(imgs):
+def dataCoverage(imgs,dzalim=75):
     lt = np.arange(0.5,24)
     lat = 90-(30+10*np.cos(np.pi*lt/12))
 
@@ -160,7 +160,7 @@ def dataCoverage(imgs):
         img=imgs.isel(date=t)
         count = np.zeros_like(lt)
         for i in range(len(lt)):
-            count[i]=np.sum((img['mlt'].values>(lt[i]-0.5))&(img['mlt'].values<(lt[i]+0.5))&(img['mlat'].values<lat[i]))
+            count[i]=np.sum((img['mlt'].values>(lt[i]-0.5))&(img['mlt'].values<(lt[i]+0.5))&(img['mlat'].values<lat[i])&(img['dza'].values<dzalim))
         isglobal.append((count>0).all())
     return np.array(isglobal)
 
@@ -380,7 +380,7 @@ def final_bondaries(orbits):
             imgs = imgs.sel(date=bi.reset_index().date.unique())
 
             bm = fuv.makeBoundaryModelBStest(bi,tKnotSep=5,tLeb=1e-1,sLeb=1e-3,tLpb=1e-1,sLpb=1e-3,resample=False)
-            isglobal = dataCoverage(imgs)
+            isglobal = dataCoverage(imgs,dzalim=65)
             bm['isglobal'] = ('date',isglobal)
 
             bm = bm.to_dataframe()
