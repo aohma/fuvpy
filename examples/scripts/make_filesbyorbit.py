@@ -427,7 +427,7 @@ def makeGIFs(orbits):
 
                 pax.scatter(wic.sel(date=t)['mlat'].values,wic.sel(date=t)['mlt'].values,c=wic.sel(date=t)['shimg'].values,s=2,alpha=0.5,vmin=0,vmax=500,cmap='Greens')
                 try:
-                    alpha = 1 if bf.loc[t.values,'I'].quantile(0.25)>50 else 0.2
+                    alpha = 1 if (bf.loc[t.values,'rmse_in']/bf.loc[t.values,'rmse_out']>2).all() else 0.2
                     linestyle = '-' if bf.loc[t.values,'isglobal'].all() else ':'
                     pax.scatter(bi.loc[t.values,'pb'].values,bi.loc[t.values,'mlt'].values,s=1,color='C7')
                     pax.scatter(bi.loc[t.values,'eb'].values,bi.loc[t.values,'mlt'].values,s=1,color='C6')
