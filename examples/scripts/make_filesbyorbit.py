@@ -388,6 +388,40 @@ def final_bondaries(orbits):
             bm = calcRMSE(imgs, bm)
             bm[['pb','eb','v_phi','v_theta','u_phi','u_theta','isglobal','orbit','rmse_in','rmse_out']].to_hdf(bpath+'final_boundaries.h5','final',format='table',append=True,data_columns=True)
         except Exception as e: print(e)
+        
+def final_bondaries_error(orbits):
+    wicpath = '/mnt/5fa6bccc-fa9d-4efc-9ddc-756f65699a0a/aohma/fuv/wic/'
+    bpath = '/mnt/5fa6bccc-fa9d-4efc-9ddc-756f65699a0a/aohma/fuv/boundaries/'
+
+
+    for orbit in orbits:
+        try:
+            imgs = xr.load_dataset(wicpath+'wic_or'+str(orbit).zfill(4)+'.nc')
+            bi = pd.read_hdf(bpath+'initial_boundaries.h5',key='initial',where='orbit=="{}"'.format(orbit))
+
+            # Only images with identified initial boundaries
+            imgs = imgs.sel(date=bi.reset_index().date.unique())
+
+            bms = []    
+            for l in [100,150,200]:
+                bm = fuv.makeBoundaryModelBStest(bi.to_xarray().sel(lim=l).to_dataframe(),tKnotSep=5,tLeb=1e-1,sLeb=1e-3,tLpb=1e-1,sLpb=1e-3)
+                bm = bm.expand_dims(lim=[l])
+                bms.append(bm)
+            
+            bms = xr.concat(bms,dim='lim')#.std(dim='sample')[['ocb','eqb']]#.rename({'ocb':'pb_err','eqb':'eb_err'})
+
+            bm = bms.mean(dim='lim')
+            bm['pb_err'] = bms['pb'].std(dim='lim')
+            bm['eb_err'] = bms['eb'].std(dim='lim')
+
+            isglobal = dataCoverage(imgs,dzalim=65)
+            bm['isglobal'] = ('date',isglobal)
+
+            bm = bm.to_dataframe()
+            bm['orbit']=orbit
+            bm = calcRMSE(imgs, bm)
+            bm[['pb','eb','pb_err','eb_err','v_phi','v_theta','u_phi','u_theta','isglobal','orbit','rmse_in','rmse_out']].to_hdf(bpath+'final_boundaries.h5','final',format='table',append=True,data_columns=True)
+        except Exception as e: print(e)
 
 def makeGIFs(orbits):
     wicpath = '/mnt/5fa6bccc-fa9d-4efc-9ddc-756f65699a0a/aohma/fuv/wic/'
@@ -440,7 +474,7 @@ def makeGIFs(orbits):
                 ax.collections.clear()
                 ax.lines.clear()
 
-
+            plt.close()
             os.system('convert '+outpath+'temp/wic*.png '+outpath+'imgs_or'+str(orbit).zfill(4)+'.gif')
             # os.system('convert '+ospath+'fig/temp/binary*.png '+ospath+'fig/oval_'+e+'.gif')
             os.system('rm '+outpath+'temp/*.png')

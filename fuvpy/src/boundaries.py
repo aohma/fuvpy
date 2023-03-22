@@ -1027,9 +1027,10 @@ def makeBoundaryModelBStest(df,stop=1e-3,tLeb=0,sLeb=0,tLpb=0,sLpb=0,tOrder = 3,
         df = df.reset_index()
 
     # Start date and duration
-    date0 = df['date'].min()
-    duration = (df['date'].max()-date0)/ np.timedelta64(1, 'm')    
-    time=(df['date']-date0)/ np.timedelta64(1, 'm')
+    dateS = df['date'].min().floor(str(tKnotSep)+'min')
+    dateE = df['date'].max().ceil(str(tKnotSep)+'min')
+    duration = (dateE-dateS)/ np.timedelta64(1, 'm')    
+    time=(df['date']-dateS)/ np.timedelta64(1, 'm')
     phi = np.deg2rad(15*df['mlt'].values)
 
 
@@ -1055,7 +1056,7 @@ def makeBoundaryModelBStest(df,stop=1e-3,tLeb=0,sLeb=0,tLpb=0,sLpb=0,tOrder = 3,
 
     # Spatial knots (extended)
     sOrder = 3
-    mltKnots = np.arange(0,24,3)
+    mltKnots = np.arange(0,24,4)
     sKnots = np.deg2rad(15*mltKnots)
     sKnots = np.r_[sKnots-2*np.pi,sKnots,sKnots+2*np.pi]
     sKnots = np.r_[np.repeat(sKnots[0],sOrder),sKnots, np.repeat(sKnots[-1],sOrder)]
@@ -1116,10 +1117,9 @@ def makeBoundaryModelBStest(df,stop=1e-3,tLeb=0,sLeb=0,tLpb=0,sLpb=0,tOrder = 3,
         m = ms
         iteration += 1
 
-
     
     # Temporal evaluation matrix
-    time_ev=(df['date'].drop_duplicates()-date0).values/ np.timedelta64(1, 'm')
+    time_ev=(df['date'].drop_duplicates()-dateS).values/ np.timedelta64(1, 'm')
     Gtime = BSpline.design_matrix(time_ev, tKnots,tOrder).toarray()
     
     # Spatial evaluation matrix
@@ -1192,7 +1192,7 @@ def makeBoundaryModelBStest(df,stop=1e-3,tLeb=0,sLeb=0,tLpb=0,sLpb=0,tOrder = 3,
     Gtime = BSpline.design_matrix(time[ind],tKnots,tOrder)
 
     # Spatial knots (extended)
-    mltKnots = np.array([0,2,4,6,9,12,15,18,20,22])
+    mltKnots = np.array([0,2,4,8,12,16,20,22])
     sKnots = np.deg2rad(15*mltKnots)
     sKnots = np.r_[sKnots-2*np.pi,sKnots,sKnots+2*np.pi]
     sKnots = np.r_[np.repeat(sKnots[0],sOrder),sKnots, np.repeat(sKnots[-1],sOrder)]
