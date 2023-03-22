@@ -469,6 +469,15 @@ def makeGIFs(orbits):
                     pax.plot(bf.loc[t.values,'eb'].values,bf.loc[t.values,'mlt'].values,color='C1',alpha=alpha,linestyle=linestyle)
                 except Exception as e: print(e)
                 
+                try:
+                    pax.plot(bf.loc[t.values,'pb'].values+bf.loc[t.values,'pb_err'].values,bf.loc[t.values,'mlt'].values,color='C3',alpha=alpha,linestyle=linestyle,linewidth=0.5)
+                    pax.plot(bf.loc[t.values,'pb'].values-bf.loc[t.values,'pb_err'].values,bf.loc[t.values,'mlt'].values,color='C3',alpha=alpha,linestyle=linestyle,linewidth=0.5)
+                    pax.plot(bf.loc[t.values,'eb'].values+bf.loc[t.values,'eb_err'].values,bf.loc[t.values,'mlt'].values,color='C1',alpha=alpha,linestyle=linestyle,linewidth=0.5)
+                    pax.plot(bf.loc[t.values,'eb'].values-bf.loc[t.values,'eb_err'].values,bf.loc[t.values,'mlt'].values,color='C1',alpha=alpha,linestyle=linestyle,linewidth=0.5)
+                    
+                except Exception as e: print(e)
+                        
+                
                 plt.savefig(outpath + 'temp/wic'+str(i).zfill(4)+'.png',bbox_inches='tight',dpi=150)
 
                 ax.collections.clear()
