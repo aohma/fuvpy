@@ -70,7 +70,7 @@ def background_removal(orbits):
 def boundary_detection(imgs):
 
 
-    thresholds = [100,150,200] # Peak threshold in counts
+    thresholds = np.arange(50,201,5) # Peak threshold in counts
     sigma = 300
 
     R_E = 6371 # Earth radius (km)
