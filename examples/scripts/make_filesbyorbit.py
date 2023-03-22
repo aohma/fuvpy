@@ -403,8 +403,8 @@ def final_bondaries_error(orbits):
             imgs = imgs.sel(date=bi.reset_index().date.unique())
 
             bms = []    
-            for l in [100,150,200]:
-                bm = fuv.makeBoundaryModelBStest(bi.to_xarray().sel(lim=l).to_dataframe(),tKnotSep=5,tLeb=1e-1,sLeb=1e-3,tLpb=1e-1,sLpb=1e-3)
+            for l in np.arange(50,201,5):
+                bm = fuv.makeBoundaryModelBStest(bi.to_xarray().sel(lim=l).to_dataframe(),tKnotSep=5,tLeb=1e-1,sLeb=1e-2,tLpb=1e-1,sLpb=1e-2)
                 bm = bm.expand_dims(lim=[l])
                 bms.append(bm)
             
