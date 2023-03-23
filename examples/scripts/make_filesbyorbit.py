@@ -482,6 +482,7 @@ def makeGIFs(orbits):
                 
                 plt.savefig(outpath + 'temp/wic'+str(i).zfill(4)+'.png',bbox_inches='tight',dpi=150)
 
+                ax.patches.clear()
                 ax.collections.clear()
                 ax.lines.clear()
 
