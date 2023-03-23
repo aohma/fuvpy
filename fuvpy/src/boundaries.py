@@ -1192,7 +1192,7 @@ def makeBoundaryModelBStest(df,stop=1e-3,tLeb=0,sLeb=0,tLpb=0,sLpb=0,tOrder = 3,
     Gtime = BSpline.design_matrix(time[ind],tKnots,tOrder)
 
     # Spatial knots (extended)
-    mltKnots = np.array([0,3,6,12,18,21])
+    mltKnots = np.array([0,2,4,6,12,18,20,22])
     sKnots = np.deg2rad(15*mltKnots)
     sKnots = np.r_[sKnots-2*np.pi,sKnots,sKnots+2*np.pi]
     sKnots = np.r_[np.repeat(sKnots[0],sOrder),sKnots, np.repeat(sKnots[-1],sOrder)]
