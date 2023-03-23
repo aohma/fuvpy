@@ -477,6 +477,9 @@ def makeGIFs(orbits):
                     mlat_err = np.concatenate((bf.loc[t.values,'pb'].values+bf.loc[t.values,'pb_err'].values,bf.loc[t.values,'pb'].values[[0]]+bf.loc[t.values,'pb_err'].values[[0]],bf.loc[t.values,'pb'].values[[0]]-bf.loc[t.values,'pb_err'].values[[0]],bf.loc[t.values,'pb'].values[::-1]-bf.loc[t.values,'pb_err'].values[::-1]))
                     mlt_err = np.concatenate((bf.loc[t.values,'mlt'].values,bf.loc[t.values,'mlt'].values[[0,0]],bf.loc[t.values,'mlt'].values[::-1]))
                     pax.fill(mlat_err,mlt_err,color='C3',alpha=0.3*alpha,edgecolor=None)
+                    
+                    mlat_err = np.concatenate((bf.loc[t.values,'eb'].values+bf.loc[t.values,'eb_err'].values,bf.loc[t.values,'eb'].values[[0]]+bf.loc[t.values,'eb_err'].values[[0]],bf.loc[t.values,'eb'].values[[0]]-bf.loc[t.values,'eb_err'].values[[0]],bf.loc[t.values,'eb'].values[::-1]-bf.loc[t.values,'eb_err'].values[::-1]))
+                    pax.fill(mlat_err,mlt_err,color='C1',alpha=0.3*alpha,edgecolor=None)
                 except Exception as e: print(e)
                         
                 
