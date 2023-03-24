@@ -19,6 +19,8 @@ import matplotlib.pyplot as plt
 from scipy.interpolate import BSpline
 from scipy.linalg import lstsq
 
+import time as timing
+
 def make_wicfiles(orbit,path):
     '''
     Make a dataframe with date, wic filename and orbit number
@@ -67,8 +69,8 @@ def background_removal(orbits):
             # df.to_hdf(outpath+'wic_or'+str(orbit).zfill(4)+'.h5','wic',format='table',append=True,data_columns=True)
         except Exception as e: print(e)
 
-def boundary_detection(imgs):
-
+def boundary_detection_loop(imgs):
+    start = timing.process_time()
 
     thresholds = np.arange(50,201,5) # Peak threshold in counts
     sigma = 300
@@ -79,7 +81,7 @@ def boundary_detection(imgs):
 
 
     # Evaluation grid
-    clat_ev = np.arange(0.5,41,0.5)
+    clat_ev = np.arange(0.5,46,0.5)
     mlt_ev = np.arange(0.5,24,1)
 
     r_ev = km_per_lat*(np.abs(clat_ev))
@@ -121,10 +123,10 @@ def boundary_detection(imgs):
                 eb = []
                 for k in range(1,len(dp)):
                     if (dp[k-1]<threshold)&(dp[k]>threshold)&np.isfinite(dp[[k-1,k]]).all()&(clat_ev[[k-1,1]]<max_colat).all():
-                        pb.append(np.average(clat_ev[[k-1,k]],weights=abs(dp[[k-1,k]]-threshold)))
+                        pb.append(np.average(clat_ev[[k-1,k]],weights=abs(dp[[k,k-1]]-threshold)))
 
                     if (dp[k-1]>threshold)&(dp[k]<threshold)&np.isfinite(dp[[k-1,k]]).all()&(clat_ev[[k-1,1]]<max_colat).all():
-                        eb.append(np.average(clat_ev[[k-1,k]],weights=abs(dp[[k-1,k]]-threshold)))
+                        eb.append(np.average(clat_ev[[k-1,k]],weights=abs(dp[[k,k-1]]-threshold)))
 
                 df = pd.DataFrame(np.nan,index=[0],columns=['pb','eb'])
                 df[['date','mlt','lim']]=[img.date.values,lt,threshold]
@@ -134,9 +136,110 @@ def boundary_detection(imgs):
 
                 dfs.append(df.set_index(['date','mlt','lim']))
 
+    print(timing.process_time() - start)
     df = pd.concat(dfs)
     return df
 
+def boundary_detection(imgs):
+    start = timing.process_time()
+    lims = np.arange(50,201,5) # Peak threshold in counts
+    sigma = 300
+    
+    R_E = 6371 # Earth radius (km)
+    R_I = R_E+130 # Assumed emission radius (km)
+    km_per_lat = np.pi*R_I/180
+    
+    
+    # Evaluation grid
+    clat_ev = np.arange(0.5,46,0.5)
+    mlt_ev = np.arange(0.5,24,1)
+    
+    r_ev = km_per_lat*(np.abs(clat_ev))
+    a_ev = (mlt_ev- 6.)/12.*np.pi
+    x_ev =  r_ev[:,None]*np.cos(a_ev[None,:])
+    y_ev =  r_ev[:,None]*np.sin(a_ev[None,:])
+    
+    #%% Model test
+    dfs=[]
+    for t in range(len(imgs.date)):
+        print('■', end='', flush=True)
+        img = imgs.isel(date=t)
+    
+    
+        # cartesian projection
+        r = km_per_lat*(90. - np.abs(img['mlat'].values))
+        a = (img['mlt'].values - 6.)/12.*np.pi
+        x =  r*np.cos(a)
+        y =  r*np.sin(a)
+        d = img['shimg'].values
+    
+    
+        # Make latitudinal intensity profiles
+        d_ev = np.full_like(x_ev,np.nan)
+        for i in range(len(clat_ev)):
+            for j in range(len(mlt_ev)):
+                ind = np.sqrt((x_ev[i,j]-x)**2+(y_ev[i,j]-y)**2)<sigma
+                if np.sum(ind)>0: # non-zero weights
+                    if (r_ev[i]>np.min(r[ind]))&(r_ev[i]<np.max(r[ind])): # Only between of pixels with non-zero weights
+                        d_ev[i,j]=np.median(d[ind])
+        
+        # Make dataset with meridian intensity profiles
+        ds = xr.Dataset(coords={'clat':clat_ev,'mlt':mlt_ev,'lim':lims})
+        ds['d'] = (['clat','mlt'],d_ev)
+        # Set values outside outer ring to nan
+        ds['d'] = xr.where(ds['clat']>35+10*np.cos(np.pi*ds['mlt']/12),np.nan,ds['d'])
+        
+        ds['above'] = (ds['d']>ds['lim']).astype(float) 
+        ds['above'] = xr.where(np.isnan(ds['d']),np.nan,ds['above'])
+    
+        
+        diff = ds['above'].diff(dim='clat')
+        
+        # Find first above
+        mask = diff==1
+        ds['firstAbove'] = xr.where(mask.any(dim='clat'), mask.argmax(dim='clat'), np.nan)+1
+        
+        # Find last above
+        mask = diff==-1
+        val = len(diff.clat) - mask.isel(clat=slice(None,None,-1)).argmax(dim='clat') - 1
+        ds['lastAbove']= xr.where(mask.any(dim='clat'), val, np.nan)
+    
+        ind = ds['firstAbove'].stack(z=('mlt','lim'))[np.isfinite(ds['firstAbove'].stack(z=('mlt','lim')))].astype(int)
+        
+        df = ind.to_dataframe().reset_index()
+        df['clatBelow'] = ds.isel(clat=ind-1)['clat'].values
+        df['clatAbove'] = ds.isel(clat=ind)['clat'].values
+        
+        df = pd.merge(df,ds['d'].to_dataframe().reset_index(),left_on=['clatBelow','mlt'],right_on=['clat','mlt'])
+        df = df.drop(columns=('clat')).rename(columns={'d':'dBelow'})
+        
+        df = pd.merge(df,ds['d'].to_dataframe().reset_index(),left_on=['clatAbove','mlt'],right_on=['clat','mlt'])
+        df = df.drop(columns=('clat')).rename(columns={'d':'dAbove'})
+        df['pb'] = np.average(df[['clatBelow','clatAbove']],weights=abs(df[['dAbove','dBelow']]-df['lim'].values[:,None]),axis=1) 
+        df['date']= img.date.values
+        df_pb = df[['date','mlt','lim','pb']].set_index(['date','mlt','lim'])    
+        
+        # EB
+        ind = ds['lastAbove'].stack(z=('mlt','lim'))[np.isfinite(ds['lastAbove'].stack(z=('mlt','lim')))].astype(int)
+        
+        df = ind.to_dataframe().reset_index()
+        df['clatAbove'] = ds.isel(clat=ind)['clat'].values
+        df['clatBelow'] = ds.isel(clat=ind+1)['clat'].values
+        
+        df = pd.merge(df,ds['d'].to_dataframe().reset_index(),left_on=['clatAbove','mlt'],right_on=['clat','mlt'])
+        df = df.drop(columns=('clat')).rename(columns={'d':'dAbove'})
+        
+        df = pd.merge(df,ds['d'].to_dataframe().reset_index(),left_on=['clatBelow','mlt'],right_on=['clat','mlt'])
+        df = df.drop(columns=('clat')).rename(columns={'d':'dBelow'})
+        df['eb'] = np.average(df[['clatAbove','clatBelow']],weights=abs(df[['dBelow','dAbove']]-df['lim'].values[:,None]),axis=1) 
+        df['date']= img.date.values
+        df_eb = df[['date','mlt','lim','eb']].set_index(['date','mlt','lim'])  
+    
+        dfs.append(pd.merge(df_pb,df_eb,left_index=True,right_index=True,how='outer'))
+    
+    df = pd.concat(dfs)
+    df[['pb','eb']]=90-df[['pb','eb']]
+    return df
 
 def initial_boundaries(orbits):
     inpath = '/mnt/5fa6bccc-fa9d-4efc-9ddc-756f65699a0a/aohma/fuv/wic/'
@@ -494,3 +597,6 @@ def makeGIFs(orbits):
             # os.system('convert '+ospath+'fig/temp/binary*.png '+ospath+'fig/oval_'+e+'.gif')
             os.system('rm '+outpath+'temp/*.png')
         except Exception as e: print(e)
+
+
+
