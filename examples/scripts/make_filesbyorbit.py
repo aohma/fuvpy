@@ -522,7 +522,7 @@ def final_bondaries_error(orbits):
             bm = bm.to_dataframe()
             bm['orbit']=orbit
             bm = calcRMSE(imgs, bm)
-            bm[['pb','eb','pb_err','eb_err','ve_pb','vn_pb','ve_eb','vn_eb','isglobal','orbit','rmse_in','rmse_out']].to_hdf(bpath+'final_boundaries.h5','final',format='table',append=True,data_columns=True)
+            bm[['pb','eb','pb_err','eb_err','ve_pb','vn_pb','ve_eb','vn_eb','dP','dA','dP_dt','dA_dt','isglobal','orbit','rmse_in','rmse_out']].to_hdf(bpath+'final_boundaries.h5','final',format='table',append=True,data_columns=True)
         except Exception as e: print(e)
 
 def makeGIFs(orbits):
