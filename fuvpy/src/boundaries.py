@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from scipy.interpolate import BSpline,griddata
+from scipy.interpolate import BSpline,griddata,CubicSpline
 from scipy.linalg import lstsq
 from scipy.sparse import csc_array
 
@@ -1074,12 +1074,13 @@ def makeBoundaryModelBStest(df,stop=1e-3,tLeb=0,sLeb=0,tLpb=0,sLpb=0,tOrder = 3,
     # Combine to full design matrix
     G_s = Gphi[:,np.repeat(np.arange(n_pcp),n_tcp)]*Gtime[:,np.tile(np.arange(n_tcp),n_pcp)]
     
-   
+    gtg_mag = np.median((G_s.T.dot(G_s)).diagonal()) 
     
     # 1st order Tikhonov regularization in time
-    tL = np.hstack((-np.identity(n_tcp-1),np.zeros((n_tcp-1,1))))+np.hstack((np.zeros((n_tcp-1,1)),np.identity(n_tcp-1)))
-    tLTL = np.zeros((n_tcp*n_pcp,n_tcp*n_pcp))
-    for i in range(n_pcp): tLTL[i*n_tcp:(i+1)*n_tcp,i*n_tcp:(i+1)*n_tcp] = tL.T@tL
+    tLtemp = np.hstack((-np.identity(n_tcp-1),np.zeros((n_tcp-1,1))))+np.hstack((np.zeros((n_tcp-1,1)),np.identity(n_tcp-1)))
+    tL = np.zeros((n_pcp*(n_tcp-1),n_pcp*n_tcp))
+    for i in range(n_pcp): tL[i*(n_tcp-1):(i+1)*(n_tcp-1),i*n_tcp:(i+1)*n_tcp] = tLtemp
+    tLTL = tL.T@tL
     
     # 1st order Tikhonov regularization in mlt
     sL = []
@@ -1089,7 +1090,12 @@ def makeBoundaryModelBStest(df,stop=1e-3,tLeb=0,sLeb=0,tLpb=0,sLpb=0,tOrder = 3,
     for t in range(n_tcp): sLTL[t:t+n_pcp*n_tcp:n_tcp,t:t+n_pcp*n_tcp:n_tcp] = sL.T@sL
     
     # Combined regularization
-    R = tLeb*tLTL + sLeb*sLTL
+    R = tLeb*gtg_mag*tLTL + sLeb*gtg_mag*sLTL
+    
+    # print(np.median((G_s.T.dot(G_s)).diagonal()))
+    # print(np.median(np.diagonal(tLTL)))
+    # print(np.median(np.diagonal(sLTL)))
+    
      
     # Initiate iterative weights
     w = np.ones(theta_eb1[ind].shape)
@@ -1102,22 +1108,25 @@ def makeBoundaryModelBStest(df,stop=1e-3,tLeb=0,sLeb=0,tLpb=0,sLpb=0,tOrder = 3,
     iteration = 0
     mtau = np.full_like(theta_eb1,np.nan)
     while (diff > stop)&(iteration<max_iter):
-        print('Iteration:',iteration)
         ms = lstsq((G_s*w).T.dot(G_s*w)+R,(G_s*w).T.dot(theta_eb1[ind]*w.toarray().squeeze()),lapack_driver='gelsy')[0]
         mtau[ind]=G_s@ms
 
         residuals = mtau[ind] - theta_eb1[ind]
         if iteration == 0: rmse = np.sqrt(np.average(residuals**2))
 
-        w[:] = np.minimum(0.5*rmse/np.abs(residuals),1)
+        w[:] = np.minimum(1.5*rmse/np.abs(residuals),1)
         if m is not None:
             diff = np.sqrt(np.mean((ms - m)**2))/(1+np.sqrt(np.mean(ms**2)))
-            print('Relative change model norm', diff)
 
         m = ms
         iteration += 1
 
-    
+    # # Norms
+    # normM = np.sqrt(np.average((tL@m)**2)) ## Should be L@m
+    # normR = np.sqrt(np.average(residuals**2,weights=w.toarray().squeeze()))
+    # print(normM)
+    # print(normR)
+
     # Temporal evaluation matrix
     time_ev=(df['date'].drop_duplicates()-dateS).values/ np.timedelta64(1, 'm')
     Gtime = BSpline.design_matrix(time_ev, tKnots,tOrder).toarray()
@@ -1179,7 +1188,19 @@ def makeBoundaryModelBStest(df,stop=1e-3,tLeb=0,sLeb=0,tLpb=0,sLpb=0,tOrder = 3,
     u_phi = R_I*np.sin(tau_eb)*dphi_dt/60
     u_theta = R_I*dtheta_dt/60
 
-        
+    ## FLUX INSIDE EB
+    
+    # Constants
+    mu0 = 4e-7*np.pi # Vacuum magnetic permeability
+    M_E = 8.05e22 # Earth's magnetic dipole moment
+    R_E = 6371e3 # Earth radii
+    height = 130e3
+    R_I = R_E + height # Radius of ionosphere    
+
+    # TOTAL FLUX
+    dT = (mu0*M_E)/(4*np.pi*R_I) * (np.sin(tau_eb)**2)
+    dT_dt = (mu0*M_E)/(4*np.pi*R_I) * np.sin(2*tau_eb)*dtau_dt_eb/60
+
     #%% Poleward boundary model
     theta_pb  = np.deg2rad(90-df['pb'].values)
     theta_pb1 = theta_pb/np.exp(mtau)
@@ -1210,10 +1231,13 @@ def makeBoundaryModelBStest(df,stop=1e-3,tLeb=0,sLeb=0,tLpb=0,sLpb=0,tOrder = 3,
     # Combine to full design matrix
     G_s = Gphi[:,np.repeat(np.arange(n_pcp),n_tcp)]*Gtime[:,np.tile(np.arange(n_tcp),n_pcp)]   
   
-    # 1st order regularization in time
-    tL = np.hstack((-np.identity(n_tcp-1),np.zeros((n_tcp-1,1))))+np.hstack((np.zeros((n_tcp-1,1)),np.identity(n_tcp-1)))
-    tLTL = np.zeros((n_tcp*n_pcp,n_tcp*n_pcp))
-    for i in range(n_pcp): tLTL[i*n_tcp:(i+1)*n_tcp,i*n_tcp:(i+1)*n_tcp] = tL.T@tL
+    gtg_mag = np.median((G_s.T.dot(G_s)).diagonal())   
+  
+    # 1st order Tikhonov regularization in time
+    tLtemp = np.hstack((-np.identity(n_tcp-1),np.zeros((n_tcp-1,1))))+np.hstack((np.zeros((n_tcp-1,1)),np.identity(n_tcp-1)))
+    tL = np.zeros((n_pcp*(n_tcp-1),n_pcp*n_tcp))
+    for i in range(n_pcp): tL[i*(n_tcp-1):(i+1)*(n_tcp-1),i*n_tcp:(i+1)*n_tcp] = tLtemp
+    tLTL = tL.T@tL
     
     # 1st order regularization in mlt
     # sL = np.array([[-1,1,0,0,0,0,0,0],[0,-1,1,0,0,0,0,0],[0,0,-1,1,0,0,0,0],[0,0,0,-1,1,0,0,0],[0,0,0,0,-1,1,0,0],[0,0,0,0,0,-1,1,0],[0,0,0,0,0,0,-1,1],[1,0,0,0,0,0,0,-1]])
@@ -1224,7 +1248,7 @@ def makeBoundaryModelBStest(df,stop=1e-3,tLeb=0,sLeb=0,tLpb=0,sLpb=0,tOrder = 3,
     for t in range(n_tcp): sLTL[t:t+n_pcp*n_tcp:n_tcp,t:t+n_pcp*n_tcp:n_tcp] = sL.T@sL
     
     # Combined regularization
-    R = tLpb*tLTL + sLpb*sLTL
+    R = tLpb*gtg_mag*tLTL + sLpb*gtg_mag*sLTL
 
     # Initiate iterative weights
     w = np.ones(theta_pb2[ind].shape)
@@ -1236,20 +1260,24 @@ def makeBoundaryModelBStest(df,stop=1e-3,tLeb=0,sLeb=0,tLpb=0,sLpb=0,tOrder = 3,
     mtau = np.full_like(theta_pb2,np.nan)
     iteration = 0
     while (diff > stop)&(iteration<max_iter):
-        print('Iteration:',iteration)
         ms = lstsq((G_s*w).T.dot(G_s*w)+R,(G_s*w).T.dot(theta_pb2[ind]*w.toarray().squeeze()),lapack_driver='gelsy')[0]
         mtau[ind]=G_s@ms
 
         residuals = mtau[ind] - theta_pb2[ind]
-        rmse = np.sqrt(np.average(residuals**2,weights=w.toarray().squeeze()))
+        if iteration == 0: rmse = np.sqrt(np.average(residuals**2,weights=w.toarray().squeeze()))
 
         w[:] = np.minimum(1.5*rmse/np.abs(residuals),1)
         if m is not None:
             diff = np.sqrt(np.mean((ms - m)**2))/(1+np.sqrt(np.mean(ms**2)))
-            print('Relative change model norm', diff)
 
         m = ms
         iteration += 1
+
+    # # Norms
+    # normM = np.sqrt(np.average((tL@m)**2)) ## Should be L@m
+    # normR = np.sqrt(np.average(residuals**2,weights=w.toarray().squeeze()))
+    # print(normM)
+    # print(normR)
 
 
     # Temporal evaluation matrix
@@ -1314,7 +1342,12 @@ def makeBoundaryModelBStest(df,stop=1e-3,tLeb=0,sLeb=0,tLpb=0,sLpb=0,tOrder = 3,
     # Boundary velocity
     v_phi = R_I*np.sin(tau_pb)*dphidt/60
     v_theta = R_I*dthetadt/60
+    
 
+    # FLUX
+    dP = (mu0*M_E)/(4*np.pi*R_I) * (np.sin(tau_pb)**2)
+    dP_dt = (mu0*M_E)/(4*np.pi*R_I) * np.sin(2*tau_pb)*dtaudt/60
+    
     # Reshape modelled values
     tau_eb =  tau_eb.reshape((len(time_ev),len(phi_ev)))
     tau_pb = tau_pb.reshape((len(time_ev),len(phi_ev)))
@@ -1324,6 +1357,11 @@ def makeBoundaryModelBStest(df,stop=1e-3,tLeb=0,sLeb=0,tLpb=0,sLpb=0,tOrder = 3,
     
     v_phi =  v_phi.reshape((len(time_ev),len(phi_ev)))
     v_theta = v_theta.reshape((len(time_ev),len(phi_ev)))
+    
+    dA = (dT-dP).reshape((len(time_ev),len(phi_ev)))
+    dA_dt = (dT_dt-dP_dt).reshape((len(time_ev),len(phi_ev)))
+    dP = (dP).reshape((len(time_ev),len(phi_ev)))
+    dP_dt = (dP_dt).reshape((len(time_ev),len(phi_ev)))
 
     
     # Make Dataset with modelled boundary locations and velocities
@@ -1331,11 +1369,14 @@ def makeBoundaryModelBStest(df,stop=1e-3,tLeb=0,sLeb=0,tLpb=0,sLpb=0,tOrder = 3,
     data_vars=dict(
         pb=(['date','mlt'], 90-np.rad2deg(tau_pb)),
         eb=(['date','mlt'], 90-np.rad2deg(tau_eb)),
-        v_phi=(['date','mlt'], v_phi),
-        v_theta=(['date','mlt'], v_theta),
-        u_phi=(['date','mlt'], u_phi),
-        u_theta=(['date','mlt'], u_theta),
-        dtaudphi = (['date','mlt'], dtaudp.reshape((len(time_ev),len(phi_ev)))),
+        ve_pb=(['date','mlt'], v_phi),
+        vn_pb=(['date','mlt'], -v_theta),
+        ve_eb=(['date','mlt'], u_phi),
+        vn_eb=(['date','mlt'], -u_theta),
+        dP=(['date','mlt'], dP),
+        dA=(['date','mlt'], dA),
+        dP_dt=(['date','mlt'], dP_dt),
+        dA_dt=(['date','mlt'], dA_dt),
         ),
     coords=dict(
         date = df['date'].drop_duplicates().values,
@@ -1345,10 +1386,14 @@ def makeBoundaryModelBStest(df,stop=1e-3,tLeb=0,sLeb=0,tLpb=0,sLpb=0,tOrder = 3,
 
     # Add attributes
     ds2['mlt'].attrs = {'long_name': 'Magnetic local time','unit':'hrs'}
-    ds2['pb'].attrs = {'long_name': 'Open-closed boundary','unit':'deg'}
+    ds2['pb'].attrs = {'long_name': 'Poleward boundary','unit':'deg'}
     ds2['eb'].attrs = {'long_name': 'Equatorward boundary','unit':'deg'}
-    ds2['v_phi'].attrs = {'long_name': '$V_\\phi$','unit':'m/s'}
-    ds2['v_theta'].attrs = {'long_name': '$V_\\theta$','unit':'m/s'}
-    ds2['u_phi'].attrs = {'long_name': '$U_\\phi$','unit':'m/s'}
-    ds2['u_theta'].attrs = {'long_name': '$U_\\theta$','unit':'m/s'}
+    ds2['ve_pb'].attrs = {'long_name': '$V_E^{pb}$','unit':'m/s'}
+    ds2['vn_pb'].attrs = {'long_name': '$V_N^{pb}$','unit':'m/s'}
+    ds2['ve_eb'].attrs = {'long_name': '$V_E^{eb}$','unit':'m/s'}
+    ds2['vn_eb'].attrs = {'long_name': '$V_N^{eb}$','unit':'m/s'}
+    ds2['dP'].attrs = {'long_name': 'Polar cap flux','unit':'Wb/rad'}
+    ds2['dP_dt'].attrs = {'long_name': 'Change polar cap flux','unit':'V/rad'}
+    ds2['dA'].attrs = {'long_name': 'Auroral flux','unit':'Wb/rad'}
+    ds2['dA_dt'].attrs = {'long_name': 'Change auroral flux','unit':'V/rad'}
     return ds2

@@ -141,7 +141,6 @@ def boundary_detection_loop(imgs):
     return df
 
 def boundary_detection(imgs):
-    start = timing.process_time()
     lims = np.arange(50,201,5) # Peak threshold in counts
     sigma = 300
     
@@ -173,7 +172,6 @@ def boundary_detection(imgs):
         y =  r*np.sin(a)
         d = img['shimg'].values
     
-    
         # Make latitudinal intensity profiles
         d_ev = np.full_like(x_ev,np.nan)
         for i in range(len(clat_ev)):
@@ -182,7 +180,7 @@ def boundary_detection(imgs):
                 if np.sum(ind)>0: # non-zero weights
                     if (r_ev[i]>np.min(r[ind]))&(r_ev[i]<np.max(r[ind])): # Only between of pixels with non-zero weights
                         d_ev[i,j]=np.median(d[ind])
-        
+
         # Make dataset with meridian intensity profiles
         ds = xr.Dataset(coords={'clat':clat_ev,'mlt':mlt_ev,'lim':lims})
         ds['d'] = (['clat','mlt'],d_ev)
@@ -511,11 +509,12 @@ def final_bondaries_error(orbits):
                 bm = bm.expand_dims(lim=[l])
                 bms.append(bm)
             
-            bms = xr.concat(bms,dim='lim')#.std(dim='sample')[['ocb','eqb']]#.rename({'ocb':'pb_err','eqb':'eb_err'})
+            bms = xr.concat(bms,dim='lim')
 
-            bm = bms.mean(dim='lim')
-            bm['pb_err'] = bms['pb'].std(dim='lim')
-            bm['eb_err'] = bms['eb'].std(dim='lim')
+            bm = fuv.makeBoundaryModelBStest(bi,tKnotSep=5,tLeb=1e-1,sLeb=1e-2,tLpb=1e-1,sLpb=1e-2)
+            keys = list(bm.keys())
+            for key in keys:
+                bm[key+'_err'] = bms[key].std(dim='lim')
 
             isglobal = dataCoverage(imgs,dzalim=65)
             bm['isglobal'] = ('date',isglobal)
