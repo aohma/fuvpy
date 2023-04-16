@@ -563,12 +563,12 @@ def makeGIFs(orbits):
 
                 pax.scatter(wic.sel(date=t)['mlat'].values,wic.sel(date=t)['mlt'].values,c=wic.sel(date=t)['shimg'].values,s=2,alpha=0.5,vmin=0,vmax=500,cmap='Greens')
                 try:
-                    alpha = 1 if (bf.loc[t.values,'rmse_in']/bf.loc[t.values,'rmse_out']>2).all() else 0.5
+                    alpha = 1 if (bf.loc[t.values,'rmse_in']/bf.loc[t.values,'rmse_out']>3).all() else 0.5
                     linestyle = '-' if bf.loc[t.values,'isglobal'].all() else ':'
-                    pax.scatter(bi.loc[t.values,'pb'].values,bi.loc[t.values,'mlt'].values,s=1,color='C7')
+                    pax.scatter(bi.loc[t.values,'pb'].values,bi.loc[t.values,'mlt'].values,s=1,color='C9')
                     pax.scatter(bi.loc[t.values,'eb'].values,bi.loc[t.values,'mlt'].values,s=1,color='C6')
                     pax.plot(bf.loc[t.values,'pb'].values,bf.loc[t.values,'mlt'].values,color='C3',alpha=alpha,linestyle=linestyle)
-                    pax.plot(bf.loc[t.values,'eb'].values,bf.loc[t.values,'mlt'].values,color='C1',alpha=alpha,linestyle=linestyle)
+                    pax.plot(bf.loc[t.values,'eb'].values,bf.loc[t.values,'mlt'].values,color='C0',alpha=alpha,linestyle=linestyle)
                 except Exception as e: print(e)
                 
                 try:
@@ -581,7 +581,7 @@ def makeGIFs(orbits):
                     pax.fill(mlat_err,mlt_err,color='C3',alpha=0.3*alpha,edgecolor=None)
                     
                     mlat_err = np.concatenate((bf.loc[t.values,'eb'].values+bf.loc[t.values,'eb_err'].values,bf.loc[t.values,'eb'].values[[0]]+bf.loc[t.values,'eb_err'].values[[0]],bf.loc[t.values,'eb'].values[[0]]-bf.loc[t.values,'eb_err'].values[[0]],bf.loc[t.values,'eb'].values[::-1]-bf.loc[t.values,'eb_err'].values[::-1]))
-                    pax.fill(mlat_err,mlt_err,color='C1',alpha=0.3*alpha,edgecolor=None)
+                    pax.fill(mlat_err,mlt_err,color='C0',alpha=0.3*alpha,edgecolor=None)
                 except Exception as e: print(e)
                         
                 
