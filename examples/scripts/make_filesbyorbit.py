@@ -565,8 +565,8 @@ def makeGIFs(orbits):
                 try:
                     alpha = 1 if (bf.loc[t.values,'rmse_in']/bf.loc[t.values,'rmse_out']>3).all() else 0.5
                     linestyle = '-' if bf.loc[t.values,'isglobal'].all() else ':'
-                    pax.scatter(bi.loc[t.values,'pb'].values,bi.loc[t.values,'mlt'].values,s=1,color='C9')
-                    pax.scatter(bi.loc[t.values,'eb'].values,bi.loc[t.values,'mlt'].values,s=1,color='C6')
+                    pax.scatter(bi.loc[t.values,'pb'].values,bi.loc[t.values,'mlt'].values,s=1,color='C6')
+                    pax.scatter(bi.loc[t.values,'eb'].values,bi.loc[t.values,'mlt'].values,s=1,color='C9')
                     pax.plot(bf.loc[t.values,'pb'].values,bf.loc[t.values,'mlt'].values,color='C3',alpha=alpha,linestyle=linestyle)
                     pax.plot(bf.loc[t.values,'eb'].values,bf.loc[t.values,'mlt'].values,color='C0',alpha=alpha,linestyle=linestyle)
                 except Exception as e: print(e)
