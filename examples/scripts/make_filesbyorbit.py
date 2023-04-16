@@ -511,7 +511,7 @@ def final_bondaries_error(orbits):
             
             bms = xr.concat(bms,dim='lim')
 
-            bm = fuv.makeBoundaryModelBStest(bi,tKnotSep=5,tLeb=1e-1,sLeb=1e-2,tLpb=1e-1,sLpb=1e-2)
+            bm = fuv.makeBoundaryModelBStest(bi,tKnotSep=10,tLeb=1e0,sLeb=0,tLpb=1e0,sLpb=0)
             keys = list(bm.keys())
             for key in keys:
                 bm[key+'_err'] = bms[key].std(dim='lim')
