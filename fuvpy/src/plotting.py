@@ -14,7 +14,7 @@ import matplotlib.gridspec as gridspec
 import matplotlib.colors as mcolors
 from matplotlib.collections import PolyCollection
 
-from fuvpy.polplot import pp
+from polplot import pp
     
 def getIMAGEcmap():
     """

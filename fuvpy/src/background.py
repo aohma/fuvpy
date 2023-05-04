@@ -16,9 +16,10 @@ from scipy.stats import binned_statistic,binned_statistic_2d
 from scipy.sparse import csc_array
 from scipy.linalg import lstsq
 
+from polplot import sdarngrid,bin_number
 from fuvpy.utils import sh
 from fuvpy.utils.sunlight import subsol
-from fuvpy.polplot import sdarngrid,bin_number
+
 
 
 def makeBSmodel(imgs,inImg='img',sOrder=3,dampingVal=0,tukeyVal=5,stop=1e-3,sKnots=None,n_tKnots=2,tOrder=2,returnNorms=False):

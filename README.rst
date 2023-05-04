@@ -30,28 +30,21 @@ fuvpy depends on the following:
 - pandas
 - scipy
 - xarray
+- polplot (github/klaundal/polplot)
 
 You should also have git version >= 2.13
 
 Install
 =======
-Start by cloning the repository, and get the code for the submodules::
+Clone the repository::
 
     git clone https://github.com/aohma/fuvpy
-    cd fuvpy
-    git submodule init
-    git submodule update
 
-There are two options to make it possible to import and use fuvpy from any location.
+Use or create a virtual environment with ``conda`` with all dependencies installed.
+A working environment is provided in the repository. In this example, the environment is called ``fuvpy-env``::
 
-Option 1
---------
-Create a virtual environment with ``conda``, where all dependencies are automatically installed. In this example, the environment is called ``fuvpy-env``::
-
-    conda env create --name fuvpy-env --file binder/fuvpy-env.yml
+    conda env create --name fuvpy-env --file fuvpy/binder/fuvpy-env.yml
     conda activate fuvpy-env
-    pip install -e .
 
-Option 2
---------
-Add the path to the fuvpy folder to PYTHONPATH, and make sure that all dependencies are installed.
+Use pip to install in editable (development) mode:
+    pip install -e ./fuvpy
