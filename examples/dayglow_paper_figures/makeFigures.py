@@ -17,7 +17,7 @@ from scipy.stats import binned_statistic,binned_statistic_2d,spearmanr
 from scipy.optimize import curve_fit
 
 import fuvpy as fuv
-
+from polplot import pp
 
 def runEvent(inpath):
     '''
@@ -494,7 +494,7 @@ def makeFig5(wic,s12,s13,idate,outpath):
     gs = gridspec.GridSpec(nrows=3,ncols=4,hspace=0.3,wspace=0.01)
     
     ## WIC ##
-    pax = fuv.pp(plt.subplot(gs[0,0]),minlat=50)
+    pax = pp(plt.subplot(gs[0,0]),minlat=50)
     fuv.plotimg(wic,'img',pax=pax,crange=(0,5000),cmap='magma')
     cbaxes = pax.ax.inset_axes([.2,.0,.6,.03]) 
     cb = plt.colorbar(pax.ax.collections[0],cax=cbaxes, orientation='horizontal',extend='max')
@@ -506,7 +506,7 @@ def makeFig5(wic,s12,s13,idate,outpath):
     pax.write(50, 9, '50',verticalalignment='center',horizontalalignment='center',fontsize=8)
     
     # Dayglow
-    pax = fuv.pp(plt.subplot(gs[0,1]),minlat=50)
+    pax = pp(plt.subplot(gs[0,1]),minlat=50)
     fuv.plotimg(wic,'dgmodel',pax=pax,crange=(0,5000),cmap='magma')
     cbaxes = pax.ax.inset_axes([.2,.0,.6,.03]) 
     cb = plt.colorbar(pax.ax.collections[0],cax=cbaxes, orientation='horizontal',extend='max')
@@ -517,7 +517,7 @@ def makeFig5(wic,s12,s13,idate,outpath):
     pax.write(50, 9, '50',verticalalignment='center',horizontalalignment='center',fontsize=8)
     
     # Corr
-    pax = fuv.pp(plt.subplot(gs[0,2]),minlat=50)
+    pax = pp(plt.subplot(gs[0,2]),minlat=50)
     fuv.plotimg(wic,'dgimg',pax=pax,crange=(-1000,1000),cmap='coolwarm')
     cbaxes = pax.ax.inset_axes([.2,.0,.6,.03]) 
     cb = plt.colorbar(pax.ax.collections[0],cax=cbaxes, orientation='horizontal',extend='both')
@@ -528,7 +528,7 @@ def makeFig5(wic,s12,s13,idate,outpath):
     pax.write(50, 9, '50',verticalalignment='center',horizontalalignment='center',fontsize=8)
     
     #Weight
-    pax = fuv.pp(plt.subplot(gs[0,3]),minlat=50)
+    pax = pp(plt.subplot(gs[0,3]),minlat=50)
     fuv.plotimg(wic,'dgweight',pax=pax,crange=(0,1))
     cbaxes = pax.ax.inset_axes([.2,.0,.6,.03]) 
     cb = plt.colorbar(pax.ax.collections[0],cax=cbaxes, orientation='horizontal')
@@ -539,7 +539,7 @@ def makeFig5(wic,s12,s13,idate,outpath):
     pax.write(50, 9, '50',verticalalignment='center',horizontalalignment='center',fontsize=8)
     
     ## S13 ##
-    pax = fuv.pp(plt.subplot(gs[2,0]),minlat=50)
+    pax = pp(plt.subplot(gs[2,0]),minlat=50)
     fuv.plotimg(s13,'img',pax=pax,crange=(0,40),cmap='magma')
     cbaxes = pax.ax.inset_axes([.2,.0,.6,.03]) 
     cb = plt.colorbar(pax.ax.collections[0],cax=cbaxes, orientation='horizontal',extend='max')
@@ -551,7 +551,7 @@ def makeFig5(wic,s12,s13,idate,outpath):
     pax.write(50, 9, '50',verticalalignment='center',horizontalalignment='center',fontsize=8)
     
     # Dayglow
-    pax = fuv.pp(plt.subplot(gs[2,1]),minlat=50)
+    pax = pp(plt.subplot(gs[2,1]),minlat=50)
     fuv.plotimg(s13,'dgmodel',pax=pax,crange=(0,40),cmap='magma')
     cbaxes = pax.ax.inset_axes([.2,.0,.6,.03]) 
     cb = plt.colorbar(pax.ax.collections[0],cax=cbaxes, orientation='horizontal',extend='max')
@@ -562,7 +562,7 @@ def makeFig5(wic,s12,s13,idate,outpath):
     pax.write(50, 9, '50',verticalalignment='center',horizontalalignment='center',fontsize=8)
     
     # Corr
-    pax = fuv.pp(plt.subplot(gs[2,2]),minlat=50)
+    pax = pp(plt.subplot(gs[2,2]),minlat=50)
     fuv.plotimg(s13,'dgimg',pax=pax,crange=(-15,15),cmap='coolwarm')
     cbaxes = pax.ax.inset_axes([.2,.0,.6,.03]) 
     cb = plt.colorbar(pax.ax.collections[0],cax=cbaxes, orientation='horizontal',extend='both')
@@ -573,7 +573,7 @@ def makeFig5(wic,s12,s13,idate,outpath):
     pax.write(50, 9, '50',verticalalignment='center',horizontalalignment='center',fontsize=8)
     
     #Weight
-    pax = fuv.pp(plt.subplot(gs[2,3]),minlat=50)
+    pax = pp(plt.subplot(gs[2,3]),minlat=50)
     fuv.plotimg(s13,'dgweight',pax=pax,crange=(0,1))
     cbaxes = pax.ax.inset_axes([.2,.0,.6,.03]) 
     cb = plt.colorbar(pax.ax.collections[0],cax=cbaxes, orientation='horizontal')
@@ -586,7 +586,7 @@ def makeFig5(wic,s12,s13,idate,outpath):
     
     
     ## S12 ##
-    pax = fuv.pp(plt.subplot(gs[1,0]),minlat=50)
+    pax = pp(plt.subplot(gs[1,0]),minlat=50)
     fuv.plotimg(s12,'img',pax=pax,crange=(0,20),cmap='magma')
     cbaxes = pax.ax.inset_axes([.2,.0,.6,.03]) 
     cb = plt.colorbar(pax.ax.collections[0],cax=cbaxes, orientation='horizontal',extend='max')
@@ -598,7 +598,7 @@ def makeFig5(wic,s12,s13,idate,outpath):
     pax.write(50, 9, '50',verticalalignment='center',horizontalalignment='center',fontsize=8)
     
     # Dayglow
-    pax = fuv.pp(plt.subplot(gs[1,1]),minlat=50)
+    pax = pp(plt.subplot(gs[1,1]),minlat=50)
     fuv.plotimg(s12,'dgmodel',pax=pax,crange=(0,20),cmap='magma')
     cbaxes = pax.ax.inset_axes([.2,.0,.6,.03]) 
     cb = plt.colorbar(pax.ax.collections[0],cax=cbaxes, orientation='horizontal',extend='max')
@@ -609,7 +609,7 @@ def makeFig5(wic,s12,s13,idate,outpath):
     pax.write(50, 9, '50',verticalalignment='center',horizontalalignment='center',fontsize=8)
     
     # Corr
-    pax = fuv.pp(plt.subplot(gs[1,2]),minlat=50)
+    pax = pp(plt.subplot(gs[1,2]),minlat=50)
     fuv.plotimg(s12,'dgimg',pax=pax,crange=(-5,5),cmap='coolwarm')
     cbaxes = pax.ax.inset_axes([.2,.0,.6,.03]) 
     cb = plt.colorbar(pax.ax.collections[0],cax=cbaxes, orientation='horizontal',extend='both')
@@ -620,7 +620,7 @@ def makeFig5(wic,s12,s13,idate,outpath):
     pax.write(50, 9, '50',verticalalignment='center',horizontalalignment='center',fontsize=8)
     
     #Weight
-    pax = fuv.pp(plt.subplot(gs[1,3]),minlat=50)
+    pax = pp(plt.subplot(gs[1,3]),minlat=50)
     fuv.plotimg(s12,'dgweight',pax=pax,crange=(0,1))
     cbaxes = pax.ax.inset_axes([.2,.0,.6,.03]) 
     cb = plt.colorbar(pax.ax.collections[0],cax=cbaxes, orientation='horizontal')
@@ -655,7 +655,7 @@ def makeFig6(wic,s12,s13,idate,outpath):
     gs = gridspec.GridSpec(nrows=3,ncols=4,hspace=0.3,wspace=0.01)
     
     ## WIC ##
-    pax = fuv.pp(plt.subplot(gs[0,0]),minlat=50)
+    pax = pp(plt.subplot(gs[0,0]),minlat=50)
     fuv.plotimg(wic,'dgimg',pax=pax,crange=(-1000,1000),cmap='coolwarm')
     cbaxes = pax.ax.inset_axes([.2,.0,.6,.03]) 
     cb = plt.colorbar(pax.ax.collections[0],cax=cbaxes, orientation='horizontal',extend='both')
@@ -667,7 +667,7 @@ def makeFig6(wic,s12,s13,idate,outpath):
     pax.write(50, 9, '50',verticalalignment='center',horizontalalignment='center',fontsize=8)
     
     # Dayglow
-    pax = fuv.pp(plt.subplot(gs[0,1]),minlat=50)
+    pax = pp(plt.subplot(gs[0,1]),minlat=50)
     fuv.plotimg(wic,'shmodel',pax=pax,crange=(-1000,1000),cmap='coolwarm')
     cbaxes = pax.ax.inset_axes([.2,.0,.6,.03]) 
     cb = plt.colorbar(pax.ax.collections[0],cax=cbaxes, orientation='horizontal',extend='both')
@@ -678,7 +678,7 @@ def makeFig6(wic,s12,s13,idate,outpath):
     pax.write(50, 9, '50',verticalalignment='center',horizontalalignment='center',fontsize=8)
     
     # Corr
-    pax = fuv.pp(plt.subplot(gs[0,2]),minlat=50)
+    pax = pp(plt.subplot(gs[0,2]),minlat=50)
     fuv.plotimg(wic,'shimg',pax=pax,crange=(-1000,1000),cmap='coolwarm')
     cbaxes = pax.ax.inset_axes([.2,.0,.6,.03]) 
     cb = plt.colorbar(pax.ax.collections[0],cax=cbaxes, orientation='horizontal',extend='both')
@@ -689,7 +689,7 @@ def makeFig6(wic,s12,s13,idate,outpath):
     pax.write(50, 9, '50',verticalalignment='center',horizontalalignment='center',fontsize=8)
     
     #Weight
-    pax = fuv.pp(plt.subplot(gs[0,3]),minlat=50)
+    pax = pp(plt.subplot(gs[0,3]),minlat=50)
     fuv.plotimg(wic,'shweight',pax=pax,crange=(0,1))
     cbaxes = pax.ax.inset_axes([.2,.0,.6,.03]) 
     cb = plt.colorbar(pax.ax.collections[0],cax=cbaxes, orientation='horizontal')
@@ -701,7 +701,7 @@ def makeFig6(wic,s12,s13,idate,outpath):
         
 
     ## S13 ##
-    pax = fuv.pp(plt.subplot(gs[2,0]),minlat=50)
+    pax = pp(plt.subplot(gs[2,0]),minlat=50)
     fuv.plotimg(s13,'dgimg',pax=pax,crange=(-15,15),cmap='coolwarm')
     cbaxes = pax.ax.inset_axes([.2,.0,.6,.03]) 
     cb = plt.colorbar(pax.ax.collections[0],cax=cbaxes, orientation='horizontal',extend='both')
@@ -713,7 +713,7 @@ def makeFig6(wic,s12,s13,idate,outpath):
     pax.write(50, 9, '50',verticalalignment='center',horizontalalignment='center',fontsize=8)
     
     # Dayglow
-    pax = fuv.pp(plt.subplot(gs[2,1]),minlat=50)
+    pax = pp(plt.subplot(gs[2,1]),minlat=50)
     fuv.plotimg(s13,'shmodel',pax=pax,crange=(-15,15),cmap='coolwarm')
     cbaxes = pax.ax.inset_axes([.2,.0,.6,.03]) 
     cb = plt.colorbar(pax.ax.collections[0],cax=cbaxes, orientation='horizontal',extend='both')
@@ -724,7 +724,7 @@ def makeFig6(wic,s12,s13,idate,outpath):
     pax.write(50, 9, '50',verticalalignment='center',horizontalalignment='center',fontsize=8)
     
     # Corr
-    pax = fuv.pp(plt.subplot(gs[2,2]),minlat=50)
+    pax = pp(plt.subplot(gs[2,2]),minlat=50)
     fuv.plotimg(s13,'shimg',pax=pax,crange=(-15,15),cmap='coolwarm')
     cbaxes = pax.ax.inset_axes([.2,.0,.6,.03]) 
     cb = plt.colorbar(pax.ax.collections[0],cax=cbaxes, orientation='horizontal',extend='both')
@@ -735,7 +735,7 @@ def makeFig6(wic,s12,s13,idate,outpath):
     pax.write(50, 9, '50',verticalalignment='center',horizontalalignment='center',fontsize=8)
     
     #Weight
-    pax = fuv.pp(plt.subplot(gs[2,3]),minlat=50)
+    pax = pp(plt.subplot(gs[2,3]),minlat=50)
     fuv.plotimg(s13,'shweight',pax=pax,crange=(0,1))
     cbaxes = pax.ax.inset_axes([.2,.0,.6,.03]) 
     cb = plt.colorbar(pax.ax.collections[0],cax=cbaxes, orientation='horizontal')
@@ -746,7 +746,7 @@ def makeFig6(wic,s12,s13,idate,outpath):
     pax.write(50, 9, '50',verticalalignment='center',horizontalalignment='center',fontsize=8)
     
     ## S12 ##
-    pax = fuv.pp(plt.subplot(gs[1,0]),minlat=50)
+    pax = pp(plt.subplot(gs[1,0]),minlat=50)
     fuv.plotimg(s12,'dgimg',pax=pax,crange=(-5,5),cmap='coolwarm')
     cbaxes = pax.ax.inset_axes([.2,.0,.6,.03]) 
     cb = plt.colorbar(pax.ax.collections[0],cax=cbaxes, orientation='horizontal',extend='both')
@@ -758,7 +758,7 @@ def makeFig6(wic,s12,s13,idate,outpath):
     pax.write(50, 9, '50',verticalalignment='center',horizontalalignment='center',fontsize=8)
     
     # Dayglow
-    pax = fuv.pp(plt.subplot(gs[1,1]),minlat=50)
+    pax = pp(plt.subplot(gs[1,1]),minlat=50)
     fuv.plotimg(s12,'shmodel',pax=pax,crange=(-5,5),cmap='coolwarm')
     cbaxes = pax.ax.inset_axes([.2,.0,.6,.03]) 
     cb = plt.colorbar(pax.ax.collections[0],cax=cbaxes, orientation='horizontal',extend='both')
@@ -769,7 +769,7 @@ def makeFig6(wic,s12,s13,idate,outpath):
     pax.write(50, 9, '50',verticalalignment='center',horizontalalignment='center',fontsize=8)
     
     # Corr
-    pax = fuv.pp(plt.subplot(gs[1,2]),minlat=50)
+    pax = pp(plt.subplot(gs[1,2]),minlat=50)
     fuv.plotimg(s12,'shimg',pax=pax,crange=(-5,5),cmap='coolwarm')
     cbaxes = pax.ax.inset_axes([.2,.0,.6,.03]) 
     cb = plt.colorbar(pax.ax.collections[0],cax=cbaxes, orientation='horizontal',extend='both')
@@ -780,7 +780,7 @@ def makeFig6(wic,s12,s13,idate,outpath):
     pax.write(50, 9, '50',verticalalignment='center',horizontalalignment='center',fontsize=8)
     
     #Weight
-    pax = fuv.pp(plt.subplot(gs[1,3]),minlat=50)
+    pax = pp(plt.subplot(gs[1,3]),minlat=50)
     fuv.plotimg(s12,'shweight',pax=pax,crange=(0,1))
     cbaxes = pax.ax.inset_axes([.2,.0,.6,.03]) 
     cb = plt.colorbar(pax.ax.collections[0],cax=cbaxes, orientation='horizontal')
