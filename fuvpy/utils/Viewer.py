@@ -8,7 +8,7 @@ Created on Wed May  4 10:22:03 2022
 
 """ Imports """
 import matplotlib.pyplot as plt
-from fuvpy.polplot import Polarplot as polar
+from polplot import Polarplot as polar
 import fuvpy as fuv
 from glob import glob
 import numpy as np
