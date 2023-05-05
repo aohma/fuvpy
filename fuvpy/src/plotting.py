@@ -52,31 +52,34 @@ def getIMAGEcmap():
 
     return mcolors.LinearSegmentedColormap('CustomMap', cdict)
 
-def showDGmodel(img,minlat=0,pathOutput=None,dzacorr=0,**kwargs):
+def plotBSmodel(img,pathOutput=None):
     '''
-    Show the dayglow model for a timestep.
-    Ex: showFUVdayglowModel(wic.isel(date=15))
+    Visualize the B-spline model for one image.
+    Ex: plotBSmodel(imgs.isel(date=15))
+
     Parameters
     ----------
     img : xarray.Dataset
         Dataset with the FUV image.
     pathOutput : str, optional
-        Path to save the figure. The default is None.
-    **kwargs
+        Path to save the figure. The default is None. 
     Returns
     -------
     None.
     '''
 
+    # Check the number of time steps provided
+    n_date = img.dims['date'] if 'date' in img.dims else 1
+    if n_date != 1: raise ValueError('Only data from a single time step can be provided')
+
     sza = img['sza'].values.flatten()
     dza = img['dza'].values.flatten()
     image = img['img'].values.flatten()
-    mlat = img['mlat'].values.flatten()
     mlt = img['mlt'].values.flatten()
 
     # Set functional form
     if img['id'] in ['WIC','SI12','SI13','UVI']:
-        fraction = np.exp(dzacorr*(1. - 1/np.cos(np.deg2rad(dza))))/np.cos(np.deg2rad(dza))*np.cos(np.deg2rad(sza))
+        fraction = np.cos(np.deg2rad(sza))/np.cos(np.deg2rad(dza))
     elif img['id'] == 'VIS':
         fraction = np.cos(np.deg2rad(sza))
 
@@ -88,7 +91,7 @@ def showDGmodel(img,minlat=0,pathOutput=None,dzacorr=0,**kwargs):
     ax1 = plt.subplot(gs[0,:])
     ax1.scatter(fraction[np.isfinite(mlt)],image[np.isfinite(mlt)],s=1,edgecolors='none',color='0.8')
 
-    ax1.scatter(fraction[mlat >= minlat],img['dgmodel'].values.flatten()[mlat >= minlat],s=1,color = 'black')
+    ax1.scatter(fraction,img['dgmodel'].values.flatten(),s=1,color = 'black')
 
     if img['id'] in ['WIC','SI13','UVI']:
         ax1.set_xlim([-3,3])
@@ -116,7 +119,7 @@ def showDGmodel(img,minlat=0,pathOutput=None,dzacorr=0,**kwargs):
     ax2 = plt.subplot(gs2[0])
     ax2c = plt.subplot(gs2[1])
     pax2 = pp(ax2)
-    plotimg(img,'img',pax=pax2,crange=[0,cmax1],**kwargs)
+    plotimg(img,'img',pax=pax2,crange=[0,cmax1])
     ax2c.axis('off')
     plt.colorbar(pax2.ax.collections[0],orientation='horizontal',ax=ax2c,fraction=1,
                  extend='max')
@@ -126,7 +129,7 @@ def showDGmodel(img,minlat=0,pathOutput=None,dzacorr=0,**kwargs):
     ax3 = plt.subplot(gs3[0])
     ax3c = plt.subplot(gs3[1])
     pax3 = pp(ax3)
-    plotimg(img,'dgmodel',pax=pax3,crange=[0,cmax1],**kwargs)
+    plotimg(img,'dgmodel',pax=pax3,crange=[0,cmax1])
     ax3c.axis('off')
     plt.colorbar(pax3.ax.collections[0],orientation='horizontal',ax=ax3c,fraction=1,
                  extend='max')
@@ -136,7 +139,7 @@ def showDGmodel(img,minlat=0,pathOutput=None,dzacorr=0,**kwargs):
     ax4 = plt.subplot(gs4[0])
     ax4c = plt.subplot(gs4[1])
     pax4 = pp(ax4)
-    plotimg(img,'dgimg',pax=pax4,crange=[-cmax2,cmax2],cmap='seismic')
+    plotimg(img,'dgimg',pax=pax4,crange=[-cmax2,cmax2],cmap='coolwarm')
     ax4c.axis('off')
     plt.colorbar(pax4.ax.collections[0],orientation='horizontal',ax=ax4c,fraction=1,
                  extend='both')
@@ -152,7 +155,7 @@ def showDGmodel(img,minlat=0,pathOutput=None,dzacorr=0,**kwargs):
         plt.savefig(pathOutput + str(img['id'].values)+filename + '_dayglowModel.png', bbox_inches='tight', dpi = 100)
         plt.clf()
         plt.close(fig)
-    #plt.show()
+
 
 def plotimg(img,inImg='img',pax=None,crange = None, bgcolor = None, **kwargs):
     '''
