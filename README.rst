@@ -4,7 +4,7 @@ Overview
 The fuvpy package contains code to work with global Far-Ultraviolet (FUV) images of aurora.
 At present, the package includes functions to remove background emissions and to visualize images.
 
-The code is based on xarray, using xarray.Dataset objects to store the images.
+The code uses xarray.Dataset objects to store the images.
 Functions to read .idl and .sav files produced by fuview3 and xvis (IMAGE and Polar mission software) into this format are provided.
 Other formats need to be converted into a xarray.Dataset with coordinates ['date','row','col'] and data_vars = ['img','mlat','mlon','mlt','glat','glon','dza','sza'].
 Here, 'date' is the datetime of the images and 'row' and 'col' refer to the row and column of the camera (2D images).
@@ -40,11 +40,12 @@ Clone the repository::
 
     git clone https://github.com/aohma/fuvpy
 
-Use or create a virtual environment with ``conda`` with all dependencies installed.
-A working environment is provided in the repository. In this example, the environment is called ``fuvpy-env``::
+Use or create a virtual environment with ``conda`` or ``mamba`` where all dependencies are installed.
+A working environment is also provided in the repository. Here we create an environment called ``fuvpy-env`` as an example::
 
     conda env create --name fuvpy-env --file fuvpy/binder/fuvpy-env.yml
     conda activate fuvpy-env
 
-Use pip to install in editable (development) mode:
+Use pip to install in editable (development) mode::
+    
     pip install -e ./fuvpy
