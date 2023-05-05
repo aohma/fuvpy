@@ -22,7 +22,7 @@ from fuvpy.utils.sunlight import subsol
 
 
 
-def makeBSmodel(imgs,inImg='img',sOrder=3,dampingVal=0,tukeyVal=5,stop=1e-3,sKnots=None,n_tKnots=2,tOrder=2,returnNorms=False):
+def makeBSmodel(imgs,**kwargs):
     '''
     Function to model the FUV dayglow and subtract it from the input image
 
@@ -50,8 +50,9 @@ def makeBSmodel(imgs,inImg='img',sOrder=3,dampingVal=0,tukeyVal=5,stop=1e-3,sKno
         Number of temporal knots, equally spaced between the endpoints. The default is 2 (only knots at endpoints)
     tOrder : int, optional
         Order of the temporal spline fit. The default is 2.
-    returnNorms : bool, optional
-        If True, also return the residual and model norms
+    inplace : bool, optional
+        If True, update the Dataset in place. Default is False (return a new Dataset).
+
 
     Returns
     -------
@@ -61,10 +62,21 @@ def makeBSmodel(imgs,inImg='img',sOrder=3,dampingVal=0,tukeyVal=5,stop=1e-3,sKno
             - imgs['dgimg'] is the dayglow-corrected image (dayglow subtracked from the input image)
             - imgs['dgweight'] is the weights after the final iteration
             - imgs['dgsigma'] is the modelled spread
-    norms : tuple, optional
-        A tuple containing the residual and model norms. Only if returnNorms is True
     '''
-    start = timing.process_time()
+
+    # Set keyword arguments to input or default values    
+    inImg = kwargs.pop('inImg') if 'inImg' in kwargs.keys() else 'img'
+    sOrder = kwargs.pop('sOrder') if 'sOrder' in kwargs.keys() else 3
+    dampingVal = kwargs.pop('dampingVal') if 'dampingVal' in kwargs.keys() else 0
+    tukeyVal = kwargs.pop('tukeyVal') if 'tukeyVal' in kwargs.keys() else 5
+    stop = kwargs.pop('stop') if 'stop' in kwargs.keys() else 1e-3
+    sKnots = kwargs.pop('sKnots') if 'sKnots' in kwargs.keys() else None
+    n_tKnots = kwargs.pop('n_tKnots') if 'n_tKnots' in kwargs.keys() else 2
+    tOrder = kwargs.pop('tOrder') if 'tOrder' in kwargs.keys() else 2
+    inplace = bool(kwargs.pop('inplace')) if 'inplace' in kwargs.keys() else False
+
+    if not inplace: imgs = imgs.copy(deep=True)
+
     # Add temporal dimension if missing
     if len(imgs.sizes)==2: imgs = imgs.expand_dims('date')
 
@@ -97,7 +109,6 @@ def makeBSmodel(imgs,inImg='img',sOrder=3,dampingVal=0,tukeyVal=5,stop=1e-3,sKno
     n_scp = len(sKnots)-sOrder-1
 
     # Temporal design matix
-    print('Building design matrix')
     M = BSpline(tKnots, np.eye(n_tcp), tOrder)(time)
 
     # Spatial design matrix
@@ -137,15 +148,11 @@ def makeBSmodel(imgs,inImg='img',sOrder=3,dampingVal=0,tukeyVal=5,stop=1e-3,sKno
     damping = dampingVal*np.ones(G_s.shape[1])
     R = np.diag(damping)
 
-    print(timing.process_time() - start)
     # Iterativaly solve the inverse problem
     diff = 1e10
     iteration = 0
     m = None
     while (diff>stop)&(iteration < 100):
-        print('Iteration:',iteration)
-
-        # m_s = np.linalg.lstsq((G_s[ind,:]*w[ind,None]*ws[ind,None]).T@(G_s[ind,:]*w[ind,None]*ws[ind,None])+R,(G_s[ind,:]*w[ind,None]*ws[ind,None]).T@(d_s[ind]*w[ind]*ws[ind]),rcond=None)[0]
         m_s = lstsq((G_s[ind,:]*w[ind,None]*ws[ind,None]).T@(G_s[ind,:]*w[ind,None]*ws[ind,None])+R,(G_s[ind,:]*w[ind,None]*ws[ind,None]).T@(d_s[ind]*w[ind]*ws[ind]),lapack_driver='gelsy')[0]
         mNew    = M@m_s.reshape((n_scp, n_tcp)).T
         dm=[]
@@ -160,12 +167,12 @@ def makeBSmodel(imgs,inImg='img',sOrder=3,dampingVal=0,tukeyVal=5,stop=1e-3,sKno
             sigma[ind] = _noiseModel(fraction.flatten()[ind], d_s[ind],dm.flatten()[ind], w[ind]*ws[ind],sKnots)
         w[ind] = (1 - np.minimum(1,(residuals/(tukeyVal*sigma[ind]))**2))**2
 
-        if m is not None:
-            diff = np.sqrt(np.mean((mNew-m)**2))/(1+np.sqrt(np.mean(mNew**2)))
-            print('Relative change model norm',diff)
+        if m is not None: diff = np.sqrt(np.mean((mNew-m)**2))/(1+np.sqrt(np.mean(mNew**2)))
         m = mNew
         iteration += 1
-        print(timing.process_time() - start)
+
+
+    if iteration == 100: print('Warning: Model did not converge. Truncated after 100 iterations')
 
     normM = np.sqrt(np.average(m_s**2))
     normR = np.sqrt(np.average(residuals**2,weights=w[ind]))
@@ -189,14 +196,13 @@ def makeBSmodel(imgs,inImg='img',sOrder=3,dampingVal=0,tukeyVal=5,stop=1e-3,sKno
     imgs['dgweight'].attrs = {'long_name': 'BS model weights'}
     imgs['dgsigma'].attrs = {'long_name': 'BS model spread'}
 
-    if returnNorms:
-        return imgs,(normR,normM)
-    else:
+    # Return the new DataSet if not inplace 
+    if not inplace:
         return imgs
 
-def makeBSmodelTest(imgs,inImg='img',dampingVal=0,tukeyVal=5,stop=1e-3,sKnots=None,sOrder=3,n_tKnots=2,tOrder=2,returnNorms=False,maxIter=100):
+def makeBSmodelTest(imgs,**kwargs):
     '''
-    Function to model the FUV dayglow and subtract it from the input image. Testing scipy.sparse
+    EXPERIMENTAL Function to model the FUV dayglow and subtract it from the input image. Testing scipy.sparse
 
     Parameters
     ----------
@@ -222,8 +228,8 @@ def makeBSmodelTest(imgs,inImg='img',dampingVal=0,tukeyVal=5,stop=1e-3,sKnots=No
         Number of temporal knots, equally spaced between the endpoints. The default is 2 (only knots at endpoints)
     tOrder : int, optional
         Order of the temporal spline fit. The default is 2.
-    returnNorms : bool, optional
-        If True, also return the residual and model norms
+    inplace : bool, optional
+        If True, update the Dataset in place. Default is False (return a new Dataset).
 
     Returns
     -------
@@ -233,10 +239,21 @@ def makeBSmodelTest(imgs,inImg='img',dampingVal=0,tukeyVal=5,stop=1e-3,sKnots=No
             - imgs['dgimg'] is the dayglow-corrected image (dayglow subtracked from the input image)
             - imgs['dgweight'] is the weights after the final iteration
             - imgs['dgsigma'] is the modelled spread
-    norms : tuple, optional
-        A tuple containing the residual and model norms. Only if returnNorms is True
     '''
-    start = timing.process_time()
+
+    # Set keyword arguments to input or default values    
+    inImg = kwargs.pop('inImg') if 'inImg' in kwargs.keys() else 'img'
+    sOrder = kwargs.pop('sOrder') if 'sOrder' in kwargs.keys() else 3
+    dampingVal = kwargs.pop('dampingVal') if 'dampingVal' in kwargs.keys() else 0
+    tukeyVal = kwargs.pop('tukeyVal') if 'tukeyVal' in kwargs.keys() else 5
+    stop = kwargs.pop('stop') if 'stop' in kwargs.keys() else 1e-3
+    sKnots = kwargs.pop('sKnots') if 'sKnots' in kwargs.keys() else None
+    n_tKnots = kwargs.pop('n_tKnots') if 'n_tKnots' in kwargs.keys() else 2
+    tOrder = kwargs.pop('tOrder') if 'tOrder' in kwargs.keys() else 2
+    inplace = bool(kwargs.pop('inplace')) if 'inplace' in kwargs.keys() else False
+
+    if not inplace: imgs = imgs.copy(deep=True)
+
     # Spatial knots and viewing angle correction
     if imgs['id'] in ['WIC','SI12','SI13','UVI']:
         fraction = np.cos(np.deg2rad(imgs['sza'].stack(z=('date','row','col')).values))/np.cos(np.deg2rad(imgs['dza'].stack(z=('date','row','col')).values))
@@ -314,14 +331,12 @@ def makeBSmodelTest(imgs,inImg='img',dampingVal=0,tukeyVal=5,stop=1e-3,sKnots=No
     damping = dampingVal*np.ones(n_scp*n_tcp)
     R = np.diag(damping)
 
-    print(timing.process_time() - start)
     # Iterativaly solve the inverse problem
     diff = 1e10
     iteration = 0
     dm = np.full((n_t*n_r*n_c),np.nan)
     m = None
-    while (diff>stop)&(iteration < maxIter):
-        print('Iteration:',iteration)
+    while (diff>stop)&(iteration < 100):
         mNew = lstsq((G*w*ws).T.dot(G*w*ws)+R,(G*w*ws).T.dot(d*w.toarray().squeeze()*ws.toarray().squeeze()),lapack_driver='gelsy')[0]
 
         dm[ind]=G.dot(mNew)
@@ -334,13 +349,10 @@ def makeBSmodelTest(imgs,inImg='img',dampingVal=0,tukeyVal=5,stop=1e-3,sKnots=No
 
         if m is not None:
             diff = np.sqrt(np.mean((mNew-m)**2))/(1+np.sqrt(np.mean(mNew**2)))
-            print('Relative change model norm',diff)
         m = mNew
         iteration += 1
-        print(timing.process_time() - start)
 
-    # normM = np.sqrt(np.average(m_s**2))
-    # normR = np.sqrt(np.average(residuals**2,weights=w[ind]))
+    if iteration == 100: print('Warning: Model did not converge. Truncated after 100 iterations')
 
 
     # Add dayglow model and corrected image to the Dataset
@@ -362,7 +374,9 @@ def makeBSmodelTest(imgs,inImg='img',dampingVal=0,tukeyVal=5,stop=1e-3,sKnots=No
     # imgs['dgweight'].attrs = {'long_name': 'BS model weights'}
     # imgs['dgsigma'].attrs = {'long_name': 'BS model spread'}
 
-    return imgs
+    # Return the new DataSet if not inplace 
+    if not inplace:
+        return imgs
 
 def _noiseModel(fraction,d,dm,w,sKnots):
 
@@ -388,7 +402,7 @@ def _noiseModel(fraction,d,dm,w,sKnots):
     return rmseFit
 
 
-def makeSHmodel(imgs,Nsh,Msh,dampingVal=0,tukeyVal=5,stop=1e-3,n_tKnots=2,tOrder=2,returnNorms=False):
+def makeSHmodel(imgs,Nsh,Msh,**kwargs):
     '''
     Function to model the FUV residual background and subtract it from the input image
 
@@ -414,18 +428,26 @@ def makeSHmodel(imgs,Nsh,Msh,dampingVal=0,tukeyVal=5,stop=1e-3,n_tKnots=2,tOrder
         Number of temporal knots, equally spaced between the endpoints. The default is 2 (only knots at endpoints)
     tOrder: int, optional
         Order of the temporal spline fit. The default is 2.
-    returnNorms : bool, optional
-        If True, also return the residual and model norms
+    inplace : bool, optional
+        If True, update the Dataset in place. Default is False (return new Dataset)
     Returns
     -------
     imgs : xarray.Dataset
-        A copy of the image Dataset with two new fields:
-            - imgs['shmodel'] is the dayglow model
-            - imgs['shimg'] is the dayglow-corrected image (dayglow subtracked from the input image)
-            - imgs['shweight'] is the weight if each pixel after the final iteration
-    norms _ tuple, optional
-        A tuple containing the residual and model norms. Only is returnNorms is True
+        A copy of the image Dataset with three new fields:
+            - imgs['shmodel'] is the sh model
+            - imgs['shimg'] is the sh-corrected image
+            - imgs['shweight'] is the weights after the final iteration
     '''
+
+    # Set keyword arguments to input or default values    
+    dampingVal = kwargs.pop('dampingVal') if 'dampingVal' in kwargs.keys() else 0
+    tukeyVal = kwargs.pop('tukeyVal') if 'tukeyVal' in kwargs.keys() else 5
+    stop = kwargs.pop('stop') if 'stop' in kwargs.keys() else 1e-3
+    n_tKnots = kwargs.pop('n_tKnots') if 'n_tKnots' in kwargs.keys() else 2
+    tOrder = kwargs.pop('tOrder') if 'tOrder' in kwargs.keys() else 2
+    inplace = bool(kwargs.pop('inplace')) if 'inplace' in kwargs.keys() else False
+
+    if not inplace: imgs = imgs.copy(deep=True)
 
     # Add temporal dimension if missing
     if len(imgs.sizes)==2: imgs = imgs.expand_dims('date')
@@ -458,7 +480,6 @@ def makeSHmodel(imgs,Nsh,Msh,dampingVal=0,tukeyVal=5,stop=1e-3,n_tKnots=2,tOrder
     skeys = sh.SHkeys(Nsh, Msh).Mge(1).MleN().NminusMeven()
     ckeys = sh.SHkeys(Nsh, Msh).MleN().NminusMeven()
 
-    print('Building sh G matrix')
     G_g=[]
     G_s=[]
     for i in range(n_t):
@@ -512,7 +533,6 @@ def makeSHmodel(imgs,Nsh,Msh,dampingVal=0,tukeyVal=5,stop=1e-3,n_tKnots=2,tOrder
     iteration = 0
     m = None
     while (diff>stop)&(iteration < 100):
-        print('Iteration:',iteration)
         # Solve for spline amplitudes
         m_s = np.linalg.lstsq((G_s[ind,:]*w[ind,None]*ws[ind,None]).T@(G_s[ind,:]*w[ind,None]*ws[ind,None])+R,(G_s[ind,:]*w[ind,None]*ws[ind,None]).T@(d_s[ind]*w[ind]*ws[ind]),rcond=None)[0]
 
@@ -529,10 +549,10 @@ def makeSHmodel(imgs,Nsh,Msh,dampingVal=0,tukeyVal=5,stop=1e-3,n_tKnots=2,tOrder
 
         if m is not None:
             diff = np.sqrt(np.mean( (mNew-m)**2))/(1+np.sqrt(np.mean(mNew**2)))
-            print('Relative change model norm:',diff)
         m = mNew
         iteration += 1
 
+    if iteration == 100: print('Warning: Model did not converge. Truncated after 100 iterations')
     normM = np.sqrt(np.average(m_s**2))
     normR = np.sqrt(np.average(residuals**2,weights=w[ind]))
 
@@ -551,9 +571,7 @@ def makeSHmodel(imgs,Nsh,Msh,dampingVal=0,tukeyVal=5,stop=1e-3,n_tKnots=2,tOrder
     imgs['shimg'].attrs = {'long_name': 'SH corrected image'}
     imgs['shweight'].attrs = {'long_name': 'SH model weights'}
 
-    if returnNorms:
-        return imgs,(normR,normM)
-    else:
+    if not inplace:
         return imgs
 
 
