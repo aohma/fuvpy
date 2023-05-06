@@ -16,11 +16,6 @@ import fuvpy as fuv
 import matplotlib.path as mplpath
 import matplotlib.pyplot as plt
 
-from scipy.interpolate import BSpline
-from scipy.linalg import lstsq
-
-import time as timing
-
 def make_wicfiles(orbit,path):
     '''
     Make a dataframe with date, wic filename and orbit number
@@ -54,7 +49,6 @@ def background_removal(orbits):
     wicpath = '/mnt/0b3b8cce-3469-42cb-b694-60a7ca36e03a/IMAGE_FUV/wic/'
     outpath = '/mnt/5fa6bccc-fa9d-4efc-9ddc-756f65699a0a/aohma/fuv/wic/'
 
-
     for orbit in orbits:
         files = pd.read_hdf(orbitpath+'wicfiles.h5',where='orbit_number=="{}"'.format(orbit))
         files['path']=wicpath
@@ -65,10 +59,7 @@ def background_removal(orbits):
             wic = fuv.makeBSmodel(wic,sKnots=[-3.5,-0.25,0,0.25,1.5,3.5],stop=0.01,n_tKnots=5,tukeyVal=5,dampingVal=1e-3)
             wic = fuv.makeSHmodel(wic,4,4,n_tKnots=5,stop=0.01,tukeyVal=5,dampingVal=1e-4)
             wic.to_netcdf(outpath+'wic_or'+str(orbit).zfill(4)+'.nc')
-            # df = wic[['img','dgimg','shimg','mlat','mlt']].to_dataframe().dropna(subset='dgimg')
-            # df.to_hdf(outpath+'wic_or'+str(orbit).zfill(4)+'.h5','wic',format='table',append=True,data_columns=True)
         except Exception as e: print(e)
-
 
 def initial_boundaries(orbits):
     inpath = '/mnt/5fa6bccc-fa9d-4efc-9ddc-756f65699a0a/aohma/fuv/wic/'
@@ -79,6 +70,7 @@ def initial_boundaries(orbits):
             imgs = xr.load_dataset(inpath+'wic_or'+str(orbit).zfill(4)+'.nc')
 
             bi = fuv.boundary_detection(imgs)
+            bi = bi.to_dataframe()
             bi['orbit']=orbit
             bi.to_hdf(outpath+'initial_boundaries.h5','initial',format='table',append=True,data_columns=True)
         except Exception as e: print(e)
@@ -228,17 +220,6 @@ def makeGIFs(orbits):
             bi = bi.reset_index().set_index('date')
             bf = bf.reset_index().set_index('date')
 
-
-            # r = (90. - np.abs(bf['pb']))/(90. - minlat)
-            # a = (bf.mlt.values - 6.)/12.*np.pi
-            # bf['px'] =  r*np.cos(a)
-            # bf['py'] =  r*np.sin(a)
-
-            # r = (90. - np.abs(bf['eb']))/(90. - minlat)
-            # a = (bf.mlt.values - 6.)/12.*np.pi
-            # bf['ex'] =  r*np.cos(a)
-            # bf['ey'] =  r*np.sin(a)
-
             fig,ax = plt.subplots(figsize=(5,5))
             ax.axis('off')
             pax = fuv.pp(ax,minlat=minlat)
@@ -258,10 +239,6 @@ def makeGIFs(orbits):
                 except Exception as e: print(e)
                 
                 try:
-                    # pax.plot(bf.loc[t.values,'pb'].values+bf.loc[t.values,'pb_err'].values,bf.loc[t.values,'mlt'].values,color='C3',alpha=alpha,linestyle=linestyle,linewidth=0.5)
-                    # pax.plot(bf.loc[t.values,'pb'].values-bf.loc[t.values,'pb_err'].values,bf.loc[t.values,'mlt'].values,color='C3',alpha=alpha,linestyle=linestyle,linewidth=0.5)
-                    # pax.plot(bf.loc[t.values,'eb'].values+bf.loc[t.values,'eb_err'].values,bf.loc[t.values,'mlt'].values,color='C1',alpha=alpha,linestyle=linestyle,linewidth=0.5)
-                    # pax.plot(bf.loc[t.values,'eb'].values-bf.loc[t.values,'eb_err'].values,bf.loc[t.values,'mlt'].values,color='C1',alpha=alpha,linestyle=linestyle,linewidth=0.5)
                     mlat_err = np.concatenate((bf.loc[t.values,'pb'].values+bf.loc[t.values,'pb_err'].values,bf.loc[t.values,'pb'].values[[0]]+bf.loc[t.values,'pb_err'].values[[0]],bf.loc[t.values,'pb'].values[[0]]-bf.loc[t.values,'pb_err'].values[[0]],bf.loc[t.values,'pb'].values[::-1]-bf.loc[t.values,'pb_err'].values[::-1]))
                     mlt_err = np.concatenate((bf.loc[t.values,'mlt'].values,bf.loc[t.values,'mlt'].values[[0,0]],bf.loc[t.values,'mlt'].values[::-1]))
                     pax.fill(mlat_err,mlt_err,color='C3',alpha=0.3*alpha,edgecolor=None)
