@@ -183,6 +183,8 @@ def boundarymodel_F(ds,**kwargs):
 
     # Set keyword arguments to input or default values
     stop = kwargs.pop('stop') if 'stop' in kwargs.keys() else 1e-3
+    Leb = kwargs.pop('Leb') if 'Leb' in kwargs.keys() else 0
+    Lpb = kwargs.pop('Lpb') if 'Lpb' in kwargs.keys() else 0
     tLeb = kwargs.pop('tLeb') if 'tLeb' in kwargs.keys() else 0
     tLpb = kwargs.pop('tLpb') if 'tLpb' in kwargs.keys() else 0
     tOrder = kwargs.pop('tOrder') if 'tOrder' in kwargs.keys() else 3
@@ -190,6 +192,8 @@ def boundarymodel_F(ds,**kwargs):
     n_terms_eb = kwargs.pop('n_terms_eb') if 'n_terms_eb' in kwargs.keys() else 3
     n_terms_pb = kwargs.pop('n_terms_pb') if 'n_terms_pb' in kwargs.keys() else 6
     max_iter = kwargs.pop('max_iter') if 'max_iter' in kwargs.keys() else 50
+
+    for key in kwargs: print(f'Warning: {key} is not a valid keyword argument')
 
     # Constants
     mu0 = 4e-7*np.pi # Vacuum magnetic permeability
@@ -236,20 +240,22 @@ def boundarymodel_F(ds,**kwargs):
         else:
             G_s = np.vstack((G_s, G_t))
 
+    gtg_mag = np.median((G_s.T.dot(G_s)).diagonal())
+
     # Data
     d_s = theta_eb.flatten()
     ind = np.isfinite(d_s)
  
-    # Temporal Damping
-    damping = 100*np.ones(G_s.shape[1])
+    # L0 regularization higher order terms
+    damping = np.ones(G_s.shape[1])
     damping[:3*n_cp]=0
 
-    
-    # TEST L1 regularization
+    # L1 regularization
     L = np.hstack((-np.identity(n_cp-1),np.zeros((n_cp-1,1))))+np.hstack((np.zeros((n_cp-1,1)),np.identity(n_cp-1)))
     LTL = np.zeros((n_cp*n_G,n_cp*n_G))
     for i in range(n_G): LTL[i*n_cp:(i+1)*n_cp,i*n_cp:(i+1)*n_cp] = L.T@L
-    R = tLeb*LTL + np.diag(damping)
+
+    R = tLeb*gtg_mag*LTL + Leb*gtg_mag*np.diag(damping)
     
     # Iteratively estimation of model parameters
     diff = 10000
@@ -365,19 +371,22 @@ def boundarymodel_F(ds,**kwargs):
         else:
             G_s = np.vstack((G_s, G_t))
 
+    gtg_mag = np.median((G_s.T.dot(G_s)).diagonal()) 
+
     # Data
     d_s = (np.log(theta_pb1)-np.log(1-theta_pb1)).flatten()
     ind = np.isfinite(d_s)
     
-    # Temporal Damping # Tst with L0 and L1 regularization
-    damping = 10*np.ones(G_s.shape[1])
+    # L0 regularization higher order terms
+    damping = np.ones(G_s.shape[1])
     damping[:3*n_cp]=0
 
-    # TEST L1 regularization
+    # L1 regularization
     L = np.hstack((-np.identity(n_cp-1),np.zeros((n_cp-1,1))))+np.hstack((np.zeros((n_cp-1,1)),np.identity(n_cp-1)))
     LTL = np.zeros((n_cp*n_G,n_cp*n_G))
     for i in range(n_G): LTL[i*n_cp:(i+1)*n_cp,i*n_cp:(i+1)*n_cp] = L.T@L
-    R = tLpb*LTL+np.diag(damping)
+
+    R = tLpb*gtg_mag*LTL + Lpb*gtg_mag*np.diag(damping)
 
     # Iteratively solve the full inverse problem
     diff = 10000
@@ -582,7 +591,9 @@ def boundarymodel_BS(ds,**kwargs):
     sKnots_pb = kwargs.pop('sKnots_pb') if 'sKnots_pb' in kwargs.keys() else np.array([0,2,4,6,12,18,20,22])
     max_iter = kwargs.pop('max_iter') if 'max_iter' in kwargs.keys() else 50
     resample = bool(kwargs.pop('resample')) if 'resample' in kwargs.keys() else False
-
+    
+    for key in kwargs: print(f'Warning: {key} is not a valid keyword argument')
+    
     # Constants
     mu0 = 4e-7*np.pi # Vacuum magnetic permeability
     M_E = 8.05e22 # Earth's magnetic dipole moment
