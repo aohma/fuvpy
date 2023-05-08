@@ -1,5 +1,5 @@
 import xarray as xr
-from fuvpy.src.background import makeBSmodel,makeSHmodel
+from fuvpy.src.background import backgroundmodel_BS,backgroundmodel_SH
 
 @xr.register_dataset_accessor("fuv")
 
@@ -8,16 +8,16 @@ class FuvAccessor:
     def __init__(self, xarray_obj):
         self._obj = xarray_obj
 
-    def makeBSmodel(self,**kwargs):
+    def backgroundmodel_BS(self,**kwargs):
         inplace = bool(kwargs.pop('inplace')) if 'inplace' in kwargs.keys() else False
         if inplace:
-            makeBSmodel(self._obj,inplace=inplace,**kwargs)
+            backgroundmodel_BS(self._obj,inplace=inplace,**kwargs)
         else:
-            return makeBSmodel(self._obj,**kwargs)
+            return backgroundmodel_BS(self._obj,**kwargs)
         
-    def makeSHmodel(self,Nsh,Msh,**kwargs):
+    def backgroundmodel_SH(self,Nsh,Msh,**kwargs):
         inplace = bool(kwargs.pop('inplace')) if 'inplace' in kwargs.keys() else False
         if inplace:
-            makeSHmodel(self._obj,Nsh,Msh,inplace=inplace,**kwargs)
+            backgroundmodel_SH(self._obj,Nsh,Msh,inplace=inplace,**kwargs)
         else:
-            return makeSHmodel(self._obj,Nsh,Msh,**kwargs)        
+            return backgroundmodel_SH(self._obj,Nsh,Msh,**kwargs)        
