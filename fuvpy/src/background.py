@@ -22,7 +22,7 @@ from fuvpy.utils.sunlight import subsol
 
 
 
-def makeBSmodel(imgs,**kwargs):
+def backgroundmodel_BS(imgs,**kwargs):
     '''
     Function to model the FUV dayglow and subtract it from the input image
 
@@ -158,7 +158,7 @@ def makeBSmodel(imgs,**kwargs):
 
         if iteration<=1:
             sigma = np.full_like(d_s,np.nan)
-            sigma[ind] = _noiseModel(fraction.flatten()[ind], d_s[ind],dm.flatten()[ind], w[ind]*ws[ind],sKnots)
+            sigma[ind] = _noisemodel(fraction.flatten()[ind], d_s[ind],dm.flatten()[ind], w[ind]*ws[ind],sKnots)
         w[ind] = (1 - np.minimum(1,(residuals/(tukeyVal*sigma[ind]))**2))**2
 
         if m is not None: diff = np.sqrt(np.mean((mNew-m)**2))/(1+np.sqrt(np.mean(mNew**2)))
@@ -196,7 +196,7 @@ def makeBSmodel(imgs,**kwargs):
     if not inplace:
         return imgs
 
-def _noiseModel(fraction,d,dm,w,sKnots):
+def _noisemodel(fraction,d,dm,w,sKnots):
 
     # Binned RMSE
     bins = np.r_[sKnots[0],np.arange(0,sKnots[-1]+0.25,0.25)]
@@ -220,7 +220,7 @@ def _noiseModel(fraction,d,dm,w,sKnots):
     return rmseFit
 
 
-def makeSHmodel(imgs,Nsh,Msh,**kwargs):
+def backgroundmodel_SH(imgs,Nsh,Msh,**kwargs):
     '''
     Function to model the FUV residual background and subtract it from the input image
 
@@ -456,7 +456,7 @@ def bin_number2(grid, mlat, mlt):
 
     return bin_n
 
-def makeSBSmodel(imgs):
+def backgroundmodel_SBS(imgs):
     '''
     Testing Spherical B-spline modelling
 
