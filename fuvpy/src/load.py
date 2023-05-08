@@ -16,7 +16,7 @@ from datetime import datetime
 from scipy.io import idl
 
 
-def readImg(filenames, dzalim = 80, hemisphere = None, reflat=True, remove_bad=True):
+def read_idl(filenames, dzalim = 80, hemisphere = None, reflat=True, remove_bad=True):
     '''
     Load FUV images into a xarray.Dataset
 
@@ -74,7 +74,7 @@ def readImg(filenames, dzalim = 80, hemisphere = None, reflat=True, remove_bad=T
         'dza': (['row','col'],imageinfo['dza'][0]),
         'sza': (['row','col'],imageinfo['sza'][0])
         })
-        img = img.expand_dims(date=[pd.to_datetime(_timestampImg(imageinfo['time'][0]))])
+        img = img.expand_dims(date=[pd.to_datetime(_timestamp_idl(imageinfo['time'][0]))])
 
         coordinates = ['mlat','mlon','mlt','glat','glon','sza','dza']
         fillvals = [-1e+31,-1e+31,-1e+31,-1e+31,-1e+31,-1,-1]
@@ -94,7 +94,7 @@ def readImg(filenames, dzalim = 80, hemisphere = None, reflat=True, remove_bad=T
         # coordinates to include
         ind = (img['dza'] < dzalim) & (img['mlat'] < 90) & (img['mlat'] > -90) & (img['glat']!=0)
         if inst_id=='WIC': ind = ind & (img['img'] > 0) # Zero-valued pixels in WIC are actually NaNs
-        if remove_bad: ind = ind & ~_badPixels(inst_id) # Ignore bad parts of the detectors
+        if remove_bad: ind = ind & ~_bad_pixels(inst_id) # Ignore bad parts of the detectors
 
         for coordinate in coordinates:
             img[coordinate] = xr.where(~ind,np.nan,img[coordinate])
@@ -120,7 +120,7 @@ def readImg(filenames, dzalim = 80, hemisphere = None, reflat=True, remove_bad=T
 
     return imgs
 
-def _timestampImg(timestamp):
+def _timestamp_idl(timestamp):
     """ returns datetime object for timestamp = imageinfo['TIME'][0] """
 
     hh = int(timestamp[1]/1000/60/60)
@@ -143,7 +143,7 @@ def _timestampImg(timestamp):
 
     return time
 
-def _badPixels(inst_id):
+def _bad_pixels(inst_id):
     '''
     Index of problematic pixels in the different detectors.
     The exact number will depent on the datetime, so this static approach is an approximation.
@@ -215,20 +215,33 @@ def _reflatWIC(wic,inImg='img',outImg='img'):
     wic[outImg]=((wic[inImg].copy()/flat[None,:,None]-background)*flat[None,:,None]+background)
     return wic
 
-def getRayleigh(imgs,inImg='img'):
+def add_rayleigh(imgs,**kwargs):
     '''
-    Convect counts to Rayleigh
+    Add data_var with intinsity converted from counts to Rayleigh
+
     Parameters
     ----------
     imgs : xarray.Dataset
         Dataset with the FUV images.
-    inImg : srtr, optional
-        Name of the image to convect. The default is 'image'.
+    inImg : str, optional
+        Name of the data_var with the input image in counts. The default is 'img'.
+    inplace : bool, optional
+        If True, update the Dataset in place. Default is False (return new Dataset) 
+    
     Returns
     -------
-    imgs : xarray.Dataset
-        Copy(?) of the FUV dataset with a new field containing the convected images.
+    imgs : xarray.Dataset, optional
+        Dataset including a new data_var with the intensity in kilo Rayleigh.
     '''
+    
+    # Set keyword arguments to input or default values    
+    inImg = kwargs.pop('inImg') if 'inImg' in kwargs.keys() else 'img'
+    inplace = bool(kwargs.pop('inplace')) if 'inplace' in kwargs.keys() else False
+
+    # Make a copy if a new Dataset should be returned
+    if not inplace: imgs = imgs.copy(deep=True)
+
+    # Add a new data_var with counts in kilo Rayleigh
     if imgs['id']=='WIC':
         imgs[inImg+'R'] = imgs[inImg]/612.6
     elif imgs['id']=='VIS':
@@ -238,5 +251,8 @@ def getRayleigh(imgs,inImg='img'):
     elif imgs['id']=='SI13':
         imgs[inImg+'R'] = imgs[inImg]/15.3
 
+    # Add attributes
     imgs[inImg+'R'].attrs = {'long_name': imgs[inImg].attrs['long_name'], 'units': 'kR'}
-    return imgs
+    
+    # Return the new Dataset
+    if not inplace: return imgs
