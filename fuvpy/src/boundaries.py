@@ -150,39 +150,7 @@ def detect_boundaries(imgs,**kwargs):
     ds['eb'].attrs = {'long_name': 'Equatorward boundary','unit':'deg'}
     return ds
 
-def solveInverseIteratively(G_s,d_s,ind,time,R,M,G,n_G,n_cp,stop):
-    # Iteratively estimation of model parameters
-    diff = 10000
-    w = np.ones(d_s[ind].shape)
-    m = None
-    iteration = 0
-    while (diff > stop)&(iteration<100):
-        print('Iteration:',iteration)
-        ms = np.linalg.inv((G_s[ind,:]*w[:,None]).T@(G_s[ind,:]*w[:,None])+R)@(G_s[ind,:]*w[:,None]).T@(d_s[ind]*w)
-        ms = ms.reshape((n_G, n_cp)).T
-
-        mNew    = M@ms
-        mtau=[]
-        for i, tt in enumerate(time):
-            mtau.append(G@mNew[i, :])
-        mtau=np.array(mtau).squeeze()
-
-        residuals = mtau.flatten()[ind] - d_s[ind]
-        rmse = np.sqrt(np.average(residuals**2,weights=w))
-
-        # Change to Tukey?
-        weights = 1.5*rmse/np.abs(residuals)
-        weights[weights > 1] = 1.
-        w = weights
-        if m is not None:
-            diff = np.sqrt(np.mean((mNew - m)**2))/(1+np.sqrt(np.mean(mNew**2)))
-            print('Relative change model norm', diff)
-
-        m = mNew
-        iteration += 1
-    return ms,m,rmse,w
-
-def makeBoundaryModelF(ds,stop=1e-3,dampingValE=2e0,dampingValP=2e1,n_termsE=3,n_termsP=6,order = 3,knotSep = 10):
+def boundarymodel_F(ds,stop=1e-3,dampingValE=2e0,dampingValP=2e1,n_termsE=3,n_termsP=6,order = 3,knotSep = 10):
     '''
     Function to make a spatiotemporal Fourier model of auroral boundaries.
 
@@ -211,9 +179,6 @@ def makeBoundaryModelF(ds,stop=1e-3,dampingValE=2e0,dampingValP=2e1,n_termsE=3,n
     -------
     xarray.Dataset
         Dataset with model boundaries.
-    tuple
-        Tuple with model and residual norms
-
     '''
 
     time=(ds.date-ds.date[0]).values/ np.timedelta64(1, 'm')
@@ -221,7 +186,7 @@ def makeBoundaryModelF(ds,stop=1e-3,dampingValE=2e0,dampingValP=2e1,n_termsE=3,n
     n_t = len(ds.date)
     n_mlt = len(mlt)
 
-    #%% Eq boundary model
+    ## Eq boundary model
     theta_eb = np.deg2rad(90-ds['eqb'].stack(z=('lim','mlt')).values)
 
     # Temporal knots
@@ -259,13 +224,7 @@ def makeBoundaryModelF(ds,stop=1e-3,dampingValE=2e0,dampingValP=2e1,n_termsE=3,n
     # Data
     d_s = theta_eb.flatten()
     ind = np.isfinite(d_s)
-
-    # # Temporal Damping
-    # damping = dampingValE*np.ones(G_s.shape[1])
-    # damping[3*n_cp:]=10*damping[3*n_cp:]
-
-    # R = np.diag(damping)
-    
+ 
     # Temporal Damping
     damping = 100*np.ones(G_s.shape[1])
     damping[:3*n_cp]=0
@@ -277,14 +236,33 @@ def makeBoundaryModelF(ds,stop=1e-3,dampingValE=2e0,dampingValP=2e1,n_termsE=3,n
     for i in range(n_G): LTL[i*n_cp:(i+1)*n_cp,i*n_cp:(i+1)*n_cp] = L.T@L
     R = dampingValE*LTL + np.diag(damping)
     
-    # Iteratively solve the full inverse problem
-    ms,m,rmse,w=solveInverseIteratively(G_s,d_s,ind,time,R,M,G,n_G,n_cp,stop)
+    # Iteratively estimation of model parameters
+    diff = 10000
+    w = np.ones(d_s[ind].shape)
+    m = None
+    iteration = 0
+    while (diff > stop)&(iteration<100):
+        ms = np.linalg.inv((G_s[ind,:]*w[:,None]).T@(G_s[ind,:]*w[:,None])+R)@(G_s[ind,:]*w[:,None]).T@(d_s[ind]*w)
+        ms = ms.reshape((n_G, n_cp)).T
 
+        mNew    = M@ms
+        mtau=[]
+        for i, tt in enumerate(time):
+            mtau.append(G@mNew[i, :])
+        mtau=np.array(mtau).squeeze()
 
-    # # Model and residual norm
-    # m_eb = m
-    # norm_eb_m = np.sqrt(np.average((L@ms).flatten()**2))
-    # norm_eb_r = rmse
+        residuals = mtau.flatten()[ind] - d_s[ind]
+        rmse = np.sqrt(np.average(residuals**2,weights=w))
+
+        # Change to Tukey?
+        weights = 1.5*rmse/np.abs(residuals)
+        weights[weights > 1] = 1.
+        w = weights
+        if m is not None:
+            diff = np.sqrt(np.mean((mNew - m)**2))/(1+np.sqrt(np.mean(mNew**2)))
+
+        m = mNew
+        iteration += 1
 
     # Data kernel evaluation
     mlt_eval      = np.linspace(0,24,24*10+1)
@@ -372,11 +350,6 @@ def makeBoundaryModelF(ds,stop=1e-3,dampingValE=2e0,dampingValP=2e1,n_termsE=3,n
     # Data
     d_s = (np.log(theta_pb1)-np.log(1-theta_pb1)).flatten()
     ind = np.isfinite(d_s)
-
-    # # Temporal Damping
-    # damping = dampingValP*np.ones(G_s.shape[1])
-    # damping[3*n_cp:]=2*damping[3*n_cp:]
-    # R = np.diag(damping)
     
     # Temporal Damping # Tst with L0 and L1 regularization
     damping = 10*np.ones(G_s.shape[1])
@@ -389,12 +362,34 @@ def makeBoundaryModelF(ds,stop=1e-3,dampingValE=2e0,dampingValP=2e1,n_termsE=3,n
     R = dampingValP*LTL+np.diag(damping)
 
     # Iteratively solve the full inverse problem
-    ms,m,rmse,w=solveInverseIteratively(G_s,d_s,ind,time,R,M,G,n_G,n_cp,stop)
+    diff = 10000
+    w = np.ones(d_s[ind].shape)
+    m = None
+    iteration = 0
+    while (diff > stop)&(iteration<100):
+        print('Iteration:',iteration)
+        ms = np.linalg.inv((G_s[ind,:]*w[:,None]).T@(G_s[ind,:]*w[:,None])+R)@(G_s[ind,:]*w[:,None]).T@(d_s[ind]*w)
+        ms = ms.reshape((n_G, n_cp)).T
 
-    # # Model and residual norm # ONLY VALID FOR 
-    # m_pb = m
-    # norm_pb_m = np.sqrt(np.average((L@ms).flatten()**2))
-    # norm_pb_r = rmse
+        mNew    = M@ms
+        mtau=[]
+        for i, tt in enumerate(time):
+            mtau.append(G@mNew[i, :])
+        mtau=np.array(mtau).squeeze()
+
+        residuals = mtau.flatten()[ind] - d_s[ind]
+        rmse = np.sqrt(np.average(residuals**2,weights=w))
+
+        # Change to Tukey?
+        weights = 1.5*rmse/np.abs(residuals)
+        weights[weights > 1] = 1.
+        w = weights
+        if m is not None:
+            diff = np.sqrt(np.mean((mNew - m)**2))/(1+np.sqrt(np.mean(mNew**2)))
+            print('Relative change model norm', diff)
+
+        m = mNew
+        iteration += 1
 
     # Data kernel evaluation
     G=[]
@@ -489,7 +484,7 @@ def makeBoundaryModelF(ds,stop=1e-3,dampingValE=2e0,dampingValP=2e1,n_termsE=3,n
     return ds2
 
 
-def makeBoundaryBS(df,stop=1e-3,tLeb=0,sLeb=0,tLpb=0,sLpb=0,tOrder = 3,tKnotSep = 10,max_iter=50,resample=False,return_norms=False):
+def boundarymodel_BS(ds,**kwargs):
     '''
     Function to make a spatiotemporal model of auroral boundaries using periodic B-splines.
 
@@ -499,37 +494,54 @@ def makeBoundaryBS(df,stop=1e-3,tLeb=0,sLeb=0,tLpb=0,sLpb=0,tOrder = 3,tKnotSep 
         Dataset with initial boundaries.
     stop : float, optional
         When to stop the iterations. Default is 0.001
-    eL1 : float, optional
-        1st order Tikhonov regularization for the equatorward boundary.
-        Default is 0
-    eL2 : float, optional
-        2nd order Tikhonov regularization for the equatorward boundary.
-        Default is 0
-    pL1 : float, optional
-        1st order Tikhonov regularization for the poleward boundary.
-        Default is 0
-    pL2 : float, optional
-        2nd order Tikhonov regularization for the epoleward boundary.
+    tLeb,sLeb,tLpb,sLeb : float, optional
+        Magnitude of 1st order Tikhonov regularization in temporal and spatial direction for the equatorward boundary (eb) and poleward boundary (pb).
         Default is 0        
     tOrder : int, optinal
         Order of the temporal B-spline. Default is 3
     tKnotSep : int, optional
-        Approximate temporal knot separation in minutes. Default is 10.
+        Temporal knot separation in minutes. Default is 10.
+    sOrder : int, optinal
+        Order of the spatial B-spline. Default is 3
+    sKnots_eb,sKnots_pb, optional
+        Locations of the spatial knots.
+    max_iter : int, optional
+        Maximum number of iterations for the model to converge. Default is 50
+    resample : bool, optional
+        If True, the input boundaries are randomly resampled with replacement before the model is made. Default is False
 
     Returns
     -------
     xarray.Dataset
         Dataset with model boundaries.
-    tuple
-        Tuple with model and residual norms
-
     '''
-    
+
+    # Set keyword arguments to input or default values
+    stop = kwargs.pop('stop') if 'stop' in kwargs.keys() else 1e-3
+    tLeb = kwargs.pop('tLeb') if 'tLeb' in kwargs.keys() else 0
+    sLeb = kwargs.pop('sLeb') if 'sLeb' in kwargs.keys() else 0
+    tLpb = kwargs.pop('tLpb') if 'tLpb' in kwargs.keys() else 0
+    sLpb = kwargs.pop('sLpb') if 'sLpb' in kwargs.keys() else 0
+    tOrder = kwargs.pop('tOrder') if 'tOrder' in kwargs.keys() else 3
+    tKnotSep = kwargs.pop('tKnotSep') if 'tKnotSep' in kwargs.keys() else 10
+    sOrder = kwargs.pop('sOrder') if 'sOrder' in kwargs.keys() else 3
+    sKnots_eb = kwargs.pop('sKnots_eb') if 'sKnots_eb' in kwargs.keys() else np.arange(0,24,6)
+    sKnots_pb = kwargs.pop('sKnots_pb') if 'sKnots_pb' in kwargs.keys() else np.array([0,2,4,6,12,18,20,22])
+    max_iter = kwargs.pop('max_iter') if 'max_iter' in kwargs.keys() else 50
+    resample = bool(kwargs.pop('resample')) if 'resample' in kwargs.keys() else False
+
+    # Constants
+    mu0 = 4e-7*np.pi # Vacuum magnetic permeability
+    M_E = 8.05e22 # Earth's magnetic dipole moment
+    R_E = 6371e3 # Earth radii
+    height = 130e3
+    R_I = R_E + height # Radius of ionosphere  
+
     # Make pandas dataframe
     if resample:
-        df = df.reset_index().sample(frac=1,replace=True)
+        df = ds.to_dataframe().reset_index().sample(frac=1,replace=True)
     else:
-        df = df.reset_index()
+        df = ds.to_dataframe().reset_index()
 
     # Start date and duration
     dateS = df['date'].min().floor(str(tKnotSep)+'min')
@@ -538,8 +550,7 @@ def makeBoundaryBS(df,stop=1e-3,tLeb=0,sLeb=0,tLpb=0,sLpb=0,tOrder = 3,tKnotSep 
     time=(df['date']-dateS)/ np.timedelta64(1, 'm')
     phi = np.deg2rad(15*df['mlt'].values)
 
-
-    #%% Eq boundary model
+    ## Eq boundary model
     
     # Equatorward boundary to radias then convert to primed coordinates
     theta_eb = np.deg2rad(90-df['eb'].values) 
@@ -558,10 +569,8 @@ def makeBoundaryBS(df,stop=1e-3,tLeb=0,sLeb=0,tLpb=0,sLpb=0,tOrder = 3,tKnotSep 
     # Temporal design matix
     Gtime = BSpline.design_matrix(time[ind],tKnots,tOrder)
 
-
     # Spatial knots (extended)
-    sOrder = 3
-    mltKnots = np.arange(0,24,6)
+    mltKnots = sKnots_eb
     sKnots = np.deg2rad(15*mltKnots)
     sKnots = np.r_[sKnots-2*np.pi,sKnots,sKnots+2*np.pi]
     sKnots = np.r_[np.repeat(sKnots[0],sOrder),sKnots, np.repeat(sKnots[-1],sOrder)]
@@ -596,11 +605,6 @@ def makeBoundaryBS(df,stop=1e-3,tLeb=0,sLeb=0,tLpb=0,sLpb=0,tOrder = 3,tKnotSep 
     
     # Combined regularization
     R = tLeb*gtg_mag*tLTL + sLeb*gtg_mag*sLTL
-    
-    # print(np.median((G_s.T.dot(G_s)).diagonal()))
-    # print(np.median(np.diagonal(tLTL)))
-    # print(np.median(np.diagonal(sLTL)))
-    
      
     # Initiate iterative weights
     w = np.ones(theta_eb1[ind].shape)
@@ -626,12 +630,6 @@ def makeBoundaryBS(df,stop=1e-3,tLeb=0,sLeb=0,tLpb=0,sLpb=0,tOrder = 3,tKnotSep 
         m = ms
         iteration += 1
 
-    # # Norms
-    # normM = np.sqrt(np.average((tL@m)**2)) ## Should be L@m
-    # normR = np.sqrt(np.average(residuals**2,weights=w.toarray().squeeze()))
-    # print(normM)
-    # print(normR)
-
     # Temporal evaluation matrix
     time_ev=(df['date'].drop_duplicates()-dateS).values/ np.timedelta64(1, 'm')
     Gtime = BSpline.design_matrix(time_ev, tKnots,tOrder).toarray()
@@ -641,9 +639,7 @@ def makeBoundaryBS(df,stop=1e-3,tLeb=0,sLeb=0,tLpb=0,sLpb=0,tOrder = 3,tKnotSep 
     Gphi = BSpline.design_matrix(phi_ev, sKnots, sOrder)
     Gphi = Gphi[:,n_pcp:2*n_pcp]+Gphi[:,2*n_pcp:3*n_pcp].toarray()
    
-    # return time_ev,Gtime,phi_ev,Gphi
     # Combined evaluation matrix
-    # G_ev = Gphi[:,np.repeat(np.arange(n_pcp),n_tcp)][np.tile(np.arange(len(phi_ev)),len(time_ev)),:]*Gtime[:,np.tile(np.arange(n_tcp),n_pcp)][np.repeat(np.arange(len(time_ev)),len(phi_ev)),:]
     G_ev = np.tile(np.repeat(Gphi,n_tcp,axis=1),(len(time_ev),1))*np.repeat(np.tile(Gtime,(1,n_pcp)),len(phi_ev),axis=0)
     
     tau1=G_ev.dot(m)
@@ -665,8 +661,6 @@ def makeBoundaryBS(df,stop=1e-3,tLeb=0,sLeb=0,tLpb=0,sLpb=0,tOrder = 3,tKnotSep 
     GdMdt = np.tile(np.repeat(Gphi,n_dtcp,axis=1),(len(time_ev),1))*np.repeat(np.tile(dMdt,(1,n_pcp)),len(phi_ev),axis=0)  
     dtau1dt = GdMdt @ dmdt.flatten()
     
-
-
     # df/d(phi) in primed
     mm = np.vstack((mm,mm[:1,:]))
     dp =(sKnots[sOrder+1:-1]-sKnots[1:-sOrder-1])
@@ -695,13 +689,6 @@ def makeBoundaryBS(df,stop=1e-3,tLeb=0,sLeb=0,tLpb=0,sLpb=0,tOrder = 3,tKnotSep 
 
     ## FLUX INSIDE EB
     
-    # Constants
-    mu0 = 4e-7*np.pi # Vacuum magnetic permeability
-    M_E = 8.05e22 # Earth's magnetic dipole moment
-    R_E = 6371e3 # Earth radii
-    height = 130e3
-    R_I = R_E + height # Radius of ionosphere    
-
     # TOTAL FLUX
     dT = (mu0*M_E)/(4*np.pi*R_I) * (np.sin(tau_eb)**2)
     dT_dt = (mu0*M_E)/(4*np.pi*R_I) * np.sin(2*tau_eb)*dtau_dt_eb/60
@@ -718,7 +705,7 @@ def makeBoundaryBS(df,stop=1e-3,tLeb=0,sLeb=0,tLpb=0,sLpb=0,tOrder = 3,tKnotSep 
     Gtime = BSpline.design_matrix(time[ind],tKnots,tOrder)
 
     # Spatial knots (extended)
-    mltKnots = np.array([0,2,4,6,12,18,20,22])
+    mltKnots = sKnots_pb
     sKnots = np.deg2rad(15*mltKnots)
     sKnots = np.r_[sKnots-2*np.pi,sKnots,sKnots+2*np.pi]
     sKnots = np.r_[np.repeat(sKnots[0],sOrder),sKnots, np.repeat(sKnots[-1],sOrder)]
@@ -745,7 +732,6 @@ def makeBoundaryBS(df,stop=1e-3,tLeb=0,sLeb=0,tLpb=0,sLpb=0,tOrder = 3,tKnotSep 
     tLTL = tL.T@tL
     
     # 1st order regularization in mlt
-    # sL = np.array([[-1,1,0,0,0,0,0,0],[0,-1,1,0,0,0,0,0],[0,0,-1,1,0,0,0,0],[0,0,0,-1,1,0,0,0],[0,0,0,0,-1,1,0,0],[0,0,0,0,0,-1,1,0],[0,0,0,0,0,0,-1,1],[1,0,0,0,0,0,0,-1]])
     sL = []
     for i in range(n_pcp): sL.append(np.roll(np.r_[-1,1,np.repeat(0,n_pcp-2)],i))
     sL=np.array(sL)
@@ -778,13 +764,6 @@ def makeBoundaryBS(df,stop=1e-3,tLeb=0,sLeb=0,tLpb=0,sLpb=0,tOrder = 3,tKnotSep 
         m = ms
         iteration += 1
 
-    # # Norms
-    # normM = np.sqrt(np.average((tL@m)**2)) ## Should be L@m
-    # normR = np.sqrt(np.average(residuals**2,weights=w.toarray().squeeze()))
-    # print(normM)
-    # print(normR)
-
-
     # Temporal evaluation matrix
     M = BSpline(tKnots, np.eye(n_tcp), tOrder)(time_ev)
     
@@ -802,9 +781,8 @@ def makeBoundaryBS(df,stop=1e-3,tLeb=0,sLeb=0,tLpb=0,sLpb=0,tOrder = 3,tKnotSep 
     tau1 = 1/(1+np.exp(-1*tau2))
     tau_pb  = tau_eb*tau1
 
-       
     ## Derivative
-    
+  
     mm = m.reshape((n_pcp,n_tcp))
 
     # df/dt in double primed
@@ -817,8 +795,6 @@ def makeBoundaryBS(df,stop=1e-3,tLeb=0,sLeb=0,tLpb=0,sLpb=0,tOrder = 3,tKnotSep 
     GdMdt = np.tile(np.repeat(G,n_dtcp,axis=1),(len(time_ev),1))*np.repeat(np.tile(dMdt,(1,n_pcp)),len(phi_ev),axis=0)  
     dtau2dt = GdMdt @ dmdt.flatten()
     
-
-
     # df/d(phi) in double primed
     mm = np.vstack((mm,mm[:1,:]))
     dp =(sKnots[sOrder+1:-1]-sKnots[1:-sOrder-1])
