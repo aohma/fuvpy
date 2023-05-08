@@ -198,13 +198,14 @@ def boundarymodel_F(ds,**kwargs):
     height = 130e3
     R_I = R_E + height # Radius of ionosphere  
 
+    duration = (ds.date[-1]-ds.date[0])/ np.timedelta64(1, 'm')
     time=(ds.date-ds.date[0]).values/ np.timedelta64(1, 'm')
     mlt = np.tile(ds.mlt.values,len(ds.lim))
     n_t = len(ds.date)
     n_mlt = len(mlt)
 
     ## Eq boundary model
-    theta_eb = np.deg2rad(90-ds['eqb'].stack(z=('lim','mlt')).values)
+    theta_eb = np.deg2rad(90-ds['eb'].stack(z=('lim','mlt')).values)
 
     # Temporal knots
     tKnots = np.arange(0,duration+tKnotSep,tKnotSep)
@@ -284,7 +285,7 @@ def boundarymodel_F(ds,**kwargs):
     for i in range(len(mlt_eval)):
         phi = np.deg2rad(15*mlt_eval[i])
         terms=[1]
-        for tt in range(1,n_termsE): terms.extend([np.cos(tt*phi),np.sin(tt*phi)])
+        for tt in range(1,n_terms_eb): terms.extend([np.cos(tt*phi),np.sin(tt*phi)])
         G.append(terms)
     G = np.array(G)
     n_G = np.shape(G)[1]
@@ -315,7 +316,7 @@ def boundarymodel_F(ds,**kwargs):
     for i in range(len(mlt_eval)):
         phi = np.deg2rad(15*mlt_eval[i])
         terms=[0]
-        for tt in range(1,n_termsE): terms.extend([-tt*np.sin(tt*phi),tt*np.cos(tt*phi)])
+        for tt in range(1,n_terms_eb): terms.extend([-tt*np.sin(tt*phi),tt*np.cos(tt*phi)])
         G_dphi.append(terms)
     G_dphi = np.array(G_dphi)
     dtau_dphi_eb = []
@@ -331,17 +332,15 @@ def boundarymodel_F(ds,**kwargs):
     # Boundary velocity
     u_phi = R_I*np.sin(tau_eb)*dphi_dt/60
     u_theta = R_I*dtheta_dt/60
-
-    ## FLUX INSIDE EB
     
-    # TOTAL FLUX
+    # Total flux inside EB
     dT = (mu0*M_E)/(4*np.pi*R_I) * (np.sin(tau_eb)**2)
     dT_dt = (mu0*M_E)/(4*np.pi*R_I) * np.sin(2*tau_eb)*dtau_dt_eb/60
 
     ## Poleward boundary model
-    theta_pb = np.deg2rad(90 - ds['ocb'].stack(z=('lim','mlt')).values)
+    theta_pb = np.deg2rad(90 - ds['pb'].stack(z=('lim','mlt')).values)
 
-    theta_pb1 = theta_pb/tau_eb[::10]
+    theta_pb1 = theta_pb/mtau
 
     # Temporal design matix
     M = BSpline(tKnots, np.eye(n_cp), tOrder)(time)
@@ -386,7 +385,6 @@ def boundarymodel_F(ds,**kwargs):
     m = None
     iteration = 0
     while (diff > stop)&(iteration<max_iter):
-        print('Iteration:',iteration)
         ms = np.linalg.inv((G_s[ind,:]*w[:,None]).T@(G_s[ind,:]*w[:,None])+R)@(G_s[ind,:]*w[:,None]).T@(d_s[ind]*w)
         ms = ms.reshape((n_G, n_cp)).T
 
@@ -403,9 +401,7 @@ def boundarymodel_F(ds,**kwargs):
         weights = 1.5*rmse/np.abs(residuals)
         weights[weights > 1] = 1.
         w = weights
-        if m is not None:
-            diff = np.sqrt(np.mean((mNew - m)**2))/(1+np.sqrt(np.mean(mNew**2)))
-            print('Relative change model norm', diff)
+        if m is not None: diff = np.sqrt(np.mean((mNew - m)**2))/(1+np.sqrt(np.mean(mNew**2)))
 
         m = mNew
         iteration += 1
@@ -415,7 +411,7 @@ def boundarymodel_F(ds,**kwargs):
     for i in range(len(mlt_eval)):
         phi = np.deg2rad(15*mlt_eval[i])
         terms=[1]
-        for tt in range(1,n_termsP): terms.extend([np.cos(tt*phi),np.sin(tt*phi)])
+        for tt in range(1,n_terms_pb): terms.extend([np.cos(tt*phi),np.sin(tt*phi)])
         G.append(terms)
     G = np.array(G)
     n_G = np.shape(G)[1]
@@ -451,7 +447,7 @@ def boundarymodel_F(ds,**kwargs):
     for i in range(len(mlt_eval)):
         phi = np.deg2rad(15*mlt_eval[i])
         terms=[0]
-        for tt in range(1,n_termsP): terms.extend([-tt*np.sin(tt*phi),tt*np.cos(tt*phi)])
+        for tt in range(1,n_terms_pb): terms.extend([-tt*np.sin(tt*phi),tt*np.cos(tt*phi)])
         G_dt.append(terms)
     G_dt = np.array(G_dt)
     dtau2_dphi = []
