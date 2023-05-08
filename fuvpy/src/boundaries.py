@@ -150,7 +150,7 @@ def detect_boundaries(imgs,**kwargs):
     ds['eb'].attrs = {'long_name': 'Equatorward boundary','unit':'deg'}
     return ds
 
-def boundarymodel_F(ds,stop=1e-3,dampingValE=2e0,dampingValP=2e1,n_termsE=3,n_termsP=6,order = 3,knotSep = 10):
+def boundarymodel_F(ds,**kwargs):
     '''
     Function to make a spatiotemporal Fourier model of auroral boundaries.
 
@@ -181,6 +181,23 @@ def boundarymodel_F(ds,stop=1e-3,dampingValE=2e0,dampingValP=2e1,n_termsE=3,n_te
         Dataset with model boundaries.
     '''
 
+    # Set keyword arguments to input or default values
+    stop = kwargs.pop('stop') if 'stop' in kwargs.keys() else 1e-3
+    tLeb = kwargs.pop('tLeb') if 'tLeb' in kwargs.keys() else 0
+    tLpb = kwargs.pop('tLpb') if 'tLpb' in kwargs.keys() else 0
+    tOrder = kwargs.pop('tOrder') if 'tOrder' in kwargs.keys() else 3
+    tKnotSep = kwargs.pop('tKnotSep') if 'tKnotSep' in kwargs.keys() else 10
+    n_terms_eb = kwargs.pop('n_terms_eb') if 'n_terms_eb' in kwargs.keys() else 3
+    n_terms_pb = kwargs.pop('n_terms_pb') if 'n_terms_pb' in kwargs.keys() else 6
+    max_iter = kwargs.pop('max_iter') if 'max_iter' in kwargs.keys() else 50
+
+    # Constants
+    mu0 = 4e-7*np.pi # Vacuum magnetic permeability
+    M_E = 8.05e22 # Earth's magnetic dipole moment
+    R_E = 6371e3 # Earth radii
+    height = 130e3
+    R_I = R_E + height # Radius of ionosphere  
+
     time=(ds.date-ds.date[0]).values/ np.timedelta64(1, 'm')
     mlt = np.tile(ds.mlt.values,len(ds.lim))
     n_t = len(ds.date)
@@ -190,24 +207,21 @@ def boundarymodel_F(ds,stop=1e-3,dampingValE=2e0,dampingValP=2e1,n_termsE=3,n_te
     theta_eb = np.deg2rad(90-ds['eqb'].stack(z=('lim','mlt')).values)
 
     # Temporal knots
-    if knotSep==None:
-        knots = np.linspace(time[0], time[-1], 2)
-    else:
-        knots = np.linspace(time[0], time[-1], int(np.round(time[-1]/knotSep)+1))
-    knots = np.r_[np.repeat(knots[0],order),knots, np.repeat(knots[-1],order)]
+    tKnots = np.arange(0,duration+tKnotSep,tKnotSep)
+    tKnots = np.r_[np.repeat(tKnots[0],tOrder),tKnots, np.repeat(tKnots[-1],tOrder)]
 
     # Number of control points
-    n_cp = len(knots)-order-1
+    n_cp = len(tKnots)-tOrder-1
 
     # Temporal design matix
-    M = BSpline(knots, np.eye(n_cp), order)(time)
+    M = BSpline(tKnots, np.eye(n_cp), tOrder)(time)
 
     # Data kernel
     G=[]
     for i in range(n_mlt):
         phi = np.deg2rad(15*mlt[i])
         terms=[1]
-        for tt in range(1,n_termsE): terms.extend([np.cos(tt*phi),np.sin(tt*phi)])
+        for tt in range(1,n_terms_eb): terms.extend([np.cos(tt*phi),np.sin(tt*phi)])
         G.append(terms)
     G = np.array(G)
     n_G = np.shape(G)[1]
@@ -234,14 +248,14 @@ def boundarymodel_F(ds,stop=1e-3,dampingValE=2e0,dampingValP=2e1,n_termsE=3,n_te
     L = np.hstack((-np.identity(n_cp-1),np.zeros((n_cp-1,1))))+np.hstack((np.zeros((n_cp-1,1)),np.identity(n_cp-1)))
     LTL = np.zeros((n_cp*n_G,n_cp*n_G))
     for i in range(n_G): LTL[i*n_cp:(i+1)*n_cp,i*n_cp:(i+1)*n_cp] = L.T@L
-    R = dampingValE*LTL + np.diag(damping)
+    R = tLeb*LTL + np.diag(damping)
     
     # Iteratively estimation of model parameters
     diff = 10000
     w = np.ones(d_s[ind].shape)
     m = None
     iteration = 0
-    while (diff > stop)&(iteration<100):
+    while (diff > stop)&(iteration<max_iter):
         ms = np.linalg.inv((G_s[ind,:]*w[:,None]).T@(G_s[ind,:]*w[:,None])+R)@(G_s[ind,:]*w[:,None]).T@(d_s[ind]*w)
         ms = ms.reshape((n_G, n_cp)).T
 
@@ -283,12 +297,12 @@ def boundarymodel_F(ds,stop=1e-3,dampingValE=2e0,dampingValP=2e1,n_termsE=3,n_te
     ## DERIVATIVE
 
     # df/dt 
-    dt =(knots[order+1:-1]-knots[1:-order-1])
-    dms_dt = (ms[1:,:] - ms[:-1,:]) * order / dt[:,None]
-    knots_dt=knots[1:-1]
-    n_cp_dt=len(knots_dt)-(order-1)-1
+    dt =(tKnots[tOrder+1:-1]-tKnots[1:-tOrder-1])
+    dms_dt = (ms[1:,:] - ms[:-1,:]) * tOrder / dt[:,None]
+    knots_dt=tKnots[1:-1]
+    n_cp_dt=len(knots_dt)-(tOrder-1)-1
 
-    M_dt = BSpline(knots_dt, np.eye(n_cp_dt), order-1)(time)
+    M_dt = BSpline(knots_dt, np.eye(n_cp_dt), tOrder-1)(time)
     dm_dt      = M_dt@dms_dt
 
     dtau_dt_eb=[]
@@ -318,21 +332,26 @@ def boundarymodel_F(ds,stop=1e-3,dampingValE=2e0,dampingValP=2e1,n_termsE=3,n_te
     u_phi = R_I*np.sin(tau_eb)*dphi_dt/60
     u_theta = R_I*dtheta_dt/60
 
+    ## FLUX INSIDE EB
+    
+    # TOTAL FLUX
+    dT = (mu0*M_E)/(4*np.pi*R_I) * (np.sin(tau_eb)**2)
+    dT_dt = (mu0*M_E)/(4*np.pi*R_I) * np.sin(2*tau_eb)*dtau_dt_eb/60
 
-    #%% Poleward boundary model
+    ## Poleward boundary model
     theta_pb = np.deg2rad(90 - ds['ocb'].stack(z=('lim','mlt')).values)
 
     theta_pb1 = theta_pb/tau_eb[::10]
 
     # Temporal design matix
-    M = BSpline(knots, np.eye(n_cp), order)(time)
+    M = BSpline(tKnots, np.eye(n_cp), tOrder)(time)
 
     # Data kernel
     G=[]
     for i in range(n_mlt):
         phi = np.deg2rad(15*mlt[i])
         terms=[1]
-        for tt in range(1,n_termsP): terms.extend([np.cos(tt*phi),np.sin(tt*phi)])
+        for tt in range(1,n_terms_pb): terms.extend([np.cos(tt*phi),np.sin(tt*phi)])
         G.append(terms)
     G = np.array(G)
     n_G = np.shape(G)[1]
@@ -359,14 +378,14 @@ def boundarymodel_F(ds,stop=1e-3,dampingValE=2e0,dampingValP=2e1,n_termsE=3,n_te
     L = np.hstack((-np.identity(n_cp-1),np.zeros((n_cp-1,1))))+np.hstack((np.zeros((n_cp-1,1)),np.identity(n_cp-1)))
     LTL = np.zeros((n_cp*n_G,n_cp*n_G))
     for i in range(n_G): LTL[i*n_cp:(i+1)*n_cp,i*n_cp:(i+1)*n_cp] = L.T@L
-    R = dampingValP*LTL+np.diag(damping)
+    R = tLpb*LTL+np.diag(damping)
 
     # Iteratively solve the full inverse problem
     diff = 10000
     w = np.ones(d_s[ind].shape)
     m = None
     iteration = 0
-    while (diff > stop)&(iteration<100):
+    while (diff > stop)&(iteration<max_iter):
         print('Iteration:',iteration)
         ms = np.linalg.inv((G_s[ind,:]*w[:,None]).T@(G_s[ind,:]*w[:,None])+R)@(G_s[ind,:]*w[:,None]).T@(d_s[ind]*w)
         ms = ms.reshape((n_G, n_cp)).T
@@ -413,13 +432,13 @@ def boundarymodel_F(ds,stop=1e-3,dampingValE=2e0,dampingValP=2e1,n_termsE=3,n_te
 
 
     # df/dt in double primed space
-    dt =(knots[order+1:-1]-knots[1:-order-1])
-    dms_dt = (ms[1:,:] - ms[:-1,:]) * order / dt[:,None]
-    knots_dt=knots[1:-1]
-    n_cp_dt=len(knots_dt)-(order-1)-1
+    dt =(tKnots[tOrder+1:-1]-tKnots[1:-tOrder-1])
+    dms_dt = (ms[1:,:] - ms[:-1,:]) * tOrder / dt[:,None]
+    knots_dt=tKnots[1:-1]
+    n_cp_dt=len(knots_dt)-(tOrder-1)-1
 
     # Temporal design matix
-    M = BSpline(knots_dt, np.eye(n_cp_dt), order-1)(time)
+    M = BSpline(knots_dt, np.eye(n_cp_dt), tOrder-1)(time)
     dm_dt = M_dt@dms_dt
 
     dtau2_dt=[]
@@ -455,6 +474,44 @@ def boundarymodel_F(ds,stop=1e-3,dampingValE=2e0,dampingValP=2e1,n_termsE=3,n_te
     # Boundary velocity
     v_phi = R_I*np.sin(tau_pb)*dphi_dt/60
     v_theta = R_I*dtheta_dt/60
+
+    # FLUX
+    dP = (mu0*M_E)/(4*np.pi*R_I) * (np.sin(tau_pb)**2)
+    dP_dt = (mu0*M_E)/(4*np.pi*R_I) * np.sin(2*tau_pb)*dtau_dt/60
+
+    # Make Dataset with modelled boundary locations and velocities
+    ds2 = xr.Dataset(
+    data_vars=dict(
+        pb=(['date','mlt'], 90-np.rad2deg(tau_pb)),
+        eb=(['date','mlt'], 90-np.rad2deg(tau_eb)),
+        ve_pb=(['date','mlt'], v_phi),
+        vn_pb=(['date','mlt'], -v_theta),
+        ve_eb=(['date','mlt'], u_phi),
+        vn_eb=(['date','mlt'], -u_theta),
+        dP=(['date','mlt'], dP),
+        dA=(['date','mlt'], dT-dP),
+        dP_dt=(['date','mlt'], dP_dt),
+        dA_dt=(['date','mlt'], dT_dt-dP_dt),
+        ),
+    coords=dict(
+        date = ds.date,
+        mlt = mlt_eval
+    ),
+    )
+
+    # Add attributes
+    ds2['mlt'].attrs = {'long_name': 'Magnetic local time','unit':'hrs'}
+    ds2['pb'].attrs = {'long_name': 'Poleward boundary','unit':'deg'}
+    ds2['eb'].attrs = {'long_name': 'Equatorward boundary','unit':'deg'}
+    ds2['ve_pb'].attrs = {'long_name': '$V_E^{pb}$','unit':'m/s'}
+    ds2['vn_pb'].attrs = {'long_name': '$V_N^{pb}$','unit':'m/s'}
+    ds2['ve_eb'].attrs = {'long_name': '$V_E^{eb}$','unit':'m/s'}
+    ds2['vn_eb'].attrs = {'long_name': '$V_N^{eb}$','unit':'m/s'}
+    ds2['dP'].attrs = {'long_name': 'Polar cap flux','unit':'Wb/rad'}
+    ds2['dP_dt'].attrs = {'long_name': 'Change polar cap flux','unit':'V/rad'}
+    ds2['dA'].attrs = {'long_name': 'Auroral flux','unit':'Wb/rad'}
+    ds2['dA_dt'].attrs = {'long_name': 'Change auroral flux','unit':'V/rad'}
+    return ds2
 
 
     # Make Dataset with modelled boundary locations and velocities
