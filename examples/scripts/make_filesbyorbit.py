@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 import fuvpy as fuv
+from polplot import pp
 
 import matplotlib.path as mplpath
 import matplotlib.pyplot as plt
@@ -44,26 +45,36 @@ def make_wicfiles(orbit,path):
     df = df.set_index(['date','orbit_number'])
     return df
 
-def background_removal(orbits):
-    orbitpath = '/Home/siv24/aoh013/python/image_analysis/'
-    wicpath = '/mnt/0b3b8cce-3469-42cb-b694-60a7ca36e03a/IMAGE_FUV/wic/'
-    outpath = '/mnt/5fa6bccc-fa9d-4efc-9ddc-756f65699a0a/aohma/fuv/wic/'
+def background_removal(orbits,orbitpath,wicpath,outpath):
+    '''
+    Background removal per orbit
+    
+    orbits (list) : Orbit numbers
+    orbitpath (str) : Path to hdf with orbit info
+    wicpath (str) : Path to wic image files
+    outpath (str) : Path to save the corrected images per orbit
+    '''
 
     for orbit in orbits:
         files = pd.read_hdf(orbitpath+'wicfiles.h5',where='orbit_number=="{}"'.format(orbit))
         files['path']=wicpath
 
         try:
-            wic = fuv.readImg((files['path']+files['wicfile']).tolist(),dzalim=75) # Load
+            wic = fuv.read_idl((files['path']+files['wicfile']).tolist(),dzalim=75) # Load
             wic = wic.sel(date=wic.hemisphere.date[wic.hemisphere=='north']) # Remove SH
-            wic = fuv.makeBSmodel(wic,sKnots=[-3.5,-0.25,0,0.25,1.5,3.5],stop=0.01,n_tKnots=5,tukeyVal=5,dampingVal=1e-3)
-            wic = fuv.makeSHmodel(wic,4,4,n_tKnots=5,stop=0.01,tukeyVal=5,dampingVal=1e-4)
+            wic = fuv.backgroundmodel_BS(wic,sKnots=[-3.5,-0.25,0,0.25,1.5,3.5],stop=0.01,n_tKnots=5,tukeyVal=5,dampingVal=1e-3)
+            wic = fuv.backgroundmodel_SH(wic,4,4,n_tKnots=5,stop=0.01,tukeyVal=5,dampingVal=1e-4)
             wic.to_netcdf(outpath+'wic_or'+str(orbit).zfill(4)+'.nc')
         except Exception as e: print(e)
 
-def initial_boundaries(orbits):
-    inpath = '/mnt/5fa6bccc-fa9d-4efc-9ddc-756f65699a0a/aohma/fuv/wic/'
-    outpath = '/mnt/5fa6bccc-fa9d-4efc-9ddc-756f65699a0a/aohma/fuv/boundaries/'
+def initial_boundaries(orbits,inpath,outpath):
+    '''
+    Initial boundary detection
+
+    orbits (list) : Orbit numbers
+    inpath (str) : Path to corrected images
+    outpath (str) : Path to save identified boundaries
+    '''
 
     for orbit in orbits:
         try:
@@ -76,6 +87,14 @@ def initial_boundaries(orbits):
         except Exception as e: print(e)
 
 def dataCoverage(imgs,dzalim=75):
+    '''
+    Determine if image(s) has global coverage
+    imgs (xr.Dataset) : Images
+    dzalim (float) : Max viewing angle to be considered
+
+    return (array) : Bool
+    '''
+
     lt = np.arange(0.5,24)
     lat = 90-(30+10*np.cos(np.pi*lt/12))
 
@@ -89,6 +108,15 @@ def dataCoverage(imgs,dzalim=75):
     return np.array(isglobal)
 
 def calcRMSE(wic,bm):
+    '''
+    Calculate intensity inside and outside modelled aurora
+
+    wic (xr.Dataset) : images
+    bm (pd.DataFrame) : boundaries
+
+    return bm with new columns
+    '''
+
     bm=bm.reset_index().set_index('date')
     wic['shimg'].attrs = {'long_name': 'Counts', 'units': ''}
 
@@ -145,10 +173,14 @@ def calcRMSE(wic,bm):
 
     return bm
 
-def final_bondaries(orbits):
-    wicpath = '/mnt/5fa6bccc-fa9d-4efc-9ddc-756f65699a0a/aohma/fuv/wic/'
-    bpath = '/mnt/5fa6bccc-fa9d-4efc-9ddc-756f65699a0a/aohma/fuv/boundaries/'
-
+def final_bondaries(orbits,wicpath,bpath):
+    '''
+    Final boundary detection
+    
+    orbits (list) : Orbit numbers
+    wicpath (str) : Path to corrected images
+    bpath (str) : Path to save model boundaries
+    '''
 
     for orbit in orbits:
         try:
@@ -158,7 +190,7 @@ def final_bondaries(orbits):
             # Only images with identified initial boundaries
             imgs = imgs.sel(date=bi.reset_index().date.unique())
 
-            bm = fuv.makeBoundaryModelBStest(bi,tKnotSep=5,tLeb=1e-1,sLeb=1e-3,tLpb=1e-1,sLpb=1e-3,resample=False)
+            bm = fuv.boundarymodel_BS(bi,tKnotSep=5,tLeb=1e-1,sLeb=1e-3,tLpb=1e-1,sLpb=1e-3,resample=False)
             isglobal = dataCoverage(imgs,dzalim=65)
             bm['isglobal'] = ('date',isglobal)
 
@@ -168,10 +200,14 @@ def final_bondaries(orbits):
             bm[['pb','eb','v_phi','v_theta','u_phi','u_theta','isglobal','orbit','rmse_in','rmse_out']].to_hdf(bpath+'final_boundaries.h5','final',format='table',append=True,data_columns=True)
         except Exception as e: print(e)
         
-def final_bondaries_error(orbits):
-    wicpath = '/mnt/5fa6bccc-fa9d-4efc-9ddc-756f65699a0a/aohma/fuv/wic/'
-    bpath = '/mnt/5fa6bccc-fa9d-4efc-9ddc-756f65699a0a/aohma/fuv/boundaries/'
-
+def final_bondaries_error(orbits,wicpath,bpath):
+    '''
+    Final boundary detection with uncertainty
+    
+    orbits (list) : Orbit numbers
+    wicpath (str) : Path to corrected images
+    bpath (str) : Path to save model boundaries
+    '''
 
     for orbit in orbits:
         try:
@@ -183,13 +219,13 @@ def final_bondaries_error(orbits):
 
             bms = []    
             for l in np.arange(50,201,5):
-                bm = fuv.makeBoundaryModelBStest(bi.to_xarray().sel(lim=l).to_dataframe(),tKnotSep=5,tLeb=1e-1,sLeb=1e-2,tLpb=1e-1,sLpb=1e-2)
+                bm = fuv.boundarymodel_BS(bi.to_xarray().sel(lim=l).to_dataframe(),tKnotSep=5,tLeb=1e-1,sLeb=1e-2,tLpb=1e-1,sLpb=1e-2)
                 bm = bm.expand_dims(lim=[l])
                 bms.append(bm)
             
             bms = xr.concat(bms,dim='lim')
 
-            bm = fuv.makeBoundaryModelBStest(bi,tKnotSep=10,tLeb=1e0,sLeb=0,tLpb=1e0,sLpb=0)
+            bm = fuv.boundarymodel_BS(bi,tKnotSep=10,tLeb=1e0,sLeb=0,tLpb=1e0,sLpb=0)
             keys = list(bm.keys())
             for key in keys:
                 bm[key+'_err'] = bms[key].std(dim='lim')
@@ -203,10 +239,16 @@ def final_bondaries_error(orbits):
             bm[['pb','eb','pb_err','eb_err','ve_pb','vn_pb','ve_eb','vn_eb','dP','dA','dP_dt','dA_dt','isglobal','orbit','rmse_in','rmse_out']].to_hdf(bpath+'final_boundaries.h5','final',format='table',append=True,data_columns=True)
         except Exception as e: print(e)
 
-def makeGIFs(orbits):
-    wicpath = '/mnt/5fa6bccc-fa9d-4efc-9ddc-756f65699a0a/aohma/fuv/wic/'
-    bpath = '/mnt/5fa6bccc-fa9d-4efc-9ddc-756f65699a0a/aohma/fuv/boundaries/'
-    outpath = '/mnt/5fa6bccc-fa9d-4efc-9ddc-756f65699a0a/aohma/fuv/fig/'
+def makeGIFs(orbits,wicpath,bpath,outpath):
+    '''
+    Make GIF of each orbit
+    
+    orbits (list) : Orbit numbers
+    wicpath (str) : Path to corrected images
+    bpath (str) : Path to model boundaries
+    outpath (str) : PAth to save the GIFs
+    '''
+
     minlat = 50
 
 
@@ -222,10 +264,9 @@ def makeGIFs(orbits):
 
             fig,ax = plt.subplots(figsize=(5,5))
             ax.axis('off')
-            pax = fuv.pp(ax,minlat=minlat)
 
             for i,t in enumerate(wic.date):
-                pax = fuv.pp(ax,minlat=minlat)
+                pax = pp(ax,minlat=minlat)
                 ax.set_title('Orbit: '+str(orbit).zfill(4)+'   '+t.dt.strftime('%Y-%m-%d').values.tolist()+' '+t.dt.strftime('%H:%M:%S').values.tolist())
 
                 pax.scatter(wic.sel(date=t)['mlat'].values,wic.sel(date=t)['mlt'].values,c=wic.sel(date=t)['shimg'].values,s=2,alpha=0.5,vmin=0,vmax=500,cmap='Greens')
@@ -256,7 +297,6 @@ def makeGIFs(orbits):
 
             plt.close()
             os.system('convert '+outpath+'temp/wic*.png '+outpath+'imgs_or'+str(orbit).zfill(4)+'.gif')
-            # os.system('convert '+ospath+'fig/temp/binary*.png '+ospath+'fig/oval_'+e+'.gif')
             os.system('rm '+outpath+'temp/*.png')
         except Exception as e: print(e)
 
