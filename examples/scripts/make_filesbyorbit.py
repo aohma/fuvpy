@@ -203,7 +203,7 @@ def final_bondaries(orbits,wicpath,bpath):
 def final_bondaries_error(orbits,wicpath,bpath):
     '''
     Final boundary detection with uncertainty
-    
+
     orbits (list) : Orbit numbers
     wicpath (str) : Path to corrected images
     bpath (str) : Path to save model boundaries
