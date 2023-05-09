@@ -566,7 +566,7 @@ def boundarymodel_BS(ds,**kwargs):
     sOrder : int, optinal
         Order of the spatial B-spline. Default is 3
     sKnots_eb,sKnots_pb, optional
-        Locations of the spatial knots.
+        Locations of the spatial knot's.
     max_iter : int, optional
         Maximum number of iterations for the model to converge. Default is 50
     resample : bool, optional
@@ -594,7 +594,7 @@ def boundarymodel_BS(ds,**kwargs):
     
     for key in kwargs: print(f'Warning: {key} is not a valid keyword argument')
     
-    # Constants
+    1# Constants
     mu0 = 4e-7*np.pi # Vacuum magnetic permeability
     M_E = 8.05e22 # Earth's magnetic dipole moment
     R_E = 6371e3 # Earth radii
