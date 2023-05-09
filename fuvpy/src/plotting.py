@@ -16,7 +16,7 @@ from matplotlib.collections import PolyCollection
 
 from polplot import pp
     
-def getIMAGEcmap():
+def cmap_IMAGE():
     """
     Make IMAGE color scale
     Return a LinearSegmentedColormap
@@ -52,17 +52,18 @@ def getIMAGEcmap():
 
     return mcolors.LinearSegmentedColormap('CustomMap', cdict)
 
-def plotBSmodel(img,pathOutput=None):
+def plot_backgroundmodel_BS(img,**kwargs):
     '''
-    Visualize the B-spline model for one image.
-    Ex: plotBSmodel(imgs.isel(date=15))
+    Visualize the B-spline background model for one image.
+    Ex: plot_backgroundmodel_BS(imgs.isel(date=15))
 
     Parameters
     ----------
     img : xarray.Dataset
         Dataset with the FUV image.
-    pathOutput : str, optional
+    outpath : str, optional
         Path to save the figure. The default is None. 
+
     Returns
     -------
     None.
@@ -71,6 +72,8 @@ def plotBSmodel(img,pathOutput=None):
     # Check the number of time steps provided
     n_date = img.dims['date'] if 'date' in img.dims else 1
     if n_date != 1: raise ValueError('Only data from a single time step can be provided')
+
+    outpath = kwargs.pop('outpath') if 'outpath' in kwargs.keys() else None
 
     sza = img['sza'].values.flatten()
     dza = img['dza'].values.flatten()
@@ -150,14 +153,16 @@ def plotBSmodel(img,pathOutput=None):
     ax4.set_title('Corrected image')
 
     gs.tight_layout(fig)
-    if pathOutput is not None:
+
+    # Save figure
+    if outpath is not None:
         filename = img['date'].dt.strftime('%Y%m%d%H%M%S').values.tolist()
-        plt.savefig(pathOutput + str(img['id'].values)+filename + '_dayglowModel.png', bbox_inches='tight', dpi = 100)
+        plt.savefig(outpath + str(img['id'].values)+filename + '_dayglowModel.png', bbox_inches='tight', dpi = 100)
         plt.clf()
         plt.close(fig)
 
 
-def plotimg(img,inImg='img',pax=None,crange = None, bgcolor = None, **kwargs):
+def plotimg(img, inImg, **kwargs):
     '''
     Show a FUV image in polar coordinates coordinates.
     Wrapper to polplot's plotimg
@@ -167,8 +172,8 @@ def plotimg(img,inImg='img',pax=None,crange = None, bgcolor = None, **kwargs):
     img : xarray.Dataset
         Image dataset.
     inImg : str
-        Name of the image to be show. Default is 'image'.
-    pax : plt.axis object, optional
+        Name of the image to be show.
+    pax : Polarplot object, optional
         pax to show the image. The default is None (new figure).
     crange : tuple/list, optional
         Color range, given as (lower,upper). The default is None (matplotlib default).
@@ -181,17 +186,19 @@ def plotimg(img,inImg='img',pax=None,crange = None, bgcolor = None, **kwargs):
     coll
         The displayed Polycollection.
     '''
-    if pax is None:
-        fig, ax = plt.subplots()
-        pax = pp(ax)
 
-    mlat = img['mlat'].values.copy()
-    mlt = img['mlt'].values.copy()
-    image = img[inImg].values.copy()
-    coll = pax.plotimg(mlat,mlt,image,crange=crange,bgcolor=bgcolor,**kwargs)
-    return coll
+    # Check the number of time steps provided
+    n_date = img.dims['date'] if 'date' in img.dims else 1
+    if n_date != 1: raise ValueError('Only data from a single time step can be provided')
 
-def pplot(imgs,inImg,col_wrap = None,tb=False,add_cbar = True,crange=None,robust=False,cbar_kwargs={},pp_kwargs={},**kwargs):
+    # Set keyword arguments to input or default values    
+    pax = kwargs.pop('pax') if 'pax' in kwargs.keys() else pp(plt.subplots()[1])
+    crange = kwargs.pop('crange') if 'crange' in kwargs.keys() else None
+    bgcolor = kwargs.pop('bgcolor') if 'bgcolor' in kwargs.keys() else None
+
+    return pax.plotimg(img['mlat'].values,img['mlt'].values,img[inImg].values,crange=crange,bgcolor=bgcolor,**kwargs)
+
+def pplot(imgs,inImg,**kwargs):
     '''
     Show images/data in polar coordinates coordinates.
     The images are by default plotted size-byside.
@@ -220,13 +227,22 @@ def pplot(imgs,inImg,col_wrap = None,tb=False,add_cbar = True,crange=None,robust
         (see :meth:`matplotlib:matplotlib.figure.Figure.colorbar`).
     pp_kwargs : dict, optional
         Dictionary of keyword arguments to pass to pp
-    **kwargs :
+    **kwargs : additional keyword arguments
         kwargs to Polycollection().
     Returns
     -------
     None.
     '''
     n_imgs = len(imgs.date)
+
+    # Set keyword arguments to input or default values
+    col_wrap = kwargs.pop('col_wrap') if 'col_wrap' in kwargs.keys() else None
+    tb = bool(kwargs.pop('tb')) if 'tb' in kwargs.keys() else False
+    add_cbar = bool(kwargs.pop('add_cbar')) if 'add_cbar' in kwargs.keys() else True
+    crange = kwargs.pop('crange') if 'crange' in kwargs.keys() else None
+    robust = bool(kwargs.pop('robust')) if 'robust' in kwargs.keys() else False
+    cbar_kwargs = kwargs.pop('cbar_kwargs') if 'cbar_kwargs' in kwargs.keys() else {}
+    pp_kwargs = kwargs.pop('pp_kwargs') if 'pp_kwargs' in kwargs.keys() else {}
 
     # Set minlat
     if 'minlat' in pp_kwargs:
@@ -325,21 +341,21 @@ def pplot(imgs,inImg,col_wrap = None,tb=False,add_cbar = True,crange=None,robust
         else:
             cbar.set_label(inImg)
 
-def plotimgProj(img,inImg='img',ax=None,mltLeft=18.,mltRight=6, minlat=50,maxlat=80,crange=None, **kwargs):
+def plot_ltlat(img,inImg,**kwargs):
     '''
     Show a section of a FUV image projected in mlt-mlat coordinates
-    Ex: plotimgProj(.isel(date=15),'img',crange=(0,1500),cmap='plasma')
+    Ex: plot_ltlat(.isel(date=15),'img',crange=(0,1500),cmap='plasma')
     Parameters
     ----------
     img : xarray.Dataset
         Image dataset.
     inImg : str
-        Name of the image to be show. Default is 'image'.
+        Name of the image to be show.
     ax : plt.axis object, optional
         ax to show the image. The default is None (new figure).
-    mltLeft : float, optional
+    leftlt : float, optional
         Left ("lower") MLT limit. The default is 18.
-    mltRight : float, optional
+    rightlt : float, optional
         Right ("Upper") MLT limit. The default is 6.
     minlat : float, optional
         Minimum latitude. The default is 50.
@@ -347,7 +363,7 @@ def plotimgProj(img,inImg='img',ax=None,mltLeft=18.,mltRight=6, minlat=50,maxlat
         Maximum latitude. The default is 80.
     crange : tuple/list, optional
         Color range, given as (lower,upper). The default is None (matplotlib default).
-    **kwargs :
+    **kwargs : additional keyword arguments
         kwargs to Polycollection().
     Returns
     -------
@@ -355,14 +371,19 @@ def plotimgProj(img,inImg='img',ax=None,mltLeft=18.,mltRight=6, minlat=50,maxlat
         The displayed Polycollection
     '''
 
-    if ax is None: fig, ax = plt.subplots()
+    ax = kwargs.pop('ax') if 'ax' in kwargs.keys() else plt.subplots()[1]
+    leftlt = kwargs.pop('leftlt') if 'leftlt' in kwargs.keys() else 18
+    rightlt = kwargs.pop('rightlt') if 'rightlt' in kwargs.keys() else 6
+    minlat = kwargs.pop('minlat') if 'minlat' in kwargs.keys() else 50
+    maxlat = kwargs.pop('maxlat') if 'maxlat' in kwargs.keys() else 80
+    crange = kwargs.pop('crange') if 'crange' in kwargs.keys() else None
 
     mlat = img['mlat'].values.copy()
     mlt =img['mlt'].values.copy()
-    mltRight=mltRight+0.2
-    mlt[mlt>mltRight]=mlt[mlt>mltRight]-24
+    rightlt=rightlt+0.2
+    mlt[mlt>rightlt]=mlt[mlt>rightlt]-24
 
-    if mltLeft>mltRight: mltLeft=mltLeft-24
+    if leftlt>rightlt:  leftlt= leftlt-24
 
     ll = mlt[1:,  :-1].flatten(), mlat[1:,  :-1].flatten()
     lr = mlt[1:,   1:].flatten(), mlat[1:,   1:].flatten()
@@ -374,7 +395,7 @@ def plotimgProj(img,inImg='img',ax=None,mltLeft=18.,mltRight=6, minlat=50,maxlat
 
     ii_neg = (vertsx<-5).any(axis=1)
     ii_pos = (vertsx>5).any(axis=1)
-    iii = np.where(vertsx >= mltLeft, True, False)&np.where(vertsx <= mltRight, True, False)&np.where(vertsy >= minlat, True, False)&np.where(vertsy <= maxlat, True, False)
+    iii = np.where(vertsx >= leftlt, True, False)&np.where(vertsx <= rightlt, True, False)&np.where(vertsy >= minlat, True, False)&np.where(vertsy <= maxlat, True, False)
     iii = (np.any(iii, axis = 1)&(ii_neg&ii_pos==False)).nonzero()[0]
 
     vertsx = vertsx[iii]
@@ -392,10 +413,10 @@ def plotimgProj(img,inImg='img',ax=None,mltLeft=18.,mltRight=6, minlat=50,maxlat
     if crange is not None: coll.set_clim(crange[0], crange[1])
     ax.add_collection(coll)
 
-    mltRight = mltRight - 0.2
-    ax.set_xlim([mltLeft,mltRight])
+    rightlt = rightlt - 0.2
+    ax.set_xlim([leftlt,rightlt])
     ax.set_ylim([minlat,maxlat])
-    xlabel = np.linspace(mltLeft,mltRight,len(ax.get_xticklabels()))
+    xlabel = np.linspace(leftlt,rightlt,len(ax.get_xticklabels()))
     xlabel[xlabel<0] = xlabel[xlabel<0]+24
     if (xlabel[xlabel!=0]%xlabel[xlabel!=0].astype(int)==0).all():
         ax.set_xticklabels(xlabel.astype(int))
@@ -404,7 +425,7 @@ def plotimgProj(img,inImg='img',ax=None,mltLeft=18.,mltRight=6, minlat=50,maxlat
 
     return coll
 
-def ppBoundaries(ds,boundary='ocb',pax=None):
+def plotboundaries(ds,boundary,**kwargs):
     '''
     Polar plot showing the temporal evolution of the OCB.
     Parameters
@@ -412,15 +433,26 @@ def ppBoundaries(ds,boundary='ocb',pax=None):
     ds : xarray.Dataset
         Dataset with boundaries identified.
         The coordinates must be mlt and date
-    boundary : str, optional
-        Name of the boundary in ds. Default is 'ocb'
+    boundary : str
+        Name of the boundary in ds.
+    pax : Polarplot object, optional
+        pax to show the image. The default is None (new figure).
+    cmap : str, optional
+        Colormap name. Default is Viridis
+    add_cbar : bool, optional
+        If True (default), a colorbar is added.
+    **kwargs : additional keyword arguments
+        Keywords to pyplot.plot
+
     Returns
     -------
     None
     '''
-    if pax is None:
-        fig,ax = plt.subplots()
-        pax = pp(ax)
+    
+    # Set keyword arguments to input or default values    
+    pax = kwargs.pop('pax') if 'pax' in kwargs.keys() else pp(plt.subplots()[1])
+    cmap = kwargs.pop('cmap') if 'cmap' in kwargs.keys() else 'viridis'
+    add_cbar = bool(kwargs.pop('add_cbar')) if 'add_cbar' in kwargs.keys() else True
 
     # Add first row to end for plotting
     ds = xr.concat([ds,ds.isel(mlt=0)],dim='mlt')
@@ -429,20 +461,19 @@ def ppBoundaries(ds,boundary='ocb',pax=None):
     date = ds.date
     n_d = len(date)
     dateStr = ds.date.dt.strftime('%H:%M:%S').values
-    cmap = plt.get_cmap('jet',n_d)
+    cmap = plt.get_cmap(cmap,n_d)
 
     for d in range(n_d):
-        pax.plot(ds.isel(date=d)[boundary].values,ds.mlt.values,linestyle='-',color=cmap(d))
+        pax.plot(ds.isel(date=d)[boundary].values,ds.mlt.values,color=cmap(d),**kwargs)
 
-
-    norm = mcolors.Normalize(vmin=0,vmax=n_d)
-    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
-    sm.set_array([])
-    cbar = plt.colorbar(sm,ticks=np.arange(0,n_d,1),boundaries=np.arange(-0.5,n_d,1),ax=pax.ax)
-    cbar.ax.tick_params(size=0)
-    cbarlabel = n_d*['']
-    cbarlabel[::n_d//10+1] = dateStr[::n_d//10+1]
-
-
-    cbar.set_ticklabels(cbarlabel)
+    if add_cbar:
+        norm = mcolors.Normalize(vmin=0,vmax=n_d)
+        sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+        sm.set_array([])
+        cbar = plt.colorbar(sm,ticks=np.arange(0,n_d,1),boundaries=np.arange(-0.5,n_d,1),ax=pax.ax)
+        cbar.ax.tick_params(size=0)
+        cbarlabel = n_d*['']
+        cbarlabel[::n_d//10+1] = dateStr[::n_d//10+1]
+        cbar.set_ticklabels(cbarlabel)
+    
     plt.tight_layout()
