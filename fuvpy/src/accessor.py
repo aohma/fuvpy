@@ -1,5 +1,6 @@
 import xarray as xr
 from fuvpy.src.background import backgroundmodel_BS,backgroundmodel_SH
+from fuvpy.src.boundaries import boundarymodel_BS,boundarymodel_F,detect_boundaries
 
 @xr.register_dataset_accessor("fuv")
 
@@ -20,4 +21,13 @@ class FuvAccessor:
         if inplace:
             backgroundmodel_SH(self._obj,Nsh,Msh,inplace=inplace,**kwargs)
         else:
-            return backgroundmodel_SH(self._obj,Nsh,Msh,**kwargs)        
+            return backgroundmodel_SH(self._obj,Nsh,Msh,**kwargs)
+
+    def detect_boundaries(self,**kwargs):
+        return detect_boundaries(self._obj,**kwargs)
+
+    def boundarymodel_BS(self,**kwargs):
+        return boundarymodel_BS(self._obj,**kwargs)
+
+    def boundarymodel_F(self,**kwargs):
+        return boundarymodel_F(self._obj,**kwargs)   
