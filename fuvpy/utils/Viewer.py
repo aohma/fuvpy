@@ -263,10 +263,10 @@ class Visualise():
         if isinstance(file, (str, np.str_)):
             if file.endswith('.idl') or file.endswith('.sav'):
                 if isinstance(date, int):
-                    axis.image_dat= fuv.readImg(file).isel(date = date).rename({in_put:'data', 
+                    axis.image_dat= fuv.read_idl(file).isel(date = date).rename({in_put:'data', 
                                                                              lt_val:'lt', lat_val:'lat'})
                 else:
-                    axis.image_dat= fuv.readImg(file).sel(date = date).rename({in_put:'data', 
+                    axis.image_dat= fuv.read_idl(file).sel(date = date).rename({in_put:'data', 
                                                                              lt_val:'lt', lat_val:'lat'})
             else:
                 import xarray as xr
@@ -414,5 +414,5 @@ if __name__=='__main__':
     cax2= fig.add_subplot(gs[1,0])
     vis=Visualise(fig, np.asarray([ax, ax2]), np.asarray([cax, cax2]), MLTax, MLATax, cax_association=[0, 1])
     vis.show_image(file, ax, cmap='viridis_r', in_put='sza')
-    xarray= fuv.readImg(file2).isel(date=0)
+    xarray= fuv.read_idl(file2).isel(date=0)
     vis.show_image(xarray, ax2)
