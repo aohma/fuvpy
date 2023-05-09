@@ -204,7 +204,7 @@ def _reflatWIC(wic,inImg='img',outImg='img'):
         Copy(?) of the FUV dataset with a new field containing the reflattened images.
     '''
     basepath = os.path.dirname(__file__)
-    flatfields = idl.readsav(basepath+'/wic_flatfield_dbase.idl')['flatfields']
+    flatfields = idl.readsav(basepath+'/../utils/wic_flatfield_dbase.idl')['flatfields']
     if pd.to_datetime(wic['date'][0].values)<pd.to_datetime('2000-10-03 23:30'):
         flat = flatfields[:,0]
     else:
