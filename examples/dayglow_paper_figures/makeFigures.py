@@ -39,16 +39,16 @@ def runEvent(inpath):
 
     '''
     wic = xr.load_dataset(inpath + 'wic.nc')
-    wic = fuv.makeBSmodel(wic,sKnots=[-3.5,-0.25,0,0.25,1.5,3.5],stop=0.01,n_tKnots=5,minlat=-90,tukeyVal=5,dzalim=75,dampingVal=1e-2)
-    wic = fuv.makeSHmodel(wic,4,4,n_tKnots=5,stop=0.01,tukeyVal=5,dampingVal=1e-4)
+    wic = fuv.backgroundmodel_BS(wic,sKnots=[-3.5,-0.25,0,0.25,1.5,3.5],stop=0.01,n_tKnots=5,minlat=-90,tukeyVal=5,dzalim=75,dampingVal=1e-2)
+    wic = fuv.backgroundmodel_SH(wic,4,4,n_tKnots=5,stop=0.01,tukeyVal=5,dampingVal=1e-4)
     
     s12 = xr.load_dataset(inpath + 's12.nc')
-    s12 = fuv.makeBSmodel(s12,sKnots=[-3.5,-0.25,0,0.25,1.5,3.5],stop=0.01,n_tKnots=5,minlat=-90,tukeyVal=5,dzalim=75,dampingVal=1e-1)
-    s12 = fuv.makeSHmodel(s12,4,4,n_tKnots=5,stop=0.01,tukeyVal=5,dampingVal=1e1)
+    s12 = fuv.backgroundmodel_BS(s12,sKnots=[-3.5,-0.25,0,0.25,1.5,3.5],stop=0.01,n_tKnots=5,minlat=-90,tukeyVal=5,dzalim=75,dampingVal=1e-1)
+    s12 = fuv.backgroundmodel_SH(s12,4,4,n_tKnots=5,stop=0.01,tukeyVal=5,dampingVal=1e1)
     
     s13 = xr.load_dataset(inpath + 's13.nc')
-    s13 = fuv.makeBSmodel(s13,sKnots=[-3.5,-0.25,0,0.25,1.5,3.5],stop=0.01,n_tKnots=5,minlat=-90,tukeyVal=5,dzalim=75,dampingVal=1e-1)
-    s13 = fuv.makeSHmodel(s13,4,4,n_tKnots=5,stop=0.01,tukeyVal=5,dampingVal=1e1)
+    s13 = fuv.backgroundmodel_BS(s13,sKnots=[-3.5,-0.25,0,0.25,1.5,3.5],stop=0.01,n_tKnots=5,minlat=-90,tukeyVal=5,dzalim=75,dampingVal=1e-1)
+    s13 = fuv.backgroundmodel_SH(s13,4,4,n_tKnots=5,stop=0.01,tukeyVal=5,dampingVal=1e1)
     
     return wic,s12,s13
 
@@ -76,9 +76,9 @@ def lcurve(imgs,model='BS'):
     norms = []
     for i in range(len(L0s)):
         if model == 'BS':
-            _,temp=fuv.makeBSmodel(imgs,sKnots=[-3.5,-0.25,0,0.25,1.5,3.5],stop=0.01,n_tKnots=5,minlat=-90,tukeyVal=5,dzalim=75,dampingVal=L0s[i],returnNorms=True)
+            temp=fuv.makeBSmodel(imgs,sKnots=[-3.5,-0.25,0,0.25,1.5,3.5],stop=0.01,n_tKnots=5,minlat=-90,tukeyVal=5,dzalim=75,dampingVal=L0s[i])[['dgnorm_residual','dgnorm_model']].to_array().values
         elif model == 'SH':
-            _,temp=fuv.makeSHmodel(imgs,4,4,n_tKnots=5,stop=0.01,tukeyVal=5,dampingVal=L0s[i],returnNorms=True)
+            temp=fuv.makeSHmodel(imgs,4,4,n_tKnots=5,stop=0.01,tukeyVal=5,dampingVal=L0s[i])[['shnorm_residual','shnorm_model']].to_array().values
         norms.append(temp)
     
     return np.array(norms)
@@ -161,8 +161,8 @@ def makeFig2(inpath,idate,outpath):
     
     wicfiles = glob.glob(inpath)
     wicfiles.sort()
-    wic = fuv.readImg(wicfiles[idate])
-    wic0 = fuv.readImg(wicfiles[idate],reflat=False)
+    wic = fuv.read_idl(wicfiles[idate])
+    wic0 = fuv.read_idl(wicfiles[idate],reflat=False)
     print(wic.date)
     ff = xr.concat([wic0, wic], pd.Index(["original", "corrected"], name="flat-field"))
     ff['img'].plot(x='col',y='row',col='flat-field',vmin=550,vmax=950,xticks=[],yticks=[],subplot_kws={'xlabel':''},cbar_kwargs={'label':'WIC intensity [counts]'},cmap='Oranges_r')
