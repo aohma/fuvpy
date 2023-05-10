@@ -355,6 +355,7 @@ class Visualise():
         except AttributeError:
             UserWarning('Failed to use date in file to make subplot title. AttributeError')
         axis.image= im
+        plt.draw()
         return im, cbar
     # Handles which axis was clicked, where it was clicked and preparation for the clicked function
     def onclick(self, axes, prof_axis1, prof_axis2, caxes, event):
@@ -390,7 +391,7 @@ class Visualise():
                     if ax.cax_number== cax_number:
                         ax.image.set_clim(crange[0], round(coord, 0))
             try:
-                if np.array(axes)[np.array([marker.axes==ax.ax for ax in axes])][0].cax_number== cax_number:
+                if marker.axes is not None and np.array(axes)[np.array([marker.axes==ax.ax for ax in axes])][0].cax_number== cax_number:
                     profile1[0].set_clim(crange)
                     profile2[0].set_clim(crange)
             except NameError:
