@@ -292,7 +292,7 @@ class Visualise():
         cax= self.caxes[axis.cax_number]
         if not cbar:
             if not cmap:
-                cmap='jet'
+                cmap='viridis'
             if not crange:
                 crange= (0, maxi)
             if not cbar_orientation:
