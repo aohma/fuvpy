@@ -456,7 +456,7 @@ def bin_number2(grid, mlat, mlt):
 
     return bin_n
 
-def backgroundmodel_SBS(imgs):
+def backgroundmodel_SBS(imgs,**kwargs):
     '''
     Testing Spherical B-spline modelling
 
@@ -471,6 +471,24 @@ def backgroundmodel_SBS(imgs):
         DESCRIPTION.
 
     '''
+
+    # Set keyword arguments to input or default values    
+    inImg = kwargs.pop('inImg') if 'inImg' in kwargs.keys() else 'img'
+    latOrder = kwargs.pop('latOrder') if 'latOrder' in kwargs.keys() else 3
+    lonOrder = kwargs.pop('lonOrder') if 'lonOrder' in kwargs.keys() else 3
+    tOrder = kwargs.pop('tOrder') if 'tOrder' in kwargs.keys() else 2
+    latKnots = kwargs.pop('latKnots') if 'latKnots' in kwargs.keys() else [-90,-10,0,10,50,90]
+    lonKnots = kwargs.pop('lonKnots') if 'lonKnots' in kwargs.keys() else np.array([0,90,180,270])
+    n_tKnots = kwargs.pop('n_tKnots') if 'n_tKnots' in kwargs.keys() else 2
+
+    dampingVal = kwargs.pop('dampingVal') if 'dampingVal' in kwargs.keys() else 0
+    tukeyVal = kwargs.pop('tukeyVal') if 'tukeyVal' in kwargs.keys() else 5
+    stop = kwargs.pop('stop') if 'stop' in kwargs.keys() else 1e-3
+    
+    
+    inplace = bool(kwargs.pop('inplace')) if 'inplace' in kwargs.keys() else False
+
+    if not inplace: imgs = imgs.copy(deep=True)
 
     sslat, sslon = map(np.ravel, subsol(imgs['date'].values))
 
@@ -499,20 +517,11 @@ def backgroundmodel_SBS(imgs):
     imgs['slon'] = (['date','row','col'],slon)
 
     # Viewving angle correction
-    background=np.nanmedian(imgs['img'].values[(imgs['bad'].values)&(imgs['sza'].values>100|np.isnan(imgs['sza'].values))])
+    background=np.nanmedian(imgs[inImg].values[(imgs['sza'].values>100)|(np.isnan(imgs['sza'].values))])
     dzacorr=0.15
-    imgs['cimg'] = (imgs['img']-background)*np.cos(np.deg2rad(imgs['dza']))/np.exp(dzacorr*(1. - 1/np.cos(np.deg2rad(imgs['dza']))))
+    imgs['cimg'] = (imgs[inImg]-background)*np.cos(np.deg2rad(imgs['dza']))/np.exp(dzacorr*(1. - 1/np.cos(np.deg2rad(imgs['dza']))))
 
-    latOrder = 3
-    lonOrder = 3
-    tOrder = 2
     tKnotSep=None
-
-    dzalim=75
-    minlat=-90
-    dampingVal =1e-2
-    tukeyVal = 3
-    stop = 1e-3
 
     # Coordinates and data
     time=(imgs['date'].to_series().values-imgs['date'].values[0])/ np.timedelta64(1, 'm')
@@ -520,27 +529,27 @@ def backgroundmodel_SBS(imgs):
     slon = imgs['slon'].stack(z=('row','col')).values
     d = imgs['cimg'].stack(z=('row','col')).values
 
-    ind = (imgs['sza'].stack(z=('row','col')).values >= 0) & (imgs['dza'].stack(z=('row','col')).values <= dzalim) & (imgs['glat'].stack(z=('row','col')).values >= minlat) & (np.isfinite(imgs['cimg'].stack(z=('row','col')).values)) & imgs['bad'].stack(z=('row','col')).values[None,:]
+    ind = (imgs['sza'].stack(z=('row','col')).values >= 0) & (np.isfinite(imgs['cimg'].stack(z=('row','col')).values))
 
     # temporal and spatial size
     n_t = slat.shape[0]
 
     # colat knots
-    latKnots = [-90,-10,0,10,50,90]
     latKnots = np.r_[np.repeat(latKnots[0],latOrder),latKnots, np.repeat(latKnots[-1],latOrder)]
     n_latcp = len(latKnots)-latOrder-1 # Number of control points
 
     # lon knots full
-    lonKnots = np.array([0,90,180,270])
     lonKnots = np.r_[lonKnots-360,lonKnots,lonKnots+360]
     lonKnots = np.r_[np.repeat(lonKnots[0],lonOrder),lonKnots, np.repeat(lonKnots[-1],lonOrder)]
     n_loncp = len(lonKnots)-lonOrder-1 # Number of control points
 
     # Temporal knots
-    if tKnotSep==None:
-        tKnots = np.linspace(time[0], time[-1], 2)
+    if n_t==1:
+        tKnots = np.linspace(time[0], time[-1]+1, n_tKnots)
+        tOrder = 0
     else:
-        tKnots = np.linspace(time[0], time[-1], int(np.round(time[-1]/tKnotSep)+1))
+        tKnots = np.linspace(time[0], time[-1], n_tKnots)
+        tKnots = np.r_[np.repeat(tKnots[0],tOrder),tKnots, np.repeat(tKnots[-1],tOrder)]
     tKnots = np.r_[np.repeat(tKnots[0],tOrder),tKnots, np.repeat(tKnots[-1],tOrder)]
     n_tcp = len(tKnots)-tOrder-1 # Number of control points
 
@@ -605,10 +614,7 @@ def backgroundmodel_SBS(imgs):
     iteration = 0
     m = None
 
-
     while (diff>stop)&(iteration < 100):
-        print('Iteration:',iteration)
-
         m_s = np.linalg.lstsq((G_s*w[:,None]*ws[:,None]).T@(G_s*w[:,None]*ws[:,None])+R,(G_s*w[:,None]*ws[:,None]).T@(d_s*w*ws),rcond=None)[0]
 
         mNew    = M@m_s.reshape((n_latcp*4, n_tcp)).T
@@ -618,16 +624,11 @@ def backgroundmodel_SBS(imgs):
         dm = np.hstack(dm)
         residuals = (d_s - dm)
 
-        # if iteration==0:
-        #     sigma = noise(slat[ind], d_s,dm,w)
-        # w = (1 - np.minimum(1,(residuals/(tukeyVal*sigma))**2))**2
-
         rmse = np.sqrt(np.average(residuals**2)     )
         w = (1 - np.minimum(1,(residuals/(tukeyVal*rmse))**2))**2
 
-        if m is not None:
-            diff = np.sqrt(np.mean((mNew-m)**2))/(1+np.sqrt(np.mean(mNew**2)))
-            print('Relative change model norm',diff)
+        if m is not None: diff = np.sqrt(np.mean((mNew-m)**2))/(1+np.sqrt(np.mean(mNew**2)))
+
         m = mNew
         iteration += 1
 
@@ -637,8 +638,27 @@ def backgroundmodel_SBS(imgs):
     # Add dayglow model and corrected image to the Dataset
     model = np.full_like(d,np.nan)
     model[ind]=dm
+    weights = np.full_like(d,np.nan)
+    weights[ind]=w
     imgs['dgmodel'] = (['date','row','col'],model.reshape((n_t,len(imgs.row),len(imgs.col))))
     imgs['dgimg'] = imgs['cimg']-imgs['dgmodel']
+    imgs['dgweight'] = (['date','row','col'],(weights).reshape((n_t,len(imgs.row),len(imgs.col))))
+    imgs['dgnorm_residual'] = normR
+    imgs['dgnorm_model'] = normM
 
+    # Remove pixels outside model scope
+    ind = (imgs.sza>=0)
+    imgs['dgmodel'] = xr.where(~ind,np.nan,imgs['dgmodel'])
+    imgs['dgimg'] = xr.where(~ind,np.nan,imgs['dgimg'])
+    imgs['dgweight'] = xr.where(~ind,np.nan,imgs['dgweight'])
 
-    return imgs
+    # Add attributes
+    imgs['dgmodel'].attrs = {'long_name': 'BS model'}
+    imgs['dgimg'].attrs = {'long_name': 'BS corrected image'}
+    imgs['dgweight'].attrs = {'long_name': 'BS model weights'}
+    imgs['dgnorm_residual'].attrs = {'long_name': 'BS model residual norm'}
+    imgs['dgnorm_model'].attrs = {'long_name': 'BS model solution norm'}
+    
+    # Return the new DataSet if not inplace 
+    if not inplace:
+        return imgs
