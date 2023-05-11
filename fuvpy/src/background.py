@@ -20,7 +20,7 @@ from polplot import sdarngrid,bin_number
 from fuvpy.utils import sh
 from fuvpy.utils.sunlight import subsol
 
-
+import matplotlib.pyplot as plt
 
 def backgroundmodel_BS(imgs,**kwargs):
     '''
@@ -458,18 +458,55 @@ def bin_number2(grid, mlat, mlt):
 
 def backgroundmodel_SBS(imgs,**kwargs):
     '''
-    Testing Spherical B-spline modelling
+    Model background emissions using Spherical B-spline (SBS) modeling
 
     Parameters
     ----------
-    imgs : TYPE
-        DESCRIPTION.
+    imgs : xarray.Dataset
+        Dataset with the FUV images, imported by readFUVimage()
+    inImg : str, optional
+        Name of the input image to be used in the model. The default is 'img'.
+    latOrder : int, optional
+        Order of the latitudinal B-splines. The default is 3.
+    lonOrder : int, optional
+        Order of the longitudinal B-splines. The default is 3.
+    tOrder : int, optional
+        Order of the temporal B-splines. The default is 2.
+    latKnots : array like, optional
+        Location of the latitudinal knots. The default is None (default is used).
+    lonKnots : array like, optional
+        Location of the longitudinal knots. The default is None (default is used).
+    n_tKnots : int, optional
+        Number of temporal knots, equally spaced between the endpoints. The default is 2 (only knots at endpoints)
+
+    dampingVal : float, optional
+        Damping (Tikhonov regularization).
+        The default is 0 (no damping).
+    tukeyVal : float, optional
+        Determines to what degree outliers are down-weighted.
+        Iterative reweights is (1-(residuals/(tukeyVal*rmse))^2)^2
+        Larger tukeyVal means less down-weight
+        Default is 5
+    stop : float, optional
+        When to stop the iteration. The default is 0.001.
+    height : float, optional
+        Assumed height of the emissions in km. Default is 130
+    dzacorr : float, optional
+        Absorption constant for viewning angle correction. Default is 0.15
+    inplace : bool, optional
+        If True, update the Dataset in place. Default is False (return a new Dataset).
+
 
     Returns
     -------
-    imgs : TYPE
-        DESCRIPTION.
-
+    imgs : xarray.Dataset, if inplace is False
+        A copy of the input Dataset with new data_vars:
+            - imgs['dgmodel'] is the B-spline based dayglow model
+            - imgs['dgimg'] is the dayglow-corrected image (dayglow subtracked from the input image)
+            - imgs['dgweight'] is the weights after the final iteration
+            - imgs['dgnorm_residual'] is the residual norm
+            - imgs['dgnorm_model'] is the model norm
+            - imgs['background'] is the identified background level
     '''
 
     # Set keyword arguments to input or default values    
@@ -484,7 +521,8 @@ def backgroundmodel_SBS(imgs,**kwargs):
     dampingVal = kwargs.pop('dampingVal') if 'dampingVal' in kwargs.keys() else 0
     tukeyVal = kwargs.pop('tukeyVal') if 'tukeyVal' in kwargs.keys() else 5
     stop = kwargs.pop('stop') if 'stop' in kwargs.keys() else 1e-3
-    
+    height = kwargs.pop('height') if 'height' in kwargs.keys() else 130
+    dzacorr = kwargs.pop('dzacorr') if 'dzacorr' in kwargs.keys() else 0.15
     
     inplace = bool(kwargs.pop('inplace')) if 'inplace' in kwargs.keys() else False
 
@@ -493,7 +531,7 @@ def backgroundmodel_SBS(imgs,**kwargs):
     sslat, sslon = map(np.ravel, subsol(imgs['date'].values))
 
 
-    r = 6500
+    r = 6371 + height
     theta = np.deg2rad(90-imgs.glat.values)
     phi = np.deg2rad((imgs['glon'].values - sslon[:,None,None] + 180) % 360 - 180)
 
@@ -518,10 +556,7 @@ def backgroundmodel_SBS(imgs,**kwargs):
 
     # Viewving angle correction
     background=np.nanmedian(imgs[inImg].values[(imgs['sza'].values>100)|(np.isnan(imgs['sza'].values))])
-    dzacorr=0.15
     imgs['cimg'] = (imgs[inImg]-background)*np.cos(np.deg2rad(imgs['dza']))/np.exp(dzacorr*(1. - 1/np.cos(np.deg2rad(imgs['dza']))))
-
-    tKnotSep=None
 
     # Coordinates and data
     time=(imgs['date'].to_series().values-imgs['date'].values[0])/ np.timedelta64(1, 'm')
@@ -556,8 +591,6 @@ def backgroundmodel_SBS(imgs,**kwargs):
     # Temporal design matix
     M = BSpline(tKnots, np.eye(n_tcp), tOrder)(time)
 
-    print('Building design matrix')
-
     G_g=[]
     G_s=[]
     for t in range(n_t):
@@ -577,7 +610,6 @@ def backgroundmodel_SBS(imgs,**kwargs):
         G_s.append(G_t)
     G_s=np.vstack(G_s)
 
-
     # Spatial weights
     grid,mltres=sdarngrid(5,5,-90) # Equal area grid
     ws = np.full(slat.shape,np.nan)
@@ -591,23 +623,20 @@ def backgroundmodel_SBS(imgs,**kwargs):
     # Make everything flat
     d_s = d[ind]
     ws = ws[ind]
+    ws[:]=1 # TEMP NO SPATIAL WEIGHTING
     w = np.ones_like(d_s)
 
     # Damping (zeroth-order Tikhonov regularization)
     damping = dampingVal**np.ones(G_s.shape[1])
     R = np.diag(damping)
 
-    latMax = np.arange(-90,90+0.1,0.1)[np.argmax(BSpline(latKnots, np.eye(n_latcp), latOrder)(np.arange(-90,90+0.1,0.1)),axis=0)]
-    latLambda = 1/np.cos(np.deg2rad(latMax))
-    latLambda[[0,-1]]=1e12
-
+    # 1- order Tikhonov in the longitudinal direction 
     L = np.array([[-1,1,0,0],[0,-1,1,0],[0,0,-1,1],[1,0,0,-1]])
     LTL = np.zeros((4*n_tcp*n_latcp,4*n_tcp*n_latcp))
     for i in range(n_latcp):
         for t in range(n_tcp):
             LTL[t+(i*4*n_tcp):t+4*n_tcp+(i*4*n_tcp):n_tcp,t+(i*4*n_tcp):t+4*n_tcp+(i*4*n_tcp):n_tcp] = L.T@L
     R = dampingVal*LTL
-    # R = dampingVal*np.repeat(latLambda,4*n_tcp)[:,None]*LTL
 
     # Iterativaly solve the inverse problem
     diff = 1e10
@@ -637,14 +666,17 @@ def backgroundmodel_SBS(imgs,**kwargs):
 
     # Add dayglow model and corrected image to the Dataset
     model = np.full_like(d,np.nan)
-    model[ind]=dm
+    model[ind]= dm
+    model = model.reshape((n_t,len(imgs.row),len(imgs.col))) * np.exp(dzacorr*(1. - 1/np.cos(np.deg2rad(imgs['dza'])))) / np.cos(np.deg2rad(imgs['dza'])) + background
+
     weights = np.full_like(d,np.nan)
     weights[ind]=w
-    imgs['dgmodel'] = (['date','row','col'],model.reshape((n_t,len(imgs.row),len(imgs.col))))
-    imgs['dgimg'] = imgs['cimg']-imgs['dgmodel']
+    imgs['dgmodel'] = model
+    imgs['dgimg'] = imgs['img']-imgs['dgmodel']
     imgs['dgweight'] = (['date','row','col'],(weights).reshape((n_t,len(imgs.row),len(imgs.col))))
     imgs['dgnorm_residual'] = normR
     imgs['dgnorm_model'] = normM
+    imgs['background'] = background
 
     # Remove pixels outside model scope
     ind = (imgs.sza>=0)
@@ -658,6 +690,7 @@ def backgroundmodel_SBS(imgs,**kwargs):
     imgs['dgweight'].attrs = {'long_name': 'BS model weights'}
     imgs['dgnorm_residual'].attrs = {'long_name': 'BS model residual norm'}
     imgs['dgnorm_model'].attrs = {'long_name': 'BS model solution norm'}
+    imgs['background'].attrs = {'long_name': 'Background level'}
     
     # Return the new DataSet if not inplace 
     if not inplace:
