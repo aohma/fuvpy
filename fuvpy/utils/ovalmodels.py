@@ -50,6 +50,23 @@ def oval_hu2017(Bx,By,Bz,Vp,Np,AE,boundary='pb'):
     return lat
 
 def q2kp(q):
+    '''
+    Convert q-index to Kp index 
+
+    The algorithm is from USAF Research Laboratory (then Phillips Laboratory) report PL-TR-93-2267 by B. S. Dandekar (AD-A282 764). 
+    https://apps.dtic.mil/sti/pdfs/ADA282764.pdf
+
+    Parameters
+    ----------
+    q : array_like
+        values to convert
+
+    Returns
+    -------
+    kp : array_like
+        converted values
+    '''
+
     kp_lim = np.mean([7/3,8/3])
     qlim = np.mean([0.96*kp_lim-0.3,2.04*kp_lim-2.7])
 
@@ -59,6 +76,23 @@ def q2kp(q):
     return kp
 
 def kp2al(kp):
+    '''
+    Convert Kp-index to AL index 
+
+    The algorithm is from Starkov, G.V., Statistical dependences between the magnetic activity indices, Geomag. Aeron., 34 (1), 101–103, 1994b. 
+    See https://www.swsc-journal.org/articles/swsc/pdf/2011/01/swsc110021.pdf
+
+    Parameters
+    ----------
+    kp : array_like
+        values to convert
+
+    Returns
+    -------
+    al : array_like
+        converted values
+    '''
+    
     c0 = 18
     c1 =-12.3
     c2 = 27.2
