@@ -89,7 +89,7 @@ def oval_hu2017(Bx,By,Bz,Vp,Np,AE,boundary='pb'):
         A = np.char.replace(A,'−', '-')
         A = A.astype(float)
 
-        lat = A[0,:][None,:] + A[[1],:]*Bx[:,None] + A[[2],:]*By[:,None] + A[[3],:]*Bz[:,None] + A[[4],:]*Vp[:,None] + A[[5],:]*Np[:,None] + A[[5],:]*AE[:,None]
+        lat = A[0,:][None,:] + A[[1],:]*Bx[:,None] + A[[2],:]*By[:,None] + A[[3],:]*Bz[:,None] + A[[4],:]*Vp[:,None] + A[[5],:]*Np[:,None] + A[[6],:]*AE[:,None]
 
     elif boundary =='eb':
         A = pd.read_csv(basepath+'/../data/ovalcoeffs_hu2017_eb',sep='\t',header=0,index_col=0).values.T
