@@ -240,7 +240,7 @@ def final_bondaries_error(orbits,wicpath,bpath):
             bi = pd.read_hdf(bpath+'initial_boundaries.h5',key='initial',where='orbit=="{}"'.format(orbit)).to_xarray()
 
             # Only images with identified initial boundaries
-            imgs = imgs.sel(date=bi.reset_index().date.unique())
+            imgs = imgs.sel(date=bi.date)
 
             bms = []    
             for l in np.arange(50,201,5):
