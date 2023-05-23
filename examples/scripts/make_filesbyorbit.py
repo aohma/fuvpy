@@ -86,28 +86,41 @@ def initial_boundaries(orbits,inpath,outpath):
             bi.to_hdf(outpath+'initial_boundaries.h5','initial',format='table',append=True,data_columns=True)
         except Exception as e: print(e)
 
-def dataCoverage(imgs,dzalim=75):
+def data_coverage(imgs,window=1,dzalim=75):
     '''
     Determine if image(s) has global coverage
     imgs (xr.Dataset) : Images
+    window (int) : Size of the moving window. Centered, window must be odd.
     dzalim (float) : Max viewing angle to be considered
 
     return (array) : Bool
     '''
+
+    if window%2 != 1 or type(window)!=int:
+        raise ValueError('window must be an odd integer')
+
+    half = window//2
 
     lt = np.arange(0.5,24)
     lat = 90-(30+10*np.cos(np.pi*lt/12))
 
     isglobal=[]
     for t in range(len(imgs.date)):
-        img=imgs.isel(date=t)
+        if t<half:
+            ind = slice(None,t+half+1)
+        elif t> len(imgs.date)-half-1:
+            ind = slice(t-half,None)
+        else:
+            ind = slice(t-half,t+half+1)
+
+        img=imgs.isel(date=ind)
         count = np.zeros_like(lt)
         for i in range(len(lt)):
             count[i]=np.sum((img['mlt'].values>(lt[i]-0.5))&(img['mlt'].values<(lt[i]+0.5))&(img['mlat'].values<lat[i])&(img['dza'].values<dzalim))
         isglobal.append((count>0).all())
     return np.array(isglobal)
 
-def calcRMSE(wic,bm):
+def intensities(wic,bm):
     '''
     Calculate intensity inside and outside modelled aurora
 
@@ -139,8 +152,13 @@ def calcRMSE(wic,bm):
     wic['x'] =  r*np.cos(a)
     wic['y'] =  r*np.sin(a)
 
-    rmse_in  = []
-    rmse_out = []
+    P_mean  = []
+    P_std = []
+    A_mean = []
+    A_std = []
+    S_mean = []
+    S_std = []
+
     for t in wic.date:
         # Create an PB polygon
         poly = mplpath.Path(bm.loc[t.values,['px','py']].values)
@@ -160,15 +178,22 @@ def calcRMSE(wic,bm):
         # Identify gridcell with center inside the EB polygon
         incap = poly.contains_points(np.stack((wic.sel(date=t).x.values.flatten(),wic.sel(date=t).y.values.flatten()),axis=1))
 
-        rmse_in.append(np.sqrt(np.nanmean(wic.sel(date=t)['shimg'].values.flatten()[ineb & ~inpb]**2)))
-        rmse_out.append(np.sqrt(np.nanmean(wic.sel(date=t)['shimg'].values.flatten()[incap & ~(ineb & ~ inpb)]**2)))
+        P_mean.append(np.nanmean(wic.sel(date=t)['shimg'].values.flatten()[inpb]))
+        P_std.append(np.nanstd(wic.sel(date=t)['shimg'].values.flatten()[inpb]))
+        A_mean.append(np.nanmean(wic.sel(date=t)['shimg'].values.flatten()[ineb & ~inpb]))
+        A_std.append(np.nanstd(wic.sel(date=t)['shimg'].values.flatten()[ineb & ~inpb]))
+        S_mean.append(np.nanmean(wic.sel(date=t)['shimg'].values.flatten()[incap & ~ineb]))
+        S_std.append(np.nanstd(wic.sel(date=t)['shimg'].values.flatten()[incap & ~ineb]))
+      
 
-    
-
-    # ADD RMSE TO BM
+    # ADD TO BM
     bm = bm.reset_index().set_index(['date','mlt']).to_xarray().sortby(['date','mlt'])
-    bm['rmse_in'] = ('date',rmse_in)
-    bm['rmse_out'] = ('date',rmse_out)
+    bm['P_mean'] = ('date',P_mean)
+    bm['P_std'] = ('date',P_std)
+    bm['A_mean'] = ('date',A_mean)
+    bm['A_std'] = ('date',A_std)
+    bm['S_mean'] = ('date',S_mean)
+    bm['S_std'] = ('date',S_std)
     bm = bm.to_dataframe().reset_index().set_index(['date','mlt'])
 
     return bm
@@ -191,12 +216,12 @@ def final_bondaries(orbits,wicpath,bpath):
             imgs = imgs.sel(date=bi.reset_index().date.unique())
 
             bm = fuv.boundarymodel_BS(bi,tKnotSep=5,tLeb=1e-1,sLeb=1e-3,tLpb=1e-1,sLpb=1e-3,resample=False)
-            isglobal = dataCoverage(imgs,dzalim=65)
+            isglobal = data_coverage(imgs,dzalim=65)
             bm['isglobal'] = ('date',isglobal)
 
             bm = bm.to_dataframe()
             bm['orbit']=orbit
-            bm = calcRMSE(imgs, bm)
+            bm = intensities(imgs, bm)
             bm[['pb','eb','v_phi','v_theta','u_phi','u_theta','isglobal','orbit','rmse_in','rmse_out']].to_hdf(bpath+'final_boundaries.h5','final',format='table',append=True,data_columns=True)
         except Exception as e: print(e)
         
@@ -212,14 +237,14 @@ def final_bondaries_error(orbits,wicpath,bpath):
     for orbit in orbits:
         try:
             imgs = xr.load_dataset(wicpath+'wic_or'+str(orbit).zfill(4)+'.nc')
-            bi = pd.read_hdf(bpath+'initial_boundaries.h5',key='initial',where='orbit=="{}"'.format(orbit))
+            bi = pd.read_hdf(bpath+'initial_boundaries.h5',key='initial',where='orbit=="{}"'.format(orbit)).to_xarray()
 
             # Only images with identified initial boundaries
             imgs = imgs.sel(date=bi.reset_index().date.unique())
 
             bms = []    
             for l in np.arange(50,201,5):
-                bm = fuv.boundarymodel_BS(bi.to_xarray().sel(lim=l).to_dataframe(),tKnotSep=5,tLeb=1e-1,sLeb=1e-2,tLpb=1e-1,sLpb=1e-2)
+                bm = fuv.boundarymodel_BS(bi.sel(lim=l),tKnotSep=5,tLeb=1e-1,sLeb=1e-2,tLpb=1e-1,sLpb=1e-2)
                 bm = bm.expand_dims(lim=[l])
                 bms.append(bm)
             
@@ -230,13 +255,14 @@ def final_bondaries_error(orbits,wicpath,bpath):
             for key in keys:
                 bm[key+'_err'] = bms[key].std(dim='lim')
 
-            isglobal = dataCoverage(imgs,dzalim=65)
+            isglobal = data_coverage(imgs,window=5,dzalim=65)
             bm['isglobal'] = ('date',isglobal)
+            bm['count'] = 0.5*(bi['pb'].count(dim='lim')>0).sum(dim='mlt') + 0.5*(bi['eb'].count(dim='lim')>0).sum(dim='mlt')
 
             bm = bm.to_dataframe()
             bm['orbit']=orbit
-            bm = calcRMSE(imgs, bm)
-            bm[['pb','eb','pb_err','eb_err','ve_pb','vn_pb','ve_eb','vn_eb','dP','dA','dP_dt','dA_dt','isglobal','orbit','rmse_in','rmse_out']].to_hdf(bpath+'final_boundaries.h5','final',format='table',append=True,data_columns=True)
+            bm = intensities(imgs, bm)
+            bm[['pb','eb','pb_err','eb_err','ve_pb','vn_pb','ve_eb','vn_eb','dP','dA','dP_dt','dA_dt','isglobal','count','orbit','P_mean','P_std','A_mean','A_std','S_mean','S_std']].to_hdf(bpath+'final_boundaries.h5','final',format='table',append=True,data_columns=True)
         except Exception as e: print(e)
 
 def makeGIFs(orbits,wicpath,bpath,outpath):
@@ -271,8 +297,14 @@ def makeGIFs(orbits,wicpath,bpath,outpath):
 
                 pax.scatter(wic.sel(date=t)['mlat'].values,wic.sel(date=t)['mlt'].values,c=wic.sel(date=t)['shimg'].values,s=2,alpha=0.5,vmin=0,vmax=500,cmap='Greens')
                 try:
-                    alpha = 1 if (bf.loc[t.values,'rmse_in']/bf.loc[t.values,'rmse_out']>3).all() else 0.5
-                    linestyle = '-' if bf.loc[t.values,'isglobal'].all() else ':'
+                    # Quality flags
+                    ind0 = bf.loc[t.values,'isglobal'].all()
+                    ind1 = (bf.loc[t.values,'A_mean'] > bf.loc[t.values,'P_mean']+bf.loc[t.values,'P_std']+bf.loc[t.values,'A_std']).all()
+                    ind2 = (bf.loc[t.values,'A_mean'] > bf.loc[t.values,'S_mean']+bf.loc[t.values,'S_std']+bf.loc[t.values,'A_std']).all()
+                    ind3 = (bf.loc[t.values,'count'] > 12).all()
+
+                    alpha = 1 
+                    linestyle = '-' if (ind0&ind1&ind2&ind3) else ':'
                     pax.scatter(bi.loc[t.values,'pb'].values,bi.loc[t.values,'mlt'].values,s=1,color='C6')
                     pax.scatter(bi.loc[t.values,'eb'].values,bi.loc[t.values,'mlt'].values,s=1,color='C9')
                     pax.plot(bf.loc[t.values,'pb'].values,bf.loc[t.values,'mlt'].values,color='C3',alpha=alpha,linestyle=linestyle)
