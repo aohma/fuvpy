@@ -37,7 +37,8 @@ def fig1(img,**kwargs):
     mlt_ev = kwargs.pop('mlt_ev') if 'mlt_ev' in kwargs.keys() else np.arange(0.5,24,1)
     mlt_profile = kwargs.pop('mlt_profile') if 'mlt_profile' in kwargs.keys() else [3,10,20]
     minlat = kwargs.pop('minlat') if 'minlat' in kwargs.keys() else 50 
-
+    outpath = kwargs.pop('outpath') if 'outpath' in kwargs.keys() else None 
+    
     # Constants    
     R_E = 6371 # Earth radius (km)
     R_I = R_E+height # Assumed emission radius (km)
@@ -188,7 +189,7 @@ def fig1(img,**kwargs):
 
     ax.scatter(77,d_ev[np.argwhere(clat_ev==13),p],s=15,zorder=22,c='k')
 
-    pass
+    if outpath: plt.savefig(outpath + 'fig01.png',bbox_inches='tight',dpi = 600)
 
 
 
