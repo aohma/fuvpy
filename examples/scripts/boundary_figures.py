@@ -33,10 +33,10 @@ def fig1(img,**kwargs):
     lims = kwargs.pop('lims') if 'lims' in kwargs.keys() else np.arange(50,201,5)
     sigma = kwargs.pop('sigma') if 'sigma' in kwargs.keys() else 300
     height = kwargs.pop('height') if 'height' in kwargs.keys() else 130
-    clat_ev = kwargs.pop('clat_ev') if 'clat_ev' in kwargs.keys() else np.arange(0.5,46,0.5)
+    clat_ev = kwargs.pop('clat_ev') if 'clat_ev' in kwargs.keys() else np.arange(0.5,50.5,0.5)
     mlt_ev = kwargs.pop('mlt_ev') if 'mlt_ev' in kwargs.keys() else np.arange(0.5,24,1)
     mlt_profile = kwargs.pop('mlt_profile') if 'mlt_profile' in kwargs.keys() else [3,10,20]
-    minlat = kwargs.pop('minlat') if 'minlat' in kwargs.keys() else 50 
+    minlat = kwargs.pop('minlat') if 'minlat' in kwargs.keys() else 40 
     outpath = kwargs.pop('outpath') if 'outpath' in kwargs.keys() else None 
     
     # Constants    
@@ -71,7 +71,7 @@ def fig1(img,**kwargs):
     ds['d'] = (['clat','mlt'],d_ev)
     
     # Set values outside outer ring to nan
-    ds['d'] = xr.where(ds['clat']>35+10*np.cos(np.pi*ds['mlt']/12),np.nan,ds['d'])
+    ds['d'] = xr.where(ds['clat']>40+10*np.cos(np.pi*ds['mlt']/12),np.nan,ds['d'])
     
     ds['above'] = (ds['d']>ds['lim']).astype(float) 
     ds['above'] = xr.where(np.isnan(ds['d']),np.nan,ds['above'])
@@ -136,7 +136,8 @@ def fig1(img,**kwargs):
     
     # Outer ring
     mlt_out = np.arange(0,24.1,0.1)
-    mlat_out = 90-(35+10*np.cos(np.pi*mlt_out/12))
+    mlat_out = 90-(40+10*np.cos(np.pi*mlt_out/12))
+    mlat_min = minlat*np.ones_like(mlat_out)
 
     fig = plt.figure(figsize=(9,6))
     gs = gridspec.GridSpec(nrows=3,ncols=4,hspace=0,wspace=0.3)
@@ -155,7 +156,13 @@ def fig1(img,**kwargs):
     pax.write(80, 2, str(80),verticalalignment='center',horizontalalignment='center')
     pax.write(50, 2, str(50),verticalalignment='center',horizontalalignment='center')
 
-    pax.plot(mlat_out,mlt_out,c='C7',linewidth=1)
+    # Lower latitude
+    pax.fill(np.concatenate((mlat_out,mlat_min)),np.concatenate((mlt_out,mlt_out[::-1])),color='C7',alpha=0.3,edgecolor=None)
+
+    #pax.plot(mlat_out,mlt_out,c='C7',linewidth=1)
+
+
+
     for i,l in enumerate(lims_profile):
         pax.scatter(ds.sel(lim=l).pb.values, ds.mlt.values,color=cmap(i+1),s=10,zorder=20)
         pax.scatter(ds.sel(lim=l).eb.values, ds.mlt.values,color=cmap(i+1),s=10,zorder=20)
@@ -165,6 +172,7 @@ def fig1(img,**kwargs):
         pax.plot([minlat,90],[mlt_ev[p],mlt_ev[p]],c='C7',zorder=2,linewidth=1)
         ax = plt.subplot(gs[i,3])
         ax.plot(90-clat_ev,d_ev[:,p],c='g')
+        ax.axvspan(90-(40+10*np.cos(np.pi*mlt_ev[p]/12)),minlat,facecolor='C7',edgecolor=None,alpha=0.3)
 
         ax.set_xlim([90,minlat])
         ax.set_ylim([-499,1999])
@@ -172,7 +180,11 @@ def fig1(img,**kwargs):
         ax.text(0.25, 0.9, str(mlt_ev[p]) + ' MLT', horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
 
         ax.set_ylabel('Intensity [counts]')
-        if i == 2: ax.set_xlabel('Magnetic latitude [deg]')
+        if i == 2:
+            ax.set_xticks([90,65,40])
+            ax.set_xlabel('Magnetic latitude [deg]')
+        else:
+            ax.set_xticks([])
 
         for j,l in enumerate(lims_profile):
             ax.axvline(ds.sel(lim=l,mlt=mlt_ev[p])['pb'],color=cmap(j+1),linewidth=0.7)

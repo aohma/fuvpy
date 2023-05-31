@@ -32,7 +32,7 @@ def detect_boundaries(imgs,**kwargs):
     height : float, optional
         Assumed height of the emissions in km. Default is 130 
     clat_ev : array_like, optional
-        Evalutation points of the latitudinal intensity profiles. Default is np.arange(0.5,46,0.5)
+        Evalutation points of the latitudinal intensity profiles. Default is np.arange(0.5,50.5,0.5)
     mlt_ev : array_like, optional
         Which mlts to evaluate the latitudinal profiles. Default is np.arange(0.5,24,1)
 
@@ -89,7 +89,7 @@ def detect_boundaries(imgs,**kwargs):
         ds['d'] = (['clat','mlt'],d_ev)
         
         # Set values outside outer ring to nan
-        ds['d'] = xr.where(ds['clat']>35+10*np.cos(np.pi*ds['mlt']/12),np.nan,ds['d'])
+        ds['d'] = xr.where(ds['clat']>40+10*np.cos(np.pi*ds['mlt']/12),np.nan,ds['d'])
         
         ds['above'] = (ds['d']>ds['lim']).astype(float) 
         ds['above'] = xr.where(np.isnan(ds['d']),np.nan,ds['above'])
