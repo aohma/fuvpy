@@ -80,7 +80,7 @@ def initial_boundaries(orbits,inpath,outpath):
         try:
             imgs = xr.load_dataset(inpath+'wic_or'+str(orbit).zfill(4)+'.nc')
 
-            bi = fuv.boundary_detection(imgs)
+            bi = fuv.detect_boundaries(imgs)
             bi = bi.to_dataframe()
             bi['orbit']=orbit
             bi.to_hdf(outpath+'initial_boundaries.h5','initial',format='table',append=True,data_columns=True)
