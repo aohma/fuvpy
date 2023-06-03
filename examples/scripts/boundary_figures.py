@@ -145,12 +145,12 @@ def fig1(img,**kwargs):
     # Corr
     pax = pp(plt.subplot(gs[:,:3]),minlat=minlat)
     fuv.plotimg(img,'shimg',pax=pax,crange=(0,500),cmap='Greens')
-    cbaxes = pax.ax.inset_axes([.3,.0,.4,.02]) 
+    cbaxes = pax.ax.inset_axes([.3,.0,.4,.017]) 
     cb = plt.colorbar(pax.ax.collections[0],cax=cbaxes, orientation='horizontal',extend='both')
     cb.set_label('Intensity [counts]')
     pax.ax.set_title(img['id'].values.tolist() + ': ' + 
              img['date'].dt.strftime('%Y-%m-%d %H:%M:%S').values.tolist(),pad=-550)
-    pax.writeLTlabels(lat=minlat+0.5)
+    pax.writeLTlabels(lat=minlat-0.1)
 
     # Lat ticks
     pax.write(80, 2, str(80),verticalalignment='center',horizontalalignment='center')

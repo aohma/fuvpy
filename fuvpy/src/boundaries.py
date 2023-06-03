@@ -50,7 +50,7 @@ def detect_boundaries(imgs,**kwargs):
     lims = kwargs.pop('lims') if 'lims' in kwargs.keys() else np.arange(50,201,5)
     sigma = kwargs.pop('sigma') if 'sigma' in kwargs.keys() else 300
     height = kwargs.pop('height') if 'height' in kwargs.keys() else 130
-    clat_ev = kwargs.pop('clat_ev') if 'clat_ev' in kwargs.keys() else np.arange(0.5,46,0.5)
+    clat_ev = kwargs.pop('clat_ev') if 'clat_ev' in kwargs.keys() else np.arange(0.5,50.5,0.5)
     mlt_ev = kwargs.pop('mlt_ev') if 'mlt_ev' in kwargs.keys() else np.arange(0.5,24,1)
 
     # Constants    
