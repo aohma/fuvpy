@@ -715,11 +715,6 @@ def boundarymodel_BS(ds,**kwargs):
     # Transform to unprimed
     tau_eb  = np.exp(tau1)
 
-    # Norms 
-    normMeb = np.sqrt(np.average((tL@ms).flatten()**2))
-    residuals = np.rad2deg(np.exp(mtau[ind]) - theta_eb[ind])
-    normReb = np.sqrt(np.average(residuals**2,weights=w.toarray().squeeze()))
-
     ## DERIVATIVE
     
     mm = m.reshape((n_pcp,n_tcp))
@@ -838,7 +833,8 @@ def boundarymodel_BS(ds,**kwargs):
         m = ms
         iteration += 1
 
-
+    normMpb = np.sqrt(np.average((tL@ms).flatten()**2))
+    normRpb = np.sqrt(np.average(residuals**2,weights=w.toarray().squeeze()))
 
     # Temporal evaluation matrix
     M = BSpline(tKnots, np.eye(n_tcp), tOrder)(time_ev)
@@ -856,11 +852,6 @@ def boundarymodel_BS(ds,**kwargs):
     # Transform to unprimed
     tau1 = 1/(1+np.exp(-1*tau2))
     tau_pb  = tau_eb*tau1
-
-    # Norms
-    normMpb = np.sqrt(np.average((sL@ms).flatten()**2))
-    residuals = np.rad2deg(tau_eb*(1/(1+np.exp(-1*mtau[ind]))) - theta_pb[ind])
-    normRpb = np.sqrt(np.average(residuals**2,weights=w.toarray().squeeze()))
 
     ## Derivative
   
