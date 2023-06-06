@@ -661,12 +661,13 @@ def boundarymodel_BS(ds,**kwargs):
     tLTL = tL.T@tL
     
     # 1st order Tikhonov regularization in mlt
-    sL = []
-    for i in range(n_pcp): sL.append(np.roll(np.r_[-1,1,np.repeat(0,n_pcp-2)],i))
-    sL=np.array(sL)
-    sLTL = np.zeros((n_pcp*n_tcp,n_pcp*n_tcp))
-    for t in range(n_tcp): sLTL[t:t+n_pcp*n_tcp:n_tcp,t:t+n_pcp*n_tcp:n_tcp] = sL.T@sL
-    
+    sLtemp = []
+    for i in range(n_pcp): sLtemp.append(np.roll(np.r_[-1,1,np.repeat(0,n_pcp-2)],i))
+    sLtemp=np.array(sLtemp)
+    sL = np.zeros((n_pcp*n_tcp,n_pcp*n_tcp))
+    for t in range(n_tcp): sL[t:t+n_pcp*n_tcp:n_tcp,t:t+n_pcp*n_tcp:n_tcp] = sLtemp
+    sLTL = sL.T@sL
+
     # Combined regularization
     R = tLeb*gtg_mag*tLTL + sLeb*gtg_mag*sLTL
      
@@ -694,6 +695,9 @@ def boundarymodel_BS(ds,**kwargs):
         m = ms
         iteration += 1
 
+    normMeb = np.sqrt(np.average((tL@ms).flatten()**2))
+    normReb = np.sqrt(np.average(residuals**2,weights=w.toarray().squeeze()))
+    
     # Temporal evaluation matrix
     time_ev=(df['date'].drop_duplicates()-dateS).values/ np.timedelta64(1, 'm')
     Gtime = BSpline.design_matrix(time_ev, tKnots,tOrder).toarray()
@@ -710,6 +714,11 @@ def boundarymodel_BS(ds,**kwargs):
 
     # Transform to unprimed
     tau_eb  = np.exp(tau1)
+
+    # Norms 
+    normMeb = np.sqrt(np.average((tL@ms).flatten()**2))
+    residuals = np.rad2deg(np.exp(mtau[ind]) - theta_eb[ind])
+    normReb = np.sqrt(np.average(residuals**2,weights=w.toarray().squeeze()))
 
     ## DERIVATIVE
     
@@ -796,11 +805,12 @@ def boundarymodel_BS(ds,**kwargs):
     tLTL = tL.T@tL
     
     # 1st order regularization in mlt
-    sL = []
-    for i in range(n_pcp): sL.append(np.roll(np.r_[-1,1,np.repeat(0,n_pcp-2)],i))
-    sL=np.array(sL)
-    sLTL = np.zeros((n_pcp*n_tcp,n_pcp*n_tcp))
-    for t in range(n_tcp): sLTL[t:t+n_pcp*n_tcp:n_tcp,t:t+n_pcp*n_tcp:n_tcp] = sL.T@sL
+    sLtemp = []
+    for i in range(n_pcp): sLtemp.append(np.roll(np.r_[-1,1,np.repeat(0,n_pcp-2)],i))
+    sLtemp=np.array(sLtemp)
+    sL = np.zeros((n_pcp*n_tcp,n_pcp*n_tcp))
+    for t in range(n_tcp): sL[t:t+n_pcp*n_tcp:n_tcp,t:t+n_pcp*n_tcp:n_tcp] = sLtemp
+    sLTL = sL.T@sL
     
     # Combined regularization
     R = tLpb*gtg_mag*tLTL + sLpb*gtg_mag*sLTL
@@ -828,6 +838,8 @@ def boundarymodel_BS(ds,**kwargs):
         m = ms
         iteration += 1
 
+
+
     # Temporal evaluation matrix
     M = BSpline(tKnots, np.eye(n_tcp), tOrder)(time_ev)
     
@@ -844,6 +856,11 @@ def boundarymodel_BS(ds,**kwargs):
     # Transform to unprimed
     tau1 = 1/(1+np.exp(-1*tau2))
     tau_pb  = tau_eb*tau1
+
+    # Norms
+    normMpb = np.sqrt(np.average((sL@ms).flatten()**2))
+    residuals = np.rad2deg(tau_eb*(1/(1+np.exp(-1*mtau[ind]))) - theta_pb[ind])
+    normRpb = np.sqrt(np.average(residuals**2,weights=w.toarray().squeeze()))
 
     ## Derivative
   
@@ -922,6 +939,10 @@ def boundarymodel_BS(ds,**kwargs):
         dA=(['date','mlt'], dA),
         dP_dt=(['date','mlt'], dP_dt),
         dA_dt=(['date','mlt'], dA_dt),
+        modelnorm_eb = normMeb,
+        residualnorm_eb = normReb,
+        modelnorm_pb = normMpb,
+        residualnorm_pb = normRpb,
         ),
     coords=dict(
         date = df['date'].drop_duplicates().values,
