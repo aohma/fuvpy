@@ -257,7 +257,7 @@ def final_bondaries_error(orbits,wicpath,bpath):
 
             isglobal = data_coverage(imgs,window=5,dzalim=65)
             bm['isglobal'] = ('date',isglobal)
-            bm['count'] = 0.5*(bi['pb'].count(dim='lim')>0).sum(dim='mlt') + 0.5*(bi['eb'].count(dim='lim')>0).sum(dim='mlt')
+            bm['count'] = 0.5*(bi['pb'].rolling(date=5,min_periods=1,center=True).count().count(dim='lim')>0).sum(dim='mlt') + 0.5*(bi['eb'].rolling(date=5,min_periods=1,center=True).count().count(dim='lim')>0).sum(dim='mlt')
 
             bm = bm.to_dataframe()
             bm['orbit']=orbit
