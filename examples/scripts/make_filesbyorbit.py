@@ -244,13 +244,13 @@ def final_bondaries_error(orbits,wicpath,bpath):
 
             bms = []    
             for l in np.arange(50,201,5):
-                bm = fuv.boundarymodel_BS(bi.sel(lim=l),tKnotSep=5,tLeb=1e-1,sLeb=1e-2,tLpb=1e-1,sLpb=1e-2)
+                bm = fuv.boundarymodel_BS(bi.sel(lim=l),tKnotSep=10,tLeb=1e0,sLeb=1e-2,tLpb=1e0,sLpb=1e-2)
                 bm = bm.expand_dims(lim=[l])
                 bms.append(bm)
             
             bms = xr.concat(bms,dim='lim')
 
-            bm = fuv.boundarymodel_BS(bi,tKnotSep=10,tLeb=1e0,sLeb=0,tLpb=1e0,sLpb=0)
+            bm = fuv.boundarymodel_BS(bi,tKnotSep=10,tLeb=1e0,sLeb=1e-2,tLpb=1e0,sLpb=1e-2)
             keys = list(bm.keys())
             for key in keys:
                 bm[key+'_err'] = bms[key].std(dim='lim')
@@ -334,3 +334,30 @@ def makeGIFs(orbits,wicpath,bpath,outpath):
 
 
 
+def find_reg(orbits,bpath,Ls,ind,oLs=None):
+    '''
+    Find regularization parameters
+    
+    orbits (list) : Orbit numbers
+    bpath (str) : Path to model boundaries
+    Ls (array) : Regularization parameters to check
+    oLs (array) : Value of the remaining reg params. If none, all are zero
+    ind (int) : Index of reg parameter to check. tLeb=0, sLeb=1, tLpb=2 and sLpb=3]
+    '''
+
+    if oLs is None: oLs = np.zeros(4)
+    boundary = ['eb','eb','pb','pb']
+    rnorms = np.full((len(orbits),len(Ls)),np.nan)
+    mnorms = np.full((len(orbits),len(Ls)),np.nan)
+
+    for i,orbit in enumerate(orbits):
+        try:
+            bi = pd.read_hdf(bpath+'initial_boundaries.h5',key='initial',where='orbit=="{}"'.format(orbit)).to_xarray()
+
+            for j,l in enumerate(Ls):
+                oLs[ind]=l
+                bm = fuv.boundarymodel_BS(bi,tLeb=oLs[0],sLeb=oLs[1],tLpb=oLs[2],sLpb=oLs[3])
+                rnorms[i,j]=bm['residualnorm_'+boundary[ind]].values
+                mnorms[i,j]=bm['modelnorm_'+boundary[ind]].values
+        except Exception as e: print(e)
+    return rnorms,mnorms
