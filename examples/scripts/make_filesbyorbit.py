@@ -408,8 +408,8 @@ def makeGIFs2(corenumber):
                     ind1 = (bf.loc[t.values,'A_mean'] > bf.loc[t.values,'P_mean']+2*bf.loc[t.values,'P_std']).all()
                     ind2 = (bf.loc[t.values,'A_mean'] > bf.loc[t.values,'S_mean']+2*bf.loc[t.values,'S_std']).all()
                     ind3 = (bf.loc[t.values,'count'] > 12).all()
-                    ind4 = (bf.loc[t.values,'pb_err'].quantile(0.75).values<1.5)
-                    ind5 = (bf.loc[t.values,'eb_err'].quantile(0.75).values<1.5)
+                    ind4 = (bf.loc[t.values,'pb_err'].quantile(0.75)<1.5)
+                    ind5 = (bf.loc[t.values,'eb_err'].quantile(0.75)<1.5)
 
                     alpha = 1 
                     linestyle = '-' if (ind0&ind1&ind2&ind3&ind4&ind5) else ':'
