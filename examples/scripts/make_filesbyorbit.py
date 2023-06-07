@@ -405,12 +405,14 @@ def makeGIFs2(corenumber):
                 try:
                     # Quality flags
                     ind0 = bf.loc[t.values,'isglobal'].all()
-                    ind1 = (bf.loc[t.values,'A_mean'] > bf.loc[t.values,'P_mean']+bf.loc[t.values,'P_std']+bf.loc[t.values,'A_std']).all()
-                    ind2 = (bf.loc[t.values,'A_mean'] > bf.loc[t.values,'S_mean']+bf.loc[t.values,'S_std']+bf.loc[t.values,'A_std']).all()
+                    ind1 = (bf.loc[t.values,'A_mean'] > bf.loc[t.values,'P_mean']+2*bf.loc[t.values,'P_std']).all()
+                    ind2 = (bf.loc[t.values,'A_mean'] > bf.loc[t.values,'S_mean']+2*bf.loc[t.values,'S_std']).all()
                     ind3 = (bf.loc[t.values,'count'] > 12).all()
+                    ind4 = (bf.loc[t.values,'pb_err'].quantile(0.75).values<1.5)
+                    ind5 = (bf.loc[t.values,'eb_err'].quantile(0.75).values<1.5)
 
                     alpha = 1 
-                    linestyle = '-' if (ind0&ind1&ind2&ind3) else ':'
+                    linestyle = '-' if (ind0&ind1&ind2&ind3&ind4&ind5) else ':'
                     pax.scatter(bi.loc[t.values,'pb'].values,bi.loc[t.values,'mlt'].values,s=1,color='C6')
                     pax.scatter(bi.loc[t.values,'eb'].values,bi.loc[t.values,'mlt'].values,s=1,color='C9')
                     pax.plot(bf.loc[t.values,'pb'].values,bf.loc[t.values,'mlt'].values,color='C3',alpha=alpha,linestyle=linestyle)
