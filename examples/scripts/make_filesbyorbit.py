@@ -265,7 +265,7 @@ def final_bondaries_error(orbits,wicpath,bpath):
             bm[['pb','eb','pb_err','eb_err','ve_pb','vn_pb','ve_eb','vn_eb','dP','dA','dP_dt','dA_dt','isglobal','count','orbit','P_mean','P_std','A_mean','A_std','S_mean','S_std']].to_hdf(bpath+'final_boundaries.h5','final',format='table',append=True,data_columns=True)
         except Exception as e: print(e)
 
-def makeGIFs(orbits,wicpath,bpath,outpath):
+def makeGIFs(orbits,wicpath,bpath,outpath,tempdir='temp'):
     '''
     Make GIF of each orbit
     
@@ -273,6 +273,7 @@ def makeGIFs(orbits,wicpath,bpath,outpath):
     wicpath (str) : Path to corrected images
     bpath (str) : Path to model boundaries
     outpath (str) : PAth to save the GIFs
+    tempdir (str) : Name of temp folder within outpath
     '''
 
     minlat = 50
@@ -361,3 +362,78 @@ def find_reg(orbits,bpath,Ls,ind,oLs=None):
                 mnorms[i,j]=bm['modelnorm_'+boundary[ind]].values
         except Exception as e: print(e)
     return rnorms,mnorms
+
+def makeGIFs2(corenumber):
+    '''
+    Make GIF of each orbit
+    
+    orbits (list) : Orbit numbers
+    wicpath (str) : Path to corrected images
+    bpath (str) : Path to model boundaries
+    outpath (str) : PAth to save the GIFs
+    tempdir (str) : Name of temp folder within outpath
+    '''
+    
+    wicpath = '/mnt/5fa6bccc-fa9d-4efc-9ddc-756f65699a0a/aohma/fuv/wic/'
+    bpath = '/mnt/5fa6bccc-fa9d-4efc-9ddc-756f65699a0a/aohma/fuv/boundaries/'
+    outpath = '/mnt/5fa6bccc-fa9d-4efc-9ddc-756f65699a0a/aohma/fuv/fig/'
+    temppath = outpath + 'temp'+str(corenumber)+'/'
+
+    orbits = [list(range(0,300)),list(range(300,500)),list(range(500,700)),list(range(700,900)),list(range(900,1100)),list(range(1100,1300)),list(range(1300,1500)),list(range(1500,1704))][corenumber]
+
+    minlat = 50
+
+
+    for orbit in orbits:
+        try:
+            wic = xr.load_dataset(wicpath+'wic_or'+str(orbit).zfill(4)+'.nc')
+            wic['shimg'].attrs = {'long_name': 'Counts', 'units': ''}
+
+            bi = pd.read_hdf(bpath+'initial_boundaries.h5',key='initial',where='orbit=="{}"'.format(orbit))
+            bf = pd.read_hdf(bpath+'final_boundaries.h5',key='final',where='orbit=="{}"'.format(orbit))
+            bi = bi.reset_index().set_index('date')
+            bf = bf.reset_index().set_index('date')
+
+            fig,ax = plt.subplots(figsize=(5,5))
+            ax.axis('off')
+
+            for i,t in enumerate(wic.date):
+                pax = pp(ax,minlat=minlat)
+                ax.set_title('Orbit: '+str(orbit).zfill(4)+'   '+t.dt.strftime('%Y-%m-%d').values.tolist()+' '+t.dt.strftime('%H:%M:%S').values.tolist())
+
+                pax.scatter(wic.sel(date=t)['mlat'].values,wic.sel(date=t)['mlt'].values,c=wic.sel(date=t)['shimg'].values,s=2,alpha=0.5,vmin=0,vmax=500,cmap='Greens')
+                try:
+                    # Quality flags
+                    ind0 = bf.loc[t.values,'isglobal'].all()
+                    ind1 = (bf.loc[t.values,'A_mean'] > bf.loc[t.values,'P_mean']+bf.loc[t.values,'P_std']+bf.loc[t.values,'A_std']).all()
+                    ind2 = (bf.loc[t.values,'A_mean'] > bf.loc[t.values,'S_mean']+bf.loc[t.values,'S_std']+bf.loc[t.values,'A_std']).all()
+                    ind3 = (bf.loc[t.values,'count'] > 12).all()
+
+                    alpha = 1 
+                    linestyle = '-' if (ind0&ind1&ind2&ind3) else ':'
+                    pax.scatter(bi.loc[t.values,'pb'].values,bi.loc[t.values,'mlt'].values,s=1,color='C6')
+                    pax.scatter(bi.loc[t.values,'eb'].values,bi.loc[t.values,'mlt'].values,s=1,color='C9')
+                    pax.plot(bf.loc[t.values,'pb'].values,bf.loc[t.values,'mlt'].values,color='C3',alpha=alpha,linestyle=linestyle)
+                    pax.plot(bf.loc[t.values,'eb'].values,bf.loc[t.values,'mlt'].values,color='C0',alpha=alpha,linestyle=linestyle)
+                except Exception as e: print(e)
+                
+                try:
+                    mlat_err = np.concatenate((bf.loc[t.values,'pb'].values+bf.loc[t.values,'pb_err'].values,bf.loc[t.values,'pb'].values[[0]]+bf.loc[t.values,'pb_err'].values[[0]],bf.loc[t.values,'pb'].values[[0]]-bf.loc[t.values,'pb_err'].values[[0]],bf.loc[t.values,'pb'].values[::-1]-bf.loc[t.values,'pb_err'].values[::-1]))
+                    mlt_err = np.concatenate((bf.loc[t.values,'mlt'].values,bf.loc[t.values,'mlt'].values[[0,0]],bf.loc[t.values,'mlt'].values[::-1]))
+                    pax.fill(mlat_err,mlt_err,color='C3',alpha=0.3*alpha,edgecolor=None)
+                    
+                    mlat_err = np.concatenate((bf.loc[t.values,'eb'].values+bf.loc[t.values,'eb_err'].values,bf.loc[t.values,'eb'].values[[0]]+bf.loc[t.values,'eb_err'].values[[0]],bf.loc[t.values,'eb'].values[[0]]-bf.loc[t.values,'eb_err'].values[[0]],bf.loc[t.values,'eb'].values[::-1]-bf.loc[t.values,'eb_err'].values[::-1]))
+                    pax.fill(mlat_err,mlt_err,color='C0',alpha=0.3*alpha,edgecolor=None)
+                except Exception as e: print(e)
+                        
+                
+                plt.savefig(temppath + 'wic'+str(i).zfill(4)+'.png',bbox_inches='tight',dpi=150)
+
+                ax.patches.clear()
+                ax.collections.clear()
+                ax.lines.clear()
+
+            plt.close()
+            os.system('convert '+temppath+'wic*.png '+outpath+'imgs_or'+str(orbit).zfill(4)+'.gif')
+            os.system('rm '+temppath+'*.png')
+        except Exception as e: print(e)
