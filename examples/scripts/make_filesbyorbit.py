@@ -379,7 +379,7 @@ def makeGIFs2(corenumber):
     outpath = '/mnt/5fa6bccc-fa9d-4efc-9ddc-756f65699a0a/aohma/fuv/fig/'
     temppath = outpath + 'temp'+str(corenumber)+'/'
 
-    orbits = [list(range(0,300)),list(range(300,500)),list(range(500,700)),list(range(700,900)),list(range(900,1100)),list(range(1100,1300)),list(range(1300,1500)),list(range(1500,1704))][corenumber]
+    orbits = [list(range(0,300)),list(range(300,500)),list(range(500,700)),list(range(700,900)),list(range(900,1100)),list(range(1100,1300)),list(range(1300,1500)),list(range(1500,1704))][corenumber-1]
 
     minlat = 50
 
