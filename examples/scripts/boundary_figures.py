@@ -159,8 +159,9 @@ def fig1(img,**kwargs):
     # Lower latitude
     pax.fill(np.concatenate((mlat_out,mlat_min)),np.concatenate((mlt_out,mlt_out[::-1])),color='C7',alpha=0.3,edgecolor=None)
 
-    #pax.plot(mlat_out,mlt_out,c='C7',linewidth=1)
+    pax.ax.text(0.2,0.9,'a',horizontalalignment='center', verticalalignment='center', transform=pax.ax.transAxes,fontsize=12)
 
+    bcd = 'bcd'
 
 
     for i,l in enumerate(lims_profile):
@@ -177,7 +178,8 @@ def fig1(img,**kwargs):
         ax.set_xlim([90,minlat])
         ax.set_ylim([-499,1999])
         #ax.set_title(str(mlt_ev[p]) + ' MLT' )
-        ax.text(0.25, 0.9, str(mlt_ev[p]) + ' MLT', horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
+        ax.text(0.1, 0.9, bcd[i], horizontalalignment='center', verticalalignment='center', transform=ax.transAxes,fontsize=12)
+        ax.text(0.8, 0.9, str(mlt_ev[p]) + ' MLT', horizontalalignment='center', verticalalignment='center', transform=ax.transAxes,fontsize=8)
 
         ax.set_ylabel('Intensity [counts]')
         if i == 2:
@@ -220,7 +222,26 @@ def load_bb():
     bb = xr.merge((bb,df.to_xarray()))
     return bb
 
+def load_bb2():
+    path = '/Users/aohma/BCSS-DAG Dropbox/Anders Ohma/data/fuvAuroralFlux/'
+    bm = pd.read_hdf(path+'hdf/final_boundaries.h5').to_xarray()
+    
+    ind0 = bm.isel(mlt=0)['isglobal'].values
+    ind1 = bm.isel(mlt=0)['A_mean'].values > bm.isel(mlt=0)['P_mean'].values + 2*bm.isel(mlt=0)['P_std'].values
+    ind2 = bm.isel(mlt=0)['A_mean'].values > bm.isel(mlt=0)['S_mean'].values + 2*bm.isel(mlt=0)['S_std'].values
+    ind3 = bm.isel(mlt=0)['count'].values > 12
 
+    ind4 = bm['pb_err'].quantile(0.75,dim='mlt').values<1.5
+    ind5 = bm['eb_err'].quantile(0.75,dim='mlt').values<1.5
+
+    dates = bm.date[ind0&ind1&ind2&ind3&ind4&ind5]
+    
+    bb = bm[['pb','eb','pb_err','eb_err','dP','dA','dP_dt','dA_dt','ve_pb','vn_pb','ve_eb','vn_eb']].sel(date=dates)
+    
+    df = processOMNI(bb.date.values)
+    df.index.name = 'date'
+    bb = xr.merge((bb,df.to_xarray()))
+    return bb
 
 def loadOMNI(fromDate='1981-01-01',toDate='2020-01-01'):
     # Load and process omni data
@@ -320,32 +341,53 @@ def plotplot(bb,outpath):
     testFit = func2(bb['A'],*popt2)
     # bb['LM'] = 1.4*bb['PhiN'] - testFit 
     print(popt2)
-    fig,axs = plt.subplots(1,3,figsize=(9,3))
+
+    ## MAGNETC FLUX AND dF/dt FIGURE
+
+    fig,axs = plt.subplots(2,2,figsize=(6,6))
     
-    (1e-6*np.deg2rad(15*0.1)*(bb['dP']).sum(dim='mlt')).plot.hist(axs[0],bins=np.arange(0,2001,25),histtype='step',color='C1')
-    (1e-6*np.deg2rad(15*0.1)*(bb['dA']).sum(dim='mlt')).plot.hist(axs[0],bins=np.arange(0,2001,25),histtype='step',color='C2')
+    bb['P'].plot.hist(axs[0,0],bins=np.arange(0,2001,25),histtype='step',color='C1')
+    bb['A'].plot.hist(axs[0,0],bins=np.arange(0,2001,25),histtype='step',color='C2')
     # (1e-6*np.deg2rad(15*0.1)*(bb['dA']+bb['dP']).sum(dim='mlt')).plot.hist(axs[0],bins=np.arange(0,2701,25),histtype='step')
     
-    # axs[0].set_ylabel('Count')
-    axs[0].set_xlabel('Magnetic flux [MWb]')
-    axs[0].legend(['P', 'A'],frameon=False)
-    
-    bb['P_dt'].plot.hist(axs[1],bins=np.arange(-500,501,10),histtype='step',color='C1')
-    bb['A_dt'].plot.hist(axs[1],bins=np.arange(-500,501,10),histtype='step',color='C2')
+    axs[0,0].set_ylabel('Counts')
+    axs[0,0].set_xlabel('Magnetic flux [MWb]')
+    axs[0,0].legend(['P', 'A'],frameon=False)
+    axs[0,0].set_xlim([0,2000])
+
+    bb['P_dt'].plot.hist(axs[0,1],bins=np.arange(-500,501,10),histtype='step',color='C1')
+    bb['A_dt'].plot.hist(axs[0,1],bins=np.arange(-500,501,10),histtype='step',color='C2')
     # (1e-3*np.deg2rad(15*0.1)*(bb['dA_dt']+bb['dP_dt']).sum(dim='mlt')).plot.hist(axs[1],bins=np.arange(-1000,1001,25),histtype='step')
     
-    axs[1].set_xlabel('Change flux [kV]')
-    axs[1].legend(['dP/dt', 'dA/dt'],frameon=False)
-    plt.tight_layout()
-    
-    axs[2].scatter(bb['P'],bb['A'],s=0.1,alpha=0.1)
-    r = np.round(pearsonr(bb['P'],bb['A'])[0],3)
-    axs[2].text(0.75,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[2].transAxes)
+    axs[0,1].set_ylabel('Counts')
+    axs[0,1].set_xlabel('Change flux [kV]')
+    axs[0,1].legend(['dP/dt', 'dA/dt'],frameon=False)
+    axs[0,1].set_xlim([-500,500])
 
-    axs[2].set_xlim([0,2000])
-    axs[2].set_ylim([0,2000])
-    axs[2].set_ylabel('A [MWb]')
-    axs[2].set_xlabel('P [MWb]')
+    axs[1,0].scatter(bb['P'],bb['A'],s=0.1,alpha=0.1)
+    r = np.round(pearsonr(bb['P'],bb['A'])[0],3)
+    axs[1,0].text(0.8,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[1,0].transAxes)
+
+    axs[1,0].set_xlim([0,2000])
+    axs[1,0].set_ylim([0,2000])
+    axs[1,0].set_ylabel('A [MWb]')
+    axs[1,0].set_xlabel('P [MWb]')
+
+
+    axs[1,1].scatter(bb['P_dt'],bb['A_dt'],s=0.1,alpha=0.1)
+    r = np.round(pearsonr(bb['P_dt'],bb['A_dt'])[0],3)
+    axs[1,1].text(0.8,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[1,1].transAxes)
+
+    axs[1,1].set_xlim([-500,500])
+    axs[1,1].set_ylim([-500,500])
+    axs[1,1].set_ylabel('dA/dt [kV]')
+    axs[1,1].set_xlabel('dP/dt [kV]')
+
+    # Letters
+    axs[0,0].text(0.05,0.95,'a',horizontalalignment='center',verticalalignment='center', transform=axs[0,0].transAxes)
+    axs[1,0].text(0.05,0.95,'b',horizontalalignment='center',verticalalignment='center', transform=axs[1,0].transAxes)
+    axs[0,1].text(0.05,0.95,'c',horizontalalignment='center',verticalalignment='center', transform=axs[0,1].transAxes)
+    axs[1,1].text(0.05,0.95,'d',horizontalalignment='center',verticalalignment='center', transform=axs[1,1].transAxes)
     
     fig.tight_layout()
     plt.savefig(outpath + 'fig01.png',bbox_inches='tight',dpi = 300)
@@ -502,39 +544,78 @@ def plotplot(bb,outpath):
     plt.savefig(outpath + 'fig04.png',bbox_inches='tight',dpi = 300)
     plt.close()
     
-    fig,axs = plt.subplots(1,3,figsize=(9,3))
+    ## GEOMAGNETIC FORCING AND INDICES
+    fig,axs = plt.subplots(2,3,figsize=(9,6))
     
-    axs[0].scatter(bb['PhiD'],1e-6*np.deg2rad(15*0.1)*bb['dA'].sum(dim='mlt'),s=0.1,alpha=0.1)
+    axs[0,0].scatter(bb['PhiD'],bb['A'],s=0.1,alpha=0.1)
     ind = np.isfinite(bb['PhiD'])
-    r = np.round(pearsonr(bb['PhiD'][ind],bb['dA'].sum(dim='mlt')[ind])[0],3)
-    axs[0].text(0.75,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[0].transAxes)
+    r = np.round(pearsonr(bb['PhiD'][ind],bb['A'][ind])[0],3)
+    axs[0,0].text(0.8,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[0,0].transAxes)
 
-    axs[0].set_xlim([0,250])
-    axs[0].set_ylim([0,2000])
-    axs[0].set_ylabel('A [MWb]')
-    axs[0].set_xlabel('$\\Phi_D$ [kV]')
+    axs[0,0].set_xlim([0,249.99])
+    axs[0,0].set_ylim([0,2000])
+    axs[0,0].set_ylabel('A [MWb]')
+    axs[0,0].set_xlabel('$\\Phi_D$ [kV]')
     
-    axs[1].scatter(bb['AE_INDEX'],1e-6*np.deg2rad(15*0.1)*bb['dA'].sum(dim='mlt'),s=0.1,alpha=0.1)
+    axs[0,1].scatter(bb['AE_INDEX'],bb['A'],s=0.1,alpha=0.1)
     ind = np.isfinite(bb['AE_INDEX'])
-    r = np.round(pearsonr(bb['AE_INDEX'][ind],1e-6*np.deg2rad(15*0.1)*bb['dA'].sum(dim='mlt')[ind])[0],3)
-    axs[1].text(0.75,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[1].transAxes)
+    r = np.round(pearsonr(bb['AE_INDEX'][ind],bb['A'][ind])[0],3)
+    axs[0,1].text(0.8,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[0,1].transAxes)
 
-    axs[1].set_xlim([0,1500])
-    axs[1].set_ylim([0,2000])
-    axs[1].set_ylabel('A [MWb]')
-    axs[1].set_xlabel('AE index [nT]')
+    axs[0,1].set_xlim([0,1499.9])
+    axs[0,1].set_ylim([0,2000])
+    axs[0,1].set_yticklabels('')
+    axs[0,1].set_xlabel('AE index [nT]')
     
-    axs[2].scatter(bb['SYM_H'],1e-6*np.deg2rad(15*0.1)*bb['dA'].sum(dim='mlt'),s=0.1,alpha=0.1)
+    axs[0,2].scatter(bb['SYM_H'],bb['A'],s=0.1,alpha=0.1)
     ind = np.isfinite(bb['SYM_H'])
-    r = np.round(pearsonr(bb['SYM_H'][ind],1e-6*np.deg2rad(15*0.1)*bb['dA'].sum(dim='mlt')[ind])[0],3)
-    axs[2].text(0.75,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[2].transAxes)
+    r = np.round(pearsonr(bb['SYM_H'][ind],bb['A'][ind])[0],3)
+    axs[0,2].text(0.8,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[0,2].transAxes)
 
-    axs[2].set_xlim([-300,100])
-    axs[2].set_ylim([0,2000])
-    axs[2].set_ylabel('A [MWb]')
-    axs[2].set_xlabel('SYM_H index [nT]')
+    axs[0,2].set_xlim([-300,100])
+    axs[0,2].set_ylim([0,2000])
+    axs[0,2].set_yticklabels('')
+    axs[0,2].set_xlabel('SYM_H index [nT]')
+
+    axs[1,0].scatter(bb['PhiD'],bb['A_dt'],s=0.1,alpha=0.1)
+    ind = np.isfinite(bb['PhiD'])
+    r = np.round(pearsonr(bb['PhiD'][ind],bb['A_dt'][ind])[0],3)
+    axs[1,0].text(0.8,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[1,0].transAxes)
+
+    axs[1,0].set_xlim([0,249.9])
+    axs[1,0].set_ylim([-500,500])
+    axs[1,0].set_ylabel('dA/dt [kV]')
+    axs[1,0].set_xlabel('$\\Phi_D$ [kV]')
     
-    plt.tight_layout()
+    axs[1,1].scatter(bb['dAE_dt'],bb['A_dt'],s=0.1,alpha=0.1)
+    ind = np.isfinite(bb['dAE_dt'])
+    r = np.round(pearsonr(bb['dAE_dt'][ind],bb['A_dt'][ind])[0],3)
+    axs[1,1].text(0.8,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[1,1].transAxes)
+
+    axs[1,1].set_xlim([-100,100])
+    axs[1,1].set_ylim([-500,500])
+    axs[1,1].set_yticklabels('')
+    axs[1,1].set_xlabel('d(AE)/dt [nT/min]')
+    
+    axs[1,2].scatter(bb['dSYMH_dt'],bb['A_dt'],s=0.1,alpha=0.1)
+    ind = np.isfinite(bb['dSYMH_dt'])
+    r = np.round(pearsonr(bb['dSYMH_dt'][ind],bb['A_dt'][ind])[0],3)
+    axs[1,2].text(0.8,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[1,2].transAxes)
+
+    axs[1,2].set_xlim([-5,5])
+    axs[1,2].set_ylim([-500,500])
+    axs[1,2].set_yticklabels('')
+    axs[1,2].set_xlabel('d(SYM_H)/dt [nT/min]')
+    
+    # Letters
+    axs[0,0].text(0.05,0.93,'a',horizontalalignment='center', verticalalignment='center', transform=axs[0,0].transAxes,fontsize=12)
+    axs[0,1].text(0.05,0.93,'c',horizontalalignment='center', verticalalignment='center', transform=axs[0,1].transAxes,fontsize=12)
+    axs[0,2].text(0.05,0.93,'e',horizontalalignment='center', verticalalignment='center', transform=axs[0,2].transAxes,fontsize=12)
+    axs[1,0].text(0.05,0.93,'b',horizontalalignment='center', verticalalignment='center', transform=axs[1,0].transAxes,fontsize=12)
+    axs[1,1].text(0.05,0.93,'d',horizontalalignment='center', verticalalignment='center', transform=axs[1,1].transAxes,fontsize=12)
+    axs[1,2].text(0.05,0.93,'f',horizontalalignment='center', verticalalignment='center', transform=axs[1,2].transAxes,fontsize=12)
+
+    plt.subplots_adjust(hspace=0.25,wspace=0.07)
     
     plt.savefig(outpath + 'fig05.png',bbox_inches='tight',dpi = 300)
     plt.close()
@@ -763,7 +844,81 @@ def plotplot(bb,outpath):
     ax.set_title('BCSS vs BAS all data')
 
     plt.savefig(outpath + 'fig10.png',bbox_inches='tight',dpi = 300)
-    plt.close()    
+    plt.close()   
+
+    fig,axs = plt.subplots(1,3,figsize=(9,3))
+    
+    axs[0].scatter(bb['PhiD']-bb['P_dt'],bb['A_dt'],s=0.1,alpha=0.1)
+    ind = np.isfinite(bb['PhiD'])
+    r = np.round(pearsonr(bb['PhiD'][ind]-bb['P_dt'][ind],bb['A_dt'][ind])[0],3)
+    axs[0].text(0.25,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[0].transAxes)
+
+    axs[0].set_xlim([-500,500])
+    axs[0].set_ylim([-500,500])
+    axs[0].set_ylabel('dA/dt [kV]')
+    axs[0].set_xlabel('$\\Phi_N$ [kV]')
+    
+    x = bb['PhiD'].values-bb['P_dt'].values
+    y = bb['A_dt'].values
+    ind = (x>-1000)&(x<1000)&(y>-1000)&(y<1000)
+    x=x[ind]
+    y=y[ind]
+    
+    m = np.linalg.eig(np.cov(x,y))[1][0][0]/np.linalg.eig(np.cov(x,y))[1][0][1]
+    b = np.mean(y) - m * np.mean(x)
+    axs[0].axline(xy1=(0, b), slope=m,color='C6',linestyle='--')
+    axs[0].text(0.7,0.1,'dA/dt $\\propto$ '+str(np.round(m,2))+' $\\Phi_N$',horizontalalignment='center',verticalalignment='center', transform=axs[1].transAxes)
+
+    axs[1].scatter(bb['PhiD'],1e-3*np.deg2rad(15*0.1)*bb['dA_dt'].sel(mlt=12),s=0.1,alpha=0.1)
+    ind = np.isfinite(bb['PhiD'])
+    r = np.round(pearsonr(bb['PhiD'][ind],1e-3*np.deg2rad(15*0.1)*bb['dA_dt'].sel(mlt=12)[ind])[0],3)
+    axs[1].text(0.75,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[1].transAxes)
+    
+    axs[1].set_xlim([0,200])
+    axs[1].set_ylim([-2,2])
+    axs[1].set_ylabel('dA$_{12}$/dt [kV]')
+    axs[1].set_xlabel('$\\Phi_D$ [kV]')
+    
+    # axs[2].scatter(bb['PhiD'],1e-3*np.deg2rad(15*0.1)*bb['dA_dt'].sel(mlt=12),s=0.1,alpha=0.1)
+    # ind = np.isfinite(bb['PhiD'])
+    # r = np.round(pearsonr(bb['PhiD'][ind],1e-3*np.deg2rad(15*0.1)*bb['dA_dt'].sel(mlt=12)[ind])[0],3)
+    # axs[2].text(0.75,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[2].transAxes)
+
+    # axs[2].set_xlim([0,250])
+    # axs[2].set_ylim([-5,5])
+    # axs[2].set_ylabel('dA$_{12}$/dt [kV]')
+    # axs[2].set_xlabel('$\\Phi_D$ [kV]')
+
+    axs[2].scatter(bb['A'],bb['L'],s=0.1,alpha=0.1)
+    ind = np.isfinite(bb['PhiD'])
+    r = np.round(pearsonr(bb['A'][ind],bb['L'][ind])[0],3)
+    axs[2].text(0.8,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[0].transAxes)
+
+    axs[2].set_xlim([0,2000])
+    axs[2].set_ylim([-399,399])
+    axs[2].set_ylabel('L [kV]')
+    axs[2].set_xlabel('$A$ [MWb]')
+    
+    x = bb['A'].values[ind]
+    y = bb['L'].values[ind]
+    # return x,y
+    #m = np.linalg.eig(np.cov(x,y))[1][1][0]/np.linalg.eig(np.cov(x,y))[1][1][1]
+    #b = np.mean(y) - m * np.mean(x)
+    #axs[0].axline(xy1=(0, b), slope=m,color='C6',linestyle='--')
+    
+    #tau = 1/(m*1e-3)/60/60
+    #axs[0].text(0.3,0.1,'L $\\propto$ A/'+str(np.round(tau,1))+' hrs',horizontalalignment='center',verticalalignment='center', transform=axs[0].transAxes)
+
+    a = np.linspace(0,1500,101)
+    #axs[0].plot(a,a**4/6e9,color='C7',linestyle=':')
+    
+    axs[0].plot(a,func(a,*popt),color='C8',linestyle=':')
+    #axs[0].plot(a,func2(a,*popt2),color='C9',linestyle=':')
+    
+    plt.subplots_adjust(wspace=0.3)
+    plt.savefig(outpath + 'fig11.png',bbox_inches='tight',dpi = 300)
+    plt.close()
+
     
 def plot_ex(orbits,outpath):
     n=len(orbits)
