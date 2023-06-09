@@ -663,7 +663,7 @@ def boundarymodel_BS(ds,**kwargs):
     # 1st order Tikhonov regularization in mlt
     sLtemp = []
     for i in range(n_pcp): sLtemp.append(np.roll(np.r_[-1,1,np.repeat(0,n_pcp-2)],i))
-    sLtemp=np.array(sLtemp)
+    sLtemp=(24/n_pcp)/np.diff(np.r_[mltKnots,24+mltKnots[0]])[:,None]*np.array(sLtemp)
     sL = np.zeros((n_pcp*n_tcp,n_pcp*n_tcp))
     for t in range(n_tcp): sL[t:t+n_pcp*n_tcp:n_tcp,t:t+n_pcp*n_tcp:n_tcp] = sLtemp
     sLTL = sL.T@sL
@@ -695,7 +695,7 @@ def boundarymodel_BS(ds,**kwargs):
         m = ms
         iteration += 1
 
-    normMeb = np.sqrt(np.average((tL@ms).flatten()**2))
+    normMeb = np.sqrt(np.average((sL@ms).flatten()**2))
     normReb = np.sqrt(np.average(residuals**2,weights=w.toarray().squeeze()))
     
     # Temporal evaluation matrix
@@ -802,7 +802,7 @@ def boundarymodel_BS(ds,**kwargs):
     # 1st order regularization in mlt
     sLtemp = []
     for i in range(n_pcp): sLtemp.append(np.roll(np.r_[-1,1,np.repeat(0,n_pcp-2)],i))
-    sLtemp=np.array(sLtemp)
+    sLtemp=(24/n_pcp)/np.diff(np.r_[mltKnots,24+mltKnots[0]])[:,None]*np.array(sLtemp)
     sL = np.zeros((n_pcp*n_tcp,n_pcp*n_tcp))
     for t in range(n_tcp): sL[t:t+n_pcp*n_tcp:n_tcp,t:t+n_pcp*n_tcp:n_tcp] = sLtemp
     sLTL = sL.T@sL
@@ -833,7 +833,7 @@ def boundarymodel_BS(ds,**kwargs):
         m = ms
         iteration += 1
 
-    normMpb = np.sqrt(np.average((tL@ms).flatten()**2))
+    normMpb = np.sqrt(np.average((sL@ms).flatten()**2))
     normRpb = np.sqrt(np.average(residuals**2,weights=w.toarray().squeeze()))
 
     # Temporal evaluation matrix
@@ -910,6 +910,11 @@ def boundarymodel_BS(ds,**kwargs):
     
     v_phi =  v_phi.reshape((len(time_ev),len(phi_ev)))
     v_theta = v_theta.reshape((len(time_ev),len(phi_ev)))
+
+    dtaudt =  dtaudt.reshape((len(time_ev),len(phi_ev)))
+    dtaudp =  dtaudp.reshape((len(time_ev),len(phi_ev)))
+    dtau_dt_eb =  dtau_dt_eb.reshape((len(time_ev),len(phi_ev)))
+    dtau_dp_eb =  dtau_dp_eb.reshape((len(time_ev),len(phi_ev)))
     
     dA = (dT-dP).reshape((len(time_ev),len(phi_ev)))
     dA_dt = (dT_dt-dP_dt).reshape((len(time_ev),len(phi_ev)))
@@ -926,6 +931,10 @@ def boundarymodel_BS(ds,**kwargs):
         vn_pb=(['date','mlt'], -v_theta),
         ve_eb=(['date','mlt'], u_phi),
         vn_eb=(['date','mlt'], -u_theta),
+        dpb_dt=(['date','mlt'], dtaudt),
+        dpb_dp=(['date','mlt'], dtaudp),
+        deb_dt=(['date','mlt'], dtau_dt_eb),
+        deb_dp=(['date','mlt'], dtau_dp_eb),
         dP=(['date','mlt'], dP),
         dA=(['date','mlt'], dA),
         dP_dt=(['date','mlt'], dP_dt),
