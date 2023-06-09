@@ -311,11 +311,11 @@ def plotplot(bb,outpath):
     bb['P_dt'] = 1e-3*np.deg2rad(15*0.1)*(bb['dP_dt']).sum(dim='mlt')
     bb['A_dt'] = 1e-3*np.deg2rad(15*0.1)*(bb['dA_dt']).sum(dim='mlt')
     bb['PhiN'] = bb['PhiD'] - bb['P_dt']
-    bb['L'] = 1.4*bb['PhiN'] - bb['A_dt']
+    bb['L'] = 1.63*bb['PhiN'] - bb['A_dt']
     # bb['LM'] = 1e3*(1/(20*60)*np.maximum(bb['A']-700,0)+1/(10*60*60)*bb['A'])
-    bb['LM'] = 1.4*bb['PhiN'] - 1e3/(1.8*60*60)*np.maximum(bb['A'],0)
+    bb['LM'] = 1.63*bb['PhiN'] - 1e3/(3.66*60*60)*np.maximum(bb['A'],0)
     
-    bb['LM'] = 1.4*bb['PhiN'] - bb['A']**4/6e9
+    #bb['LM'] = 1.63*bb['PhiN'] - bb['A']**4/6e9
     
     
 
@@ -330,7 +330,7 @@ def plotplot(bb,outpath):
 
     popt, pcov=curve_fit(func, bb['A'][ind], bb['L'][ind], bounds=(0,np.inf))
     testFit = func(bb['A'],*popt)
-    bb['LM'] = 1.4*bb['PhiN'] - testFit  
+    bb['LM'] = 1.63*bb['PhiN'] - testFit  
     
     def func2(x,a):
         return a*x
@@ -592,7 +592,7 @@ def plotplot(bb,outpath):
     r = np.round(pearsonr(bb['dAE_dt'][ind],bb['A_dt'][ind])[0],3)
     axs[1,1].text(0.8,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[1,1].transAxes)
 
-    axs[1,1].set_xlim([-100,100])
+    axs[1,1].set_xlim([-50,50])
     axs[1,1].set_ylim([-500,500])
     axs[1,1].set_yticklabels('')
     axs[1,1].set_xlabel('d(AE)/dt [nT/min]')
@@ -846,7 +846,7 @@ def plotplot(bb,outpath):
     plt.savefig(outpath + 'fig10.png',bbox_inches='tight',dpi = 300)
     plt.close()   
 
-    fig,axs = plt.subplots(1,3,figsize=(9,3))
+    fig,axs = plt.subplots(1,3,figsize=(10,3))
     
     axs[0].scatter(bb['PhiD']-bb['P_dt'],bb['A_dt'],s=0.1,alpha=0.1)
     ind = np.isfinite(bb['PhiD'])
@@ -867,7 +867,7 @@ def plotplot(bb,outpath):
     m = np.linalg.eig(np.cov(x,y))[1][0][0]/np.linalg.eig(np.cov(x,y))[1][0][1]
     b = np.mean(y) - m * np.mean(x)
     axs[0].axline(xy1=(0, b), slope=m,color='C6',linestyle='--')
-    axs[0].text(0.7,0.1,'dA/dt $\\propto$ '+str(np.round(m,2))+' $\\Phi_N$',horizontalalignment='center',verticalalignment='center', transform=axs[1].transAxes)
+    axs[0].text(0.7,0.1,'dA/dt $\\propto$ '+str(np.round(m,2))+' $\\Phi_N$',horizontalalignment='center',verticalalignment='center', transform=axs[0].transAxes)
 
     axs[1].scatter(bb['PhiD'],1e-3*np.deg2rad(15*0.1)*bb['dA_dt'].sel(mlt=12),s=0.1,alpha=0.1)
     ind = np.isfinite(bb['PhiD'])
@@ -892,7 +892,7 @@ def plotplot(bb,outpath):
     axs[2].scatter(bb['A'],bb['L'],s=0.1,alpha=0.1)
     ind = np.isfinite(bb['PhiD'])
     r = np.round(pearsonr(bb['A'][ind],bb['L'][ind])[0],3)
-    axs[2].text(0.8,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[0].transAxes)
+    axs[2].text(0.8,0.1,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[2].transAxes)
 
     axs[2].set_xlim([0,2000])
     axs[2].set_ylim([-399,399])
@@ -912,8 +912,8 @@ def plotplot(bb,outpath):
     a = np.linspace(0,1500,101)
     #axs[0].plot(a,a**4/6e9,color='C7',linestyle=':')
     
-    axs[0].plot(a,func(a,*popt),color='C8',linestyle=':')
-    #axs[0].plot(a,func2(a,*popt2),color='C9',linestyle=':')
+    axs[2].plot(a,func(a,*popt),color='C7',linestyle=':')
+    axs[2].plot(a,func2(a,*popt2),color='C9',linestyle=':')
     
     plt.subplots_adjust(wspace=0.3)
     plt.savefig(outpath + 'fig11.png',bbox_inches='tight',dpi = 300)
@@ -1041,7 +1041,61 @@ def plot_ex(orbits,outpath):
         
         
         
+def plot_ex2(orbits,outpath):
+    n=len(orbits)
+    path = '/Users/aohma/BCSS-DAG Dropbox/Anders Ohma/data/fuvAuroralFlux/'
+    
+    fig,axs = plt.subplots(n,2,figsize=(8,3))
+    
+    for i in range(n):
+        bm = pd.read_hdf(path+'hdf/final_boundaries.h5',where='orbit=="{}"'.format(orbits[i])).to_xarray()
+    
+        df = processOMNI(bm.date.values)
+        df.index.name = 'date'
+        bm = xr.merge((bm,df.to_xarray()))
         
+        bm['A'] = 1e-3*np.deg2rad(15*0.1)*(bm['dA']).sum(dim='mlt')
+        bm['A_dt'] = 1e-3*np.deg2rad(15*0.1)*(bm['dA_dt']).sum(dim='mlt')
+        bm['P_dt'] = 1e-3*np.deg2rad(15*0.1)*(bm['dP_dt']).sum(dim='mlt')
+        bm['PhiN'] = bm['PhiD']-bm['P_dt']
+        bm['L'] = 1.63*bm['PhiN'] - bm['A_dt']
+        bm['t2'] = 1/(3.66*60*60)*bm['A']
+
+        time=(bm.date-bm.date[0]).values/ np.timedelta64(1, 'h')
+    
+        
+        axs[i,0].plot(time,bm['A_dt'].values,color='C2')
+        axs[i,0].plot(time,1.63*bm['PhiN'].values,color='C1')
+        
+        # axs[0].legend(['dA/dt [kV]','$\\Phi_N$ [kV]'],frameon=False,ncol=2)
+        axs[0,0].text(0.25,0.88,'dA/dt [kV]',color='C2',horizontalalignment='center',verticalalignment='center', transform=axs[0,0].transAxes)
+        axs[0,0].text(0.75,0.88,'$\\Phi_N$ [kV]',color='C1',horizontalalignment='center',verticalalignment='center', transform=axs[0,0].transAxes)
+
+        axs[i,0].set_xlim([1,8])
+        axs[i,0].set_ylim([-399,599])
+        axs[i,0].set_ylabel('Orbit '+str(orbits[i]))
+        if i != n-1:
+            axs[i,0].xaxis.set_tick_params(labelbottom=False)
+        else:
+            axs[i,0].set_xlabel('time [hrs]')
+
+        axs[i,1].plot(time,bm['L'].values,color='C2')
+        axs[i,1].plot(time,bm['t2'].values,color='C4')
+        
+        axs[0,1].text(0.25,0.88,'L [kV]',color='C2',horizontalalignment='center',verticalalignment='center', transform=axs[0,1].transAxes)
+        axs[0,1].text(0.75,0.88,'A/1.8 hrs [kV]',color='C4',horizontalalignment='center',verticalalignment='center', transform=axs[0,1].transAxes)
+
+        axs[i,1].set_xlim([1,8])
+        axs[i,1].set_ylim([-399,599])
+        axs[i,1].set_yticklabels('')
+        if i != n-1:
+            axs[i,1].xaxis.set_tick_params(labelbottom=False)
+        else:
+            axs[i,1].set_xlabel('time [hrs]')
+    
+    plt.subplots_adjust(wspace=0.0,hspace=0.0)
+    plt.savefig(outpath + 'fig11.png',bbox_inches='tight',dpi = 300)
+    plt.close()         
         
         
         
