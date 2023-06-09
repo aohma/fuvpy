@@ -262,7 +262,7 @@ def final_bondaries_error(orbits,wicpath,bpath):
             bm = bm.to_dataframe()
             bm['orbit']=orbit
             bm = intensities(imgs, bm)
-            bm[['pb','eb','pb_err','eb_err','ve_pb','vn_pb','ve_eb','vn_eb','dpb_dt','dpb_dp','deb_dt','deb_dp','dP','dA','dP_dt','dA_dt','isglobal','count','orbit','P_mean','P_std','A_mean','A_std','S_mean','S_std']].to_hdf(bpath+'final_boundaries.h5','final',format='table',append=True,data_columns=True)
+            bm[['pb','eb','pb_err','eb_err','ve_pb','vn_pb','ve_eb','vn_eb','dpb_dt','dpb_dp','deb_dt','deb_dp','dP','dA','dP_dt','dA_dt','isglobal','count','orbit','P_mean','P_std','A_mean','A_std','S_mean','S_std']].to_hdf(bpath+'final_boundaries_dense.h5','final',format='table',append=True,data_columns=True)
         except Exception as e: print(e)
 
 def makeGIFs(orbits,wicpath,bpath,outpath,tempdir='temp'):
