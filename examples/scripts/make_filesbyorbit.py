@@ -244,13 +244,13 @@ def final_bondaries_error(orbits,wicpath,bpath):
 
             bms = []    
             for l in np.arange(50,201,5):
-                bm = fuv.boundarymodel_BS(bi.sel(lim=l),tKnotSep=10,tLeb=1e0,sLeb=1e-2,tLpb=1e0,sLpb=1e-2)
+                bm = fuv.boundarymodel_BS(bi.sel(lim=l),tKnotSep=10,tLeb=1e0,sLeb=1e-2,tLpb=1e0,sLpb=1e-1,sKnots_eb=np.arange(0,24,4),sKnots_pb=np.array([0,1,2,3,4,5,6,8,12,16,18,19,20,21,22,23]))
                 bm = bm.expand_dims(lim=[l])
                 bms.append(bm)
             
             bms = xr.concat(bms,dim='lim')
 
-            bm = fuv.boundarymodel_BS(bi,tKnotSep=10,tLeb=1e0,sLeb=1e-2,tLpb=1e0,sLpb=1e-2)
+            bm = fuv.boundarymodel_BS(bi,tKnotSep=10,tLeb=1e0,sLeb=1e-2,tLpb=1e0,sLpb=1e-1,sKnots_eb=np.arange(0,24,4),sKnots_pb=np.array([0,1,2,3,4,5,6,8,12,16,18,19,20,21,22,23]))
             keys = list(bm.keys())
             for key in keys:
                 bm[key+'_err'] = bms[key].std(dim='lim')
@@ -262,7 +262,7 @@ def final_bondaries_error(orbits,wicpath,bpath):
             bm = bm.to_dataframe()
             bm['orbit']=orbit
             bm = intensities(imgs, bm)
-            bm[['pb','eb','pb_err','eb_err','ve_pb','vn_pb','ve_eb','vn_eb','dP','dA','dP_dt','dA_dt','isglobal','count','orbit','P_mean','P_std','A_mean','A_std','S_mean','S_std']].to_hdf(bpath+'final_boundaries.h5','final',format='table',append=True,data_columns=True)
+            bm[['pb','eb','pb_err','eb_err','ve_pb','vn_pb','ve_eb','vn_eb','dpb_dt','dpb_dp','deb_dt','deb_dp','dP','dA','dP_dt','dA_dt','isglobal','count','orbit','P_mean','P_std','A_mean','A_std','S_mean','S_std']].to_hdf(bpath+'final_boundaries.h5','final',format='table',append=True,data_columns=True)
         except Exception as e: print(e)
 
 def makeGIFs(orbits,wicpath,bpath,outpath,tempdir='temp'):
@@ -357,7 +357,7 @@ def find_reg(orbits,bpath,Ls,ind,oLs=None):
 
             for j,l in enumerate(Ls):
                 oLs[ind]=l
-                bm = fuv.boundarymodel_BS(bi,tLeb=oLs[0],sLeb=oLs[1],tLpb=oLs[2],sLpb=oLs[3])
+                bm = fuv.boundarymodel_BS(bi,tLeb=oLs[0],sLeb=oLs[1],tLpb=oLs[2],sLpb=oLs[3],sKnots_eb=np.arange(0,24,4),sKnots_pb=np.array([0,1,2,3,4,5,6,8,12,16,18,19,20,21,22,23]))
                 rnorms[i,j]=bm['residualnorm_'+boundary[ind]].values
                 mnorms[i,j]=bm['modelnorm_'+boundary[ind]].values
         except Exception as e: print(e)
