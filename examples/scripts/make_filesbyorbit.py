@@ -390,7 +390,7 @@ def makeGIFs2(corenumber):
             wic['shimg'].attrs = {'long_name': 'Counts', 'units': ''}
 
             bi = pd.read_hdf(bpath+'initial_boundaries.h5',key='initial',where='orbit=="{}"'.format(orbit))
-            bf = pd.read_hdf(bpath+'final_boundaries.h5',key='final',where='orbit=="{}"'.format(orbit))
+            bf = pd.read_hdf(bpath+'final_boundaries_dense.h5',key='final',where='orbit=="{}"'.format(orbit))
             bi = bi.reset_index().set_index('date')
             bf = bf.reset_index().set_index('date')
 
