@@ -357,7 +357,7 @@ def find_reg(orbits,bpath,Ls,ind,oLs=None):
 
             for j,l in enumerate(Ls):
                 oLs[ind]=l
-                bm = fuv.boundarymodel_BS(bi,tLeb=oLs[0],sLeb=oLs[1],tLpb=oLs[2],sLpb=oLs[3],sKnots_eb=np.arange(0,24,4),sKnots_pb=np.array([0,1,2,3,4,5,6,8,12,16,18,19,20,21,22,23]))
+                bm = fuv.boundarymodel_BS(bi,tLeb=oLs[0],sLeb=oLs[1],tLpb=oLs[2],sLpb=oLs[3])
                 rnorms[i,j]=bm['residualnorm_'+boundary[ind]].values
                 mnorms[i,j]=bm['modelnorm_'+boundary[ind]].values
         except Exception as e: print(e)

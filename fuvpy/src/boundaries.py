@@ -659,17 +659,19 @@ def boundarymodel_BS(ds,**kwargs):
     tL = np.zeros((n_pcp*(n_tcp-1),n_pcp*n_tcp))
     for i in range(n_pcp): tL[i*(n_tcp-1):(i+1)*(n_tcp-1),i*n_tcp:(i+1)*n_tcp] = tLtemp
     tLTL = tL.T@tL
+    tLTL_mag = np.median(tLTL.diagonal()) 
     
     # 1st order Tikhonov regularization in mlt
     sLtemp = []
     for i in range(n_pcp): sLtemp.append(np.roll(np.r_[-1,1,np.repeat(0,n_pcp-2)],i))
-    sLtemp=(24/n_pcp)/np.diff(np.r_[mltKnots,24+mltKnots[0]])[:,None]*np.array(sLtemp)
+    sLtemp=1/np.diff(np.r_[mltKnots,24+mltKnots[0]])[:,None]*np.array(sLtemp)
     sL = np.zeros((n_pcp*n_tcp,n_pcp*n_tcp))
     for t in range(n_tcp): sL[t:t+n_pcp*n_tcp:n_tcp,t:t+n_pcp*n_tcp:n_tcp] = sLtemp
     sLTL = sL.T@sL
+    sLTL_mag = np.median(sLTL.diagonal()) 
 
     # Combined regularization
-    R = tLeb*gtg_mag*tLTL + sLeb*gtg_mag*sLTL
+    R = tLeb*gtg_mag/tLTL_mag*tLTL + sLeb*gtg_mag/sLTL_mag*sLTL
      
     # Initiate iterative weights
     w = np.ones(theta_eb1[ind].shape)
@@ -695,7 +697,7 @@ def boundarymodel_BS(ds,**kwargs):
         m = ms
         iteration += 1
 
-    normMeb = np.sqrt(np.average((sL@ms).flatten()**2))
+    normMeb = np.sqrt(np.average((tL@ms).flatten()**2))
     normReb = np.sqrt(np.average(residuals**2,weights=w.toarray().squeeze()))
     
     # Temporal evaluation matrix
@@ -798,17 +800,19 @@ def boundarymodel_BS(ds,**kwargs):
     tL = np.zeros((n_pcp*(n_tcp-1),n_pcp*n_tcp))
     for i in range(n_pcp): tL[i*(n_tcp-1):(i+1)*(n_tcp-1),i*n_tcp:(i+1)*n_tcp] = tLtemp
     tLTL = tL.T@tL
-    
+    tLTL_mag = np.median(tLTL.diagonal()) 
+
     # 1st order regularization in mlt
     sLtemp = []
     for i in range(n_pcp): sLtemp.append(np.roll(np.r_[-1,1,np.repeat(0,n_pcp-2)],i))
-    sLtemp=(24/n_pcp)/np.diff(np.r_[mltKnots,24+mltKnots[0]])[:,None]*np.array(sLtemp)
+    sLtemp=1/np.diff(np.r_[mltKnots,24+mltKnots[0]])[:,None]*np.array(sLtemp)
     sL = np.zeros((n_pcp*n_tcp,n_pcp*n_tcp))
     for t in range(n_tcp): sL[t:t+n_pcp*n_tcp:n_tcp,t:t+n_pcp*n_tcp:n_tcp] = sLtemp
     sLTL = sL.T@sL
-    
+    sLTL_mag = np.median(sLTL.diagonal()) 
+
     # Combined regularization
-    R = tLpb*gtg_mag*tLTL + sLpb*gtg_mag*sLTL
+    R = tLpb*gtg_mag/tLTL_mag*tLTL + sLpb*gtg_mag/sLTL_mag*sLTL
 
     # Initiate iterative weights
     w = np.ones(theta_pb2[ind].shape)
@@ -833,7 +837,7 @@ def boundarymodel_BS(ds,**kwargs):
         m = ms
         iteration += 1
 
-    normMpb = np.sqrt(np.average((sL@ms).flatten()**2))
+    normMpb = np.sqrt(np.average((tL@ms).flatten()**2))
     normRpb = np.sqrt(np.average(residuals**2,weights=w.toarray().squeeze()))
 
     # Temporal evaluation matrix
