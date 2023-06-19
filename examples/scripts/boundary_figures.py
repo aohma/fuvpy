@@ -143,10 +143,10 @@ def fig1(img,**kwargs):
     mlat_min = minlat*np.ones_like(mlat_out)
 
     fig = plt.figure(figsize=(9,6))
-    gs = gridspec.GridSpec(nrows=3,ncols=4,hspace=0,wspace=0.3)
+    gs = gridspec.GridSpec(nrows=3,ncols=4,hspace=0,wspace=0.01)
     
     # Corr
-    pax = pp(plt.subplot(gs[:,:3]),minlat=minlat)
+    pax = pp(plt.subplot(gs[:,1:]),minlat=minlat)
     fuv.plotimg(img,'shimg',pax=pax,crange=(0,500),cmap='Greens')
     cbaxes = pax.ax.inset_axes([.3,.0,.4,.017]) 
     cb = plt.colorbar(pax.ax.collections[0],cax=cbaxes, orientation='horizontal',extend='both')
@@ -162,9 +162,9 @@ def fig1(img,**kwargs):
     # Lower latitude
     pax.fill(np.concatenate((mlat_out,mlat_min)),np.concatenate((mlt_out,mlt_out[::-1])),color='C7',alpha=0.3,edgecolor=None)
 
-    pax.ax.text(0.2,0.9,'a',horizontalalignment='center', verticalalignment='center', transform=pax.ax.transAxes,fontsize=12)
+    pax.ax.text(0.2,0.9,'d',horizontalalignment='center', verticalalignment='center', transform=pax.ax.transAxes,fontsize=12)
 
-    bcd = 'bcd'
+    bcd = 'abc'
 
 
     for i,l in enumerate(lims_profile):
@@ -174,7 +174,7 @@ def fig1(img,**kwargs):
 
     for i,p in enumerate(mlt_profile):
         pax.plot([minlat,90],[mlt_ev[p],mlt_ev[p]],c='C7',zorder=2,linewidth=1)
-        ax = plt.subplot(gs[i,3])
+        ax = plt.subplot(gs[i,0])
         ax.plot(90-clat_ev,d_ev[:,p],c='g')
         ax.axvspan(90-(40+10*np.cos(np.pi*mlt_ev[p]/12)),minlat,facecolor='C7',edgecolor=None,alpha=0.3)
 
@@ -187,7 +187,7 @@ def fig1(img,**kwargs):
         ax.set_ylabel('Intensity [counts]')
         if i == 2:
             ax.set_xticks([90,65,40])
-            ax.set_xlabel('Magnetic latitude [deg]')
+            ax.set_xlabel('Magnetic latitude [$^\circ$]')
         else:
             ax.set_xticks([])
 
@@ -201,8 +201,6 @@ def fig1(img,**kwargs):
     pax.ax.scatter(x0,y0,s=15,zorder=25,c='k')
     a0 = np.linspace(0,2*np.pi,361)
     pax.ax.plot(x0+r0*np.cos(a0),y0+r0*np.sin(a0),zorder=22,c='k')
-
-    print(np.argwhere(clat_ev==13))
 
     ax.scatter(77,d_ev[np.argwhere(clat_ev==13),p],s=15,zorder=22,c='k')
 
@@ -263,9 +261,9 @@ def fig3(bi,bm,outpath):
 
     bi['pb_median'] = bi['pb'].median(dim='lim')
     #bi['pb_median'] = bi['pb'].sel(lim=200)
-    bi['pb_median'].attrs = {'long_name':'Median boundary','unit':'deg'}
-    bm['pb'].attrs = {'long_name':'Model boundary','unit':'deg'}
-    bm['pb_err'].attrs = {'long_name':'Model uncertainty','unit':'deg'}
+    bi['pb_median'].attrs = {'long_name':'Median boundary','unit':'$^\circ$'}
+    bm['pb'].attrs = {'long_name':'Model boundary','unit':'$^\circ$'}
+    bm['pb_err'].attrs = {'long_name':'Model uncertainty','unit':'$^\circ$'}
     bm['v_pb'].attrs = {'long_name':'Boundary velocity','unit':'m/s'}
 
     bi['pb_median'].plot(ax=axs[0],vmin=65,vmax=80,cbar_kwargs={'orientation':'horizontal','pad':0.09})
@@ -279,7 +277,7 @@ def fig3(bi,bm,outpath):
     for i in range(4):
         bm['isglobal'].plot.contour(ax=axs[i],colors='r')
         
-        axs[i].set_xlabel('MLT [hrs]')
+        axs[i].set_xlabel('MLT [h]')
         axs[i].set_xticks([0,6,12,18])
         axs[i].text(0.05,0.94,abc[i],horizontalalignment='center', verticalalignment='center', transform=axs[i].transAxes,fontsize=12,color=cc[i])
 
@@ -354,7 +352,7 @@ def fig4(ds,outpath):
     (ds['pb_bas']-ds['Lpb']).plot.hist(ax=ax,histtype='step',bins=np.arange(45,91))
     ax.tick_params(direction="in")
     ax.set_ylim([0,55000])
-    ax.set_xlabel('Latitude [deg]')
+    ax.set_xlabel('Latitude [$^\circ$]')
     ax.set_ylabel('Poleward boundary [counts]')
     ax.text(0.1,0.9,'c',horizontalalignment='center', verticalalignment='center', transform=ax.transAxes,fontsize=12)
 
@@ -364,7 +362,7 @@ def fig4(ds,outpath):
     ax.tick_params(direction="in")
     ax.set_yticklabels([])
     ax.set_ylim([0,55000])
-    ax.set_xlabel('Relative lat [deg]')
+    ax.set_xlabel('Relative lat [$^\circ$]')
     ax.text(0.1,0.9,'e',horizontalalignment='center', verticalalignment='center', transform=ax.transAxes,fontsize=12)
 
     ind = [6,7,8,9,16,17,18,19,20,21]
@@ -389,7 +387,7 @@ def fig4(ds,outpath):
     ax.tick_params(direction="in")
     ax.set_yticklabels([])
     ax.set_ylim([0,55000])
-    ax.set_xlabel('Relative lat [deg]')
+    ax.set_xlabel('Relative lat [$^\circ$]')
     ax.text(0.1,0.9,'g',horizontalalignment='center', verticalalignment='center', transform=ax.transAxes,fontsize=12)
 
     plt.savefig(outpath + 'fig04.png',bbox_inches='tight',dpi = 600)
@@ -400,9 +398,10 @@ def fig5(bb,outpath):
     fig,axs = plt.subplots(1,3,figsize=(10,4))
 
     h = histogram(bb['pb'], bins=[bbins], dim=['date'],density=True)
-    h['pb_bin'].attrs={'long_name':'Latitude','unit':'deg'}
-    h.plot(x='mlt',ax=axs[0],add_colorbar=False,norm=colors.LogNorm(vmin=5e-3, vmax=2e-1))
     bb['pb'].quantile([0.25,0.75],dim='date').plot.line(ax=axs[0],x='mlt',c='w',add_legend=False)
+    h['pb_bin'].attrs={'long_name':'Latitude','unit':'$^\circ$'}
+    h.plot(x='mlt',ax=axs[0],add_colorbar=False,norm=colors.LogNorm(vmin=5e-3, vmax=2e-1))
+    
 
     h = histogram(bb['eb'], bins=[bbins], dim=['date'],density=True)
     pc = h.plot(x='mlt',ax=axs[1],add_colorbar=False,norm=colors.LogNorm(vmin=5e-3, vmax=2e-1))
@@ -426,8 +425,8 @@ def fig5(bb,outpath):
 
     axs[0].set_xticks([0,6,12,18])
     axs[1].set_xticks([0,6,12,18])
-    axs[0].set_xlabel('MLT [hrs]')
-    axs[1].set_xlabel('MLT [hrs]')
+    axs[0].set_xlabel('MLT [h]')
+    axs[1].set_xlabel('MLT [h]')
     axs[2].set_xlabel('Normalized counts')
 
     # Titles
@@ -461,9 +460,10 @@ def fig6(bb,outpath):
     fig,axs = plt.subplots(1,3,figsize=(10,4))
 
     h = histogram(bb['v_pb'], bins=[vbins], dim=['date'],density=True)
+    bb['v_pb'].quantile([0.25,0.75],dim='date').plot.line(ax=axs[0],x='mlt',c='w',add_legend=False)
     h['v_pb_bin'].attrs={'long_name':'Velocity','unit':'m/s'}
     h.plot(x='mlt',ax=axs[0],add_colorbar=False,norm=colors.LogNorm(vmin=5e-5, vmax=6e-3))
-    bb['v_pb'].quantile([0.25,0.75],dim='date').plot.line(ax=axs[0],x='mlt',c='w',add_legend=False)
+    
 
 
     h = histogram(bb['v_eb'], bins=[vbins], dim=['date'],density=True)
@@ -488,8 +488,8 @@ def fig6(bb,outpath):
 
     axs[0].set_xticks([0,6,12,18])
     axs[1].set_xticks([0,6,12,18])
-    axs[0].set_xlabel('MLT [hrs]')
-    axs[1].set_xlabel('MLT [hrs]')
+    axs[0].set_xlabel('MLT [h]')
+    axs[1].set_xlabel('MLT [h]')
     axs[2].set_xlabel('Normalized counts')
 
     # Titles
@@ -580,7 +580,7 @@ def fig8_9_10(bb,outpath):
     bb['PhiN'] = bb['PhiD'] - bb['P_dt']
     bb['L'] = 1.63*bb['PhiN'] - bb['A_dt']
     # bb['LM'] = 1e3*(1/(20*60)*np.maximum(bb['A']-700,0)+1/(10*60*60)*bb['A'])
-    bb['LM'] = 1.63*bb['PhiN'] - 1e3/(3.66*60*60)*np.maximum(bb['A'],0)
+    bb['LM'] = 1.7*bb['PhiN'] - 1e3/(3.66*60*60)*np.maximum(bb['A'],0)
     
     #bb['LM'] = 1.63*bb['PhiN'] - bb['A']**4/6e9
     
@@ -597,7 +597,7 @@ def fig8_9_10(bb,outpath):
 
     popt, pcov=curve_fit(func, bb['A'][ind], bb['L'][ind], bounds=(0,np.inf))
     testFit = func(bb['A'],*popt)
-    bb['LM'] = 1.63*bb['PhiN'] - testFit  
+    #bb['LM'] = 1.63*bb['PhiN'] - testFit  
     
     def func2(x,a):
         return a*x
@@ -608,7 +608,7 @@ def fig8_9_10(bb,outpath):
     testFit = func2(bb['A'],*popt2)
     # bb['LM'] = 1.4*bb['PhiN'] - testFit 
     print(popt2)
-
+    bb['LM'] = 1.7*bb['PhiN'] - popt2[0]*np.maximum(bb['A'],0)
     ## MAGNETC FLUX AND dF/dt FIGURE
 
     fig,axs = plt.subplots(2,2,figsize=(6,6))
@@ -668,7 +668,7 @@ def fig8_9_10(bb,outpath):
     plt.savefig(outpath + 'fig08.png',bbox_inches='tight',dpi = 600)
     plt.close()
 
-      ## GEOMAGNETIC FORCING AND INDICES
+    ## GEOMAGNETIC FORCING AND INDICES
     fig,axs = plt.subplots(2,3,figsize=(9,6))
     
     axs[0,0].scatter(bb['PhiD'],bb['A'],s=0.1,alpha=0.1)
@@ -699,7 +699,7 @@ def fig8_9_10(bb,outpath):
     axs[0,2].set_xlim([-300,100])
     axs[0,2].set_ylim([0,2000])
     axs[0,2].set_yticklabels('')
-    axs[0,2].set_xlabel('SYM_H index [nT]')
+    axs[0,2].set_xlabel('SYM-H index [nT]')
 
     axs[1,0].scatter(bb['PhiD'],bb['A_dt'],s=0.1,alpha=0.1)
     ind = np.isfinite(bb['PhiD'])
@@ -729,7 +729,7 @@ def fig8_9_10(bb,outpath):
     axs[1,2].set_xlim([-5,5])
     axs[1,2].set_ylim([-500,500])
     axs[1,2].set_yticklabels('')
-    axs[1,2].set_xlabel('d(SYM_H)/dt [nT/min]')
+    axs[1,2].set_xlabel('d(SYM-H)/dt [nT/min]')
     
     # Letters
     axs[0,0].text(0.05,0.93,'a',horizontalalignment='center', verticalalignment='center', transform=axs[0,0].transAxes,fontsize=12)
@@ -797,7 +797,7 @@ def fig8_9_10(bb,outpath):
 
     a = np.linspace(0,2000,101)
     axs[2].plot(a,func2(a,*popt2),color='C6',linestyle='--')
-    axs[2].plot(a,func(a,*popt),color='C8',linestyle=':')
+    #axs[2].plot(a,func(a,*popt),color='C8',linestyle=':')
 
     ind = np.isfinite(bb['PhiD'])
     r = np.round(pearsonr(bb['LM'][ind],bb['A_dt'][ind])[0],3)
@@ -814,9 +814,86 @@ def fig8_9_10(bb,outpath):
     plt.savefig(outpath + 'fig11.png',bbox_inches='tight',dpi = 600)
     plt.close()
 
+    ## GEOMAGNETIC FORCING AND BOUNDARIES
+    fig,axs = plt.subplots(2,3,figsize=(9,6))
+    
+    axs[0,0].scatter(bb['PhiD'],bb['eb'].median(dim='mlt'),s=0.1,alpha=0.1)
+    ind = np.isfinite(bb['PhiD'])
+    r = np.round(pearsonr(bb['PhiD'][ind],bb['eb'].median(dim='mlt')[ind])[0],3)
+    axs[0,0].text(0.8,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[0,0].transAxes)
+
+    axs[0,0].set_xlim([0,249.99])
+    axs[0,0].set_ylim([50,80])
+    axs[0,0].set_ylabel('Equatorward boundary [$^\circ$]')
+    axs[0,0].set_xticklabels('')
+    
+    axs[0,1].scatter(bb['AE_INDEX'],bb['eb'].median(dim='mlt'),s=0.1,alpha=0.1)
+    ind = np.isfinite(bb['AE_INDEX'])
+    r = np.round(pearsonr(bb['AE_INDEX'][ind],bb['eb'].median(dim='mlt')[ind])[0],3)
+    axs[0,1].text(0.8,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[0,1].transAxes)
+
+    axs[0,1].set_xlim([0,1499.9])
+    axs[0,1].set_ylim([50,80])
+    axs[0,1].set_yticklabels('')
+    axs[0,1].set_xticklabels('')
+    
+    axs[0,2].scatter(bb['SYM_H'],bb['eb'].median(dim='mlt'),s=0.1,alpha=0.1)
+    ind = np.isfinite(bb['SYM_H'])
+    r = np.round(pearsonr(bb['SYM_H'][ind],bb['eb'].median(dim='mlt')[ind])[0],3)
+    axs[0,2].text(0.8,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[0,2].transAxes)
+
+    axs[0,2].set_xlim([-300,100])
+    axs[0,2].set_ylim([50,80])
+    axs[0,2].set_yticklabels('')
+    axs[0,2].set_xticklabels('')
+
+    axs[1,0].scatter(bb['PhiD'],bb['pb'].median(dim='mlt'),s=0.1,alpha=0.1)
+    ind = np.isfinite(bb['PhiD'])
+    r = np.round(pearsonr(bb['PhiD'][ind],bb['pb'].median(dim='mlt')[ind])[0],3)
+    axs[1,0].text(0.8,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[1,0].transAxes)
+
+    axs[1,0].set_xlim([0,249.99])
+    axs[1,0].set_ylim([60,90])
+    axs[1,0].set_ylabel('Poleward boundary [$^\circ$]')
+    axs[1,0].set_xlabel('$\\Phi_D$ [kV]')
+    
+    axs[1,1].scatter(bb['AE_INDEX'],bb['pb'].median(dim='mlt'),s=0.1,alpha=0.1)
+    ind = np.isfinite(bb['AE_INDEX'])
+    r = np.round(pearsonr(bb['AE_INDEX'][ind],bb['pb'].median(dim='mlt')[ind])[0],3)
+    axs[1,1].text(0.8,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[1,1].transAxes)
+
+    axs[1,1].set_xlim([0,1499.9])
+    axs[1,1].set_ylim([60,90])
+    axs[1,1].set_yticklabels('')
+    axs[1,1].set_xlabel('AE index [nT]')
+    
+    axs[1,2].scatter(bb['SYM_H'],bb['pb'].median(dim='mlt'),s=0.1,alpha=0.1)
+    ind = np.isfinite(bb['SYM_H'])
+    r = np.round(pearsonr(bb['SYM_H'][ind],bb['pb'].median(dim='mlt')[ind])[0],3)
+    axs[1,2].text(0.8,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[1,2].transAxes)
+
+    axs[1,2].set_xlim([-300,100])
+    axs[1,2].set_ylim([60,90])
+    axs[1,2].set_yticklabels('')
+    axs[1,2].set_xlabel('SYM-H index [nT]')
+    
+    # Letters
+    axs[0,0].text(0.05,0.93,'a',horizontalalignment='center', verticalalignment='center', transform=axs[0,0].transAxes,fontsize=12)
+    axs[0,1].text(0.05,0.93,'c',horizontalalignment='center', verticalalignment='center', transform=axs[0,1].transAxes,fontsize=12)
+    axs[0,2].text(0.05,0.93,'e',horizontalalignment='center', verticalalignment='center', transform=axs[0,2].transAxes,fontsize=12)
+    axs[1,0].text(0.05,0.93,'b',horizontalalignment='center', verticalalignment='center', transform=axs[1,0].transAxes,fontsize=12)
+    axs[1,1].text(0.05,0.93,'d',horizontalalignment='center', verticalalignment='center', transform=axs[1,1].transAxes,fontsize=12)
+    axs[1,2].text(0.05,0.93,'f',horizontalalignment='center', verticalalignment='center', transform=axs[1,2].transAxes,fontsize=12)
+
+    plt.subplots_adjust(hspace=0.07,wspace=0.07)
+    
+    plt.savefig(outpath + 'fig0X.png',bbox_inches='tight',dpi = 600)
+    plt.close()
+
 def load_bb():
     path = '/Users/aohma/BCSS-DAG Dropbox/Anders Ohma/data/fuvAuroralFlux/'
     bm = pd.read_hdf(path+'hdf/final_boundaries.h5').to_xarray()
+    print(len(bm.date))
     
     ind = bm.isel(mlt=0)['isglobal'].values & ((bm.isel(mlt=0)['rmse_in'].values/bm.isel(mlt=0)['rmse_out'].values)>3) & (bm['pb_err'].quantile(0.75,dim='mlt').values<1.5) & (bm['eb_err'].quantile(0.75,dim='mlt').values<1.5)
     dates = bm.date[ind]
@@ -830,8 +907,9 @@ def load_bb():
 
 def load_bb2():
     path = '/Users/aohma/BCSS-DAG Dropbox/Anders Ohma/data/fuvAuroralFlux/'
-    bm = pd.read_hdf(path+'hdf/final_boundaries.h5').to_xarray()
-    
+    bm = pd.read_hdf(path+'hdf/final_boundaries_final.h5').to_xarray()
+    print(len(bm.date))
+
     ind0 = bm.isel(mlt=0)['isglobal'].values
     ind1 = bm.isel(mlt=0)['A_mean'].values > bm.isel(mlt=0)['P_mean'].values + 2*bm.isel(mlt=0)['P_std'].values
     ind2 = bm.isel(mlt=0)['A_mean'].values > bm.isel(mlt=0)['S_mean'].values + 2*bm.isel(mlt=0)['S_std'].values
@@ -1679,7 +1757,7 @@ def plot_ex2(orbits,outpath):
     
     for i in range(n):
         
-        bm = pd.read_hdf(path+'hdf/final_boundaries.h5',where='orbit=="{}"'.format(orbits[i])).to_xarray()
+        bm = pd.read_hdf(path+'hdf/final_boundaries_final.h5',where='orbit=="{}"'.format(orbits[i])).to_xarray()
         print(bm.date[[0,-1]])
 
         df = processOMNI(bm.date.values)
@@ -1726,7 +1804,7 @@ def plot_ex2(orbits,outpath):
             axs[i,1].set_xlabel('time [hrs]')
     
     plt.subplots_adjust(wspace=0.0,hspace=0.0)
-    plt.savefig(outpath + 'fig11.png',bbox_inches='tight',dpi = 300)
+    plt.savefig(outpath + 'fig12.png',bbox_inches='tight',dpi = 300)
     plt.close()         
         
         
