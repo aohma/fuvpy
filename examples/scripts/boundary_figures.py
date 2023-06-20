@@ -166,9 +166,10 @@ def fig1(img,**kwargs):
 
     bcd = 'abc'
 
-
+    sc=[]
     for i,l in enumerate(lims_profile):
-        pax.scatter(ds.sel(lim=l).pb.values, ds.mlt.values,color=cmap(i+1),s=10,zorder=20)
+        sctemp = pax.scatter(ds.sel(lim=l).pb.values, ds.mlt.values,color=cmap(i+1),s=10,zorder=20)
+        sc.append(sctemp)
         pax.scatter(ds.sel(lim=l).eb.values, ds.mlt.values,color=cmap(i+1),s=10,zorder=20)
     
 
@@ -203,6 +204,7 @@ def fig1(img,**kwargs):
     pax.ax.plot(x0+r0*np.cos(a0),y0+r0*np.sin(a0),zorder=22,c='k')
 
     ax.scatter(77,d_ev[np.argwhere(clat_ev==13),p],s=15,zorder=22,c='k')
+    pax.ax.legend(sc,[' 50 counts','125 counts','200 counts'],frameon=False)
 
     if outpath: plt.savefig(outpath + 'fig01.png',bbox_inches='tight',dpi = 600)
 
@@ -1787,21 +1789,21 @@ def plot_ex2(orbits,outpath):
         if i != n-1:
             axs[i,0].xaxis.set_tick_params(labelbottom=False)
         else:
-            axs[i,0].set_xlabel('time [hrs]')
+            axs[i,0].set_xlabel('time [h]')
 
         axs[i,1].plot(time,bm['L'].values,color='C2')
         axs[i,1].plot(time,bm['t2'].values,color='C4')
         
         axs[0,1].text(0.25,0.88,'L [kV]',color='C2',horizontalalignment='center',verticalalignment='center', transform=axs[0,1].transAxes)
-        axs[0,1].text(0.75,0.88,'A/3.7 hrs [kV]',color='C4',horizontalalignment='center',verticalalignment='center', transform=axs[0,1].transAxes)
+        axs[0,1].text(0.75,0.88,'A/3.6 [kV]',color='C4',horizontalalignment='center',verticalalignment='center', transform=axs[0,1].transAxes)
 
-        axs[i,1].set_xlim([1,8])
+        axs[i,1].set_xlim([1.001,8])
         axs[i,1].set_ylim([-399,599])
         axs[i,1].set_yticklabels('')
         if i != n-1:
             axs[i,1].xaxis.set_tick_params(labelbottom=False)
         else:
-            axs[i,1].set_xlabel('time [hrs]')
+            axs[i,1].set_xlabel('time [h]')
     
     plt.subplots_adjust(wspace=0.0,hspace=0.0)
     plt.savefig(outpath + 'fig12.png',bbox_inches='tight',dpi = 300)
