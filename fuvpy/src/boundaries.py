@@ -32,7 +32,7 @@ def detect_boundaries(imgs,**kwargs):
     height : float, optional
         Assumed height of the emissions in km. Default is 130 
     clat_ev : array_like, optional
-        Evalutation points of the latitudinal intensity profiles. Default is np.arange(0.5,46,0.5)
+        Evalutation points of the latitudinal intensity profiles. Default is np.arange(0.5,50.5,0.5)
     mlt_ev : array_like, optional
         Which mlts to evaluate the latitudinal profiles. Default is np.arange(0.5,24,1)
 
@@ -50,7 +50,7 @@ def detect_boundaries(imgs,**kwargs):
     lims = kwargs.pop('lims') if 'lims' in kwargs.keys() else np.arange(50,201,5)
     sigma = kwargs.pop('sigma') if 'sigma' in kwargs.keys() else 300
     height = kwargs.pop('height') if 'height' in kwargs.keys() else 130
-    clat_ev = kwargs.pop('clat_ev') if 'clat_ev' in kwargs.keys() else np.arange(0.5,46,0.5)
+    clat_ev = kwargs.pop('clat_ev') if 'clat_ev' in kwargs.keys() else np.arange(0.5,50.5,0.5)
     mlt_ev = kwargs.pop('mlt_ev') if 'mlt_ev' in kwargs.keys() else np.arange(0.5,24,1)
 
     # Constants    
@@ -89,7 +89,7 @@ def detect_boundaries(imgs,**kwargs):
         ds['d'] = (['clat','mlt'],d_ev)
         
         # Set values outside outer ring to nan
-        ds['d'] = xr.where(ds['clat']>35+10*np.cos(np.pi*ds['mlt']/12),np.nan,ds['d'])
+        ds['d'] = xr.where(ds['clat']>40+10*np.cos(np.pi*ds['mlt']/12),np.nan,ds['d'])
         
         ds['above'] = (ds['d']>ds['lim']).astype(float) 
         ds['above'] = xr.where(np.isnan(ds['d']),np.nan,ds['above'])
@@ -594,7 +594,7 @@ def boundarymodel_BS(ds,**kwargs):
     
     for key in kwargs: print(f'Warning: {key} is not a valid keyword argument')
     
-    1# Constants
+    # Constants
     mu0 = 4e-7*np.pi # Vacuum magnetic permeability
     M_E = 8.05e22 # Earth's magnetic dipole moment
     R_E = 6371e3 # Earth radii
@@ -659,16 +659,19 @@ def boundarymodel_BS(ds,**kwargs):
     tL = np.zeros((n_pcp*(n_tcp-1),n_pcp*n_tcp))
     for i in range(n_pcp): tL[i*(n_tcp-1):(i+1)*(n_tcp-1),i*n_tcp:(i+1)*n_tcp] = tLtemp
     tLTL = tL.T@tL
+    tLTL_mag = np.median(tLTL.diagonal()) 
     
     # 1st order Tikhonov regularization in mlt
-    sL = []
-    for i in range(n_pcp): sL.append(np.roll(np.r_[-1,1,np.repeat(0,n_pcp-2)],i))
-    sL=np.array(sL)
-    sLTL = np.zeros((n_pcp*n_tcp,n_pcp*n_tcp))
-    for t in range(n_tcp): sLTL[t:t+n_pcp*n_tcp:n_tcp,t:t+n_pcp*n_tcp:n_tcp] = sL.T@sL
-    
+    sLtemp = []
+    for i in range(n_pcp): sLtemp.append(np.roll(np.r_[-1,1,np.repeat(0,n_pcp-2)],i))
+    sLtemp=1/np.diff(np.r_[mltKnots,24+mltKnots[0]])[:,None]*np.array(sLtemp)
+    sL = np.zeros((n_pcp*n_tcp,n_pcp*n_tcp))
+    for t in range(n_tcp): sL[t:t+n_pcp*n_tcp:n_tcp,t:t+n_pcp*n_tcp:n_tcp] = sLtemp
+    sLTL = sL.T@sL
+    sLTL_mag = np.median(sLTL.diagonal()) 
+
     # Combined regularization
-    R = tLeb*gtg_mag*tLTL + sLeb*gtg_mag*sLTL
+    R = tLeb*gtg_mag/tLTL_mag*tLTL + sLeb*gtg_mag/sLTL_mag*sLTL
      
     # Initiate iterative weights
     w = np.ones(theta_eb1[ind].shape)
@@ -694,6 +697,9 @@ def boundarymodel_BS(ds,**kwargs):
         m = ms
         iteration += 1
 
+    normMeb = np.sqrt(np.average((tL@ms).flatten()**2))
+    normReb = np.sqrt(np.average(residuals**2,weights=w.toarray().squeeze()))
+    
     # Temporal evaluation matrix
     time_ev=(df['date'].drop_duplicates()-dateS).values/ np.timedelta64(1, 'm')
     Gtime = BSpline.design_matrix(time_ev, tKnots,tOrder).toarray()
@@ -794,16 +800,19 @@ def boundarymodel_BS(ds,**kwargs):
     tL = np.zeros((n_pcp*(n_tcp-1),n_pcp*n_tcp))
     for i in range(n_pcp): tL[i*(n_tcp-1):(i+1)*(n_tcp-1),i*n_tcp:(i+1)*n_tcp] = tLtemp
     tLTL = tL.T@tL
-    
+    tLTL_mag = np.median(tLTL.diagonal()) 
+
     # 1st order regularization in mlt
-    sL = []
-    for i in range(n_pcp): sL.append(np.roll(np.r_[-1,1,np.repeat(0,n_pcp-2)],i))
-    sL=np.array(sL)
-    sLTL = np.zeros((n_pcp*n_tcp,n_pcp*n_tcp))
-    for t in range(n_tcp): sLTL[t:t+n_pcp*n_tcp:n_tcp,t:t+n_pcp*n_tcp:n_tcp] = sL.T@sL
-    
+    sLtemp = []
+    for i in range(n_pcp): sLtemp.append(np.roll(np.r_[-1,1,np.repeat(0,n_pcp-2)],i))
+    sLtemp=1/np.diff(np.r_[mltKnots,24+mltKnots[0]])[:,None]*np.array(sLtemp)
+    sL = np.zeros((n_pcp*n_tcp,n_pcp*n_tcp))
+    for t in range(n_tcp): sL[t:t+n_pcp*n_tcp:n_tcp,t:t+n_pcp*n_tcp:n_tcp] = sLtemp
+    sLTL = sL.T@sL
+    sLTL_mag = np.median(sLTL.diagonal()) 
+
     # Combined regularization
-    R = tLpb*gtg_mag*tLTL + sLpb*gtg_mag*sLTL
+    R = tLpb*gtg_mag/tLTL_mag*tLTL + sLpb*gtg_mag/sLTL_mag*sLTL
 
     # Initiate iterative weights
     w = np.ones(theta_pb2[ind].shape)
@@ -827,6 +836,9 @@ def boundarymodel_BS(ds,**kwargs):
 
         m = ms
         iteration += 1
+
+    normMpb = np.sqrt(np.average((tL@ms).flatten()**2))
+    normRpb = np.sqrt(np.average(residuals**2,weights=w.toarray().squeeze()))
 
     # Temporal evaluation matrix
     M = BSpline(tKnots, np.eye(n_tcp), tOrder)(time_ev)
@@ -902,6 +914,11 @@ def boundarymodel_BS(ds,**kwargs):
     
     v_phi =  v_phi.reshape((len(time_ev),len(phi_ev)))
     v_theta = v_theta.reshape((len(time_ev),len(phi_ev)))
+
+    dtaudt =  dtaudt.reshape((len(time_ev),len(phi_ev)))
+    dtaudp =  dtaudp.reshape((len(time_ev),len(phi_ev)))
+    dtau_dt_eb =  dtau_dt_eb.reshape((len(time_ev),len(phi_ev)))
+    dtau_dp_eb =  dtau_dp_eb.reshape((len(time_ev),len(phi_ev)))
     
     dA = (dT-dP).reshape((len(time_ev),len(phi_ev)))
     dA_dt = (dT_dt-dP_dt).reshape((len(time_ev),len(phi_ev)))
@@ -918,10 +935,18 @@ def boundarymodel_BS(ds,**kwargs):
         vn_pb=(['date','mlt'], -v_theta),
         ve_eb=(['date','mlt'], u_phi),
         vn_eb=(['date','mlt'], -u_theta),
+        dpb_dt=(['date','mlt'], dtaudt),
+        dpb_dp=(['date','mlt'], dtaudp),
+        deb_dt=(['date','mlt'], dtau_dt_eb),
+        deb_dp=(['date','mlt'], dtau_dp_eb),
         dP=(['date','mlt'], dP),
         dA=(['date','mlt'], dA),
         dP_dt=(['date','mlt'], dP_dt),
         dA_dt=(['date','mlt'], dA_dt),
+        modelnorm_eb = normMeb,
+        residualnorm_eb = normReb,
+        modelnorm_pb = normMpb,
+        residualnorm_pb = normRpb,
         ),
     coords=dict(
         date = df['date'].drop_duplicates().values,

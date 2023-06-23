@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import pandas as pd
+import xarray as xr
 
 
 def oval_starkov1994(mlt,al,boundary='pb'):
@@ -101,6 +102,53 @@ def oval_hu2017(Bx,By,Bz,Vp,Np,AE,boundary='pb'):
         lat = A[0,:][None,:] + A[[1],:]*Bx[:,None] + A[[2],:]*By[:,None] + A[[3],:]*Bz[:,None] + A[[4],:]*Vp[:,None] + A[[5],:]*Np[:,None] + A[[6],:]*AE[:,None]
 
     return lat
+
+def oval_gjerloev2008():
+    basepath = os.path.dirname(__file__)
+    path =  basepath+'/../data/ovalcoeffs_gjerloev2007'
+    mlt = np.arange(0,24,0.1)
+    epoch = np.arange(-4,7)
+
+    A = pd.read_csv(path+'_pb',sep=',',header=None,index_col=0).values
+    A =np.char.strip(A.astype(str))
+    A = np.char.replace(A,'−', '-')
+    A = A.astype(float)
+
+    pb = A[:,[0]] + A[:,[1]]*np.cos(1*mlt*np.pi/12)+ A[:,[2]]*np.sin(1*mlt*np.pi/12)+ A[:,[3]]*np.cos(2*mlt*np.pi/12)+ A[:,[4]]*np.sin(2*mlt*np.pi/12)+ A[:,[5]]*np.cos(3*mlt*np.pi/12)+ A[:,[6]]*np.sin(3*mlt*np.pi/12)+ A[:,[7]]*np.cos(4*mlt*np.pi/12)+ A[:,[8]]*np.sin(4*mlt*np.pi/12)
+
+    A = pd.read_csv(path+'_eb',sep=',',header=None,index_col=0).values
+    A =np.char.strip(A.astype(str))
+    A = np.char.replace(A,'−', '-')
+    A = A.astype(float)
+
+    eb = A[:,[0]] + A[:,[1]]*np.cos(1*mlt*np.pi/12)+ A[:,[2]]*np.sin(1*mlt*np.pi/12)+ A[:,[3]]*np.cos(2*mlt*np.pi/12)+ A[:,[4]]*np.sin(2*mlt*np.pi/12)+ A[:,[5]]*np.cos(3*mlt*np.pi/12)+ A[:,[6]]*np.sin(3*mlt*np.pi/12)+ A[:,[7]]*np.cos(4*mlt*np.pi/12)+ A[:,[8]]*np.sin(4*mlt*np.pi/12)
+
+    ds = xr.Dataset(
+        data_vars=dict(
+            pb=(['epoch','mlt'], pb),
+            eb=(['epoch','mlt'], eb),
+            ),
+        coords=dict(
+            epoch = epoch,
+            mlt = mlt
+        ),
+        )
+
+    mu0 = 4e-7*np.pi # Vacuum magnetic permeability
+    M_E = 8.05e22 # Earth's magnetic dipole moment
+    R_E = 6371e3 # Earth radii
+    height = 130e3
+    R_I = R_E + height # Radius of ionosphere
+    ds['dP'] = (mu0*M_E)/(4*np.pi*R_I) * (np.sin(np.deg2rad(90-ds['pb']))**2)
+
+    ds['dA'] = (mu0*M_E)/(4*np.pi*R_I) * (np.sin(np.deg2rad(90-ds['eb']))**2) - ds['dP']
+
+    #ind = np.r_[range(60),range(180,240)]
+    ind = np.r_[range(240)]
+
+    ds['P'] = 1e-6*np.deg2rad(15*0.1)*(ds['dP']).isel(mlt=ind).sum(dim='mlt')
+    ds['A'] = 1e-6*np.deg2rad(15*0.1)*(ds['dA']).isel(mlt=ind).sum(dim='mlt')
+    return ds
 
 def q2kp(q):
     '''
