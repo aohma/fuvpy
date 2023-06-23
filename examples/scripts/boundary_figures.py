@@ -23,6 +23,9 @@ from scipy.optimize import curve_fit
 import fuvpy as fuv
 from polplot import pp
 
+import cdflib # pip install cdflib
+import os
+
 def fig1(img,**kwargs):
     '''
     Plot a figure to illustrate the boundary detection method
@@ -519,62 +522,8 @@ def fig6(bb,outpath):
 
     plt.savefig(outpath + 'fig06.png',bbox_inches='tight',dpi = 600)
 
-def fig7(bb,outpath):
-    bbins = np.arange(-5,5,0.1)
 
-    fig,axs = plt.subplots(1,3,figsize=(10,4))
-
-    h = histogram(-15*bb['dpb_dp'], bins=[bbins], dim=['date'],density=True)
-    h['dpb_dp_bin'].attrs={'long_name':'d(lat)/d(MLT)','unit':'deg/hrs'}
-    h.plot(x='mlt',ax=axs[0],add_colorbar=False,norm=colors.LogNorm(vmin=5e-3, vmax=5e-1))
-    (-15*bb['dpb_dp']).quantile([0.25,0.75],dim='date').plot.line(ax=axs[0],x='mlt',c='w',add_legend=False)
-
-    h = histogram(-15*bb['deb_dp'], bins=[bbins], dim=['date'],density=True)
-    pc = h.plot(x='mlt',ax=axs[1],add_colorbar=False,norm=colors.LogNorm(vmin=5e-3, vmax=5e-1))
-    (-15*bb['deb_dp']).quantile([0.25,0.75],dim='date').plot.line(ax=axs[1],x='mlt',c='w',add_legend=False)
-
-    (-15*bb['dpb_dp']).plot.hist(ax=axs[2], bins=bbins, density=True,histtype='step',edgecolor='C3',orientation='horizontal')
-    (-15*bb['deb_dp']).plot.hist(ax=axs[2], bins=bbins, density=True,histtype='step',edgecolor='C0',orientation='horizontal')
-
-    # Colorbar
-    cbaxes = axs[0].inset_axes([.1,.14,.4,.03]) 
-    cb = plt.colorbar(pc,cax=cbaxes,ticks=[1e-2,1e-1],orientation='horizontal')
-    cb.set_label('counts',color='white')
-    cb.outline.set_edgecolor('white')
-    cbaxes.tick_params(axis='both', colors='white')
-
-    # Labels and ticks
-    axs[1].set_yticklabels([])
-    axs[2].set_yticklabels([])
-    axs[1].set_ylabel('')
-    axs[2].set_ylim([bbins[0],bbins[-1]])
-
-    axs[0].set_xticks([0,6,12,18])
-    axs[1].set_xticks([0,6,12,18])
-    axs[0].set_xlabel('MLT [hrs]')
-    axs[1].set_xlabel('MLT [hrs]')
-    axs[2].set_xlabel('Normalized counts')
-
-    # Titles
-    axs[0].set_title('Poleward boundary location')
-    axs[1].set_title('Equatorward boundary location')
-    axs[2].legend(['pb','eb'],frameon=False)
-
-    # Background
-    background = plt.cm.get_cmap('viridis')(0)
-    axs[0].set_facecolor(background)
-    axs[1].set_facecolor(background)
-
-    # Letters
-    axs[0].text(0.05,0.95,'a',horizontalalignment='center', verticalalignment='center', transform=axs[0].transAxes,fontsize=12,color='w')
-    axs[1].text(0.05,0.95,'b',horizontalalignment='center', verticalalignment='center', transform=axs[1].transAxes,fontsize=12,color='w')
-    axs[2].text(0.05,0.95,'c',horizontalalignment='center', verticalalignment='center', transform=axs[2].transAxes,fontsize=12,color='k')
-
-    plt.subplots_adjust(wspace=0.05)
-
-    plt.savefig(outpath + 'fig05.png',bbox_inches='tight',dpi = 600)
-
-def fig8_9_10(bb,outpath):
+def fig7_8_10(bb,outpath):
     bb['P'] = 1e-6*np.deg2rad(15*0.1)*(bb['dP']).sum(dim='mlt')
     bb['A'] = 1e-6*np.deg2rad(15*0.1)*(bb['dA']).sum(dim='mlt')
     bb['P_dt'] = 1e-3*np.deg2rad(15*0.1)*(bb['dP_dt']).sum(dim='mlt')
@@ -667,7 +616,7 @@ def fig8_9_10(bb,outpath):
     axs[1,1].text(0.05,0.95,'d',horizontalalignment='center',verticalalignment='center', transform=axs[1,1].transAxes)
     
     fig.tight_layout()
-    plt.savefig(outpath + 'fig08.png',bbox_inches='tight',dpi = 600)
+    plt.savefig(outpath + 'fig07.png',bbox_inches='tight',dpi = 600)
     plt.close()
 
     ## GEOMAGNETIC FORCING AND INDICES
@@ -743,7 +692,7 @@ def fig8_9_10(bb,outpath):
 
     plt.subplots_adjust(hspace=0.25,wspace=0.07)
     
-    plt.savefig(outpath + 'fig09.png',bbox_inches='tight',dpi = 600)
+    plt.savefig(outpath + 'fig08.png',bbox_inches='tight',dpi = 600)
     plt.close()
 
     ## AURORAL MODEL
@@ -813,7 +762,7 @@ def fig8_9_10(bb,outpath):
 
     plt.subplots_adjust(wspace=0.33)
 
-    plt.savefig(outpath + 'fig11.png',bbox_inches='tight',dpi = 600)
+    plt.savefig(outpath + 'fig10.png',bbox_inches='tight',dpi = 600)
     plt.close()
 
     ## GEOMAGNETIC FORCING AND BOUNDARIES
@@ -889,877 +838,22 @@ def fig8_9_10(bb,outpath):
 
     plt.subplots_adjust(hspace=0.07,wspace=0.07)
     
-    plt.savefig(outpath + 'fig0X.png',bbox_inches='tight',dpi = 600)
+    plt.savefig(outpath + 'figXX.png',bbox_inches='tight',dpi = 600)
     plt.close()
 
-def load_bb():
-    path = '/Users/aohma/BCSS-DAG Dropbox/Anders Ohma/data/fuvAuroralFlux/'
-    bm = pd.read_hdf(path+'hdf/final_boundaries.h5').to_xarray()
-    print(len(bm.date))
-    
-    ind = bm.isel(mlt=0)['isglobal'].values & ((bm.isel(mlt=0)['rmse_in'].values/bm.isel(mlt=0)['rmse_out'].values)>3) & (bm['pb_err'].quantile(0.75,dim='mlt').values<1.5) & (bm['eb_err'].quantile(0.75,dim='mlt').values<1.5)
-    dates = bm.date[ind]
-    
-    bb = bm[['pb','eb','pb_err','eb_err','dP','dA','dP_dt','dA_dt','ve_pb','vn_pb','ve_eb','vn_eb']].sel(date=dates)
-    
-    df = processOMNI(bb.date.values)
-    df.index.name = 'date'
-    bb = xr.merge((bb,df.to_xarray()))
-    return bb
-
-def load_bb2():
-    path = '/Users/aohma/BCSS-DAG Dropbox/Anders Ohma/data/fuvAuroralFlux/'
-    bm = pd.read_hdf(path+'hdf/final_boundaries_final.h5').to_xarray()
-    print(len(bm.date))
-
-    ind0 = bm.isel(mlt=0)['isglobal'].values
-    ind1 = bm.isel(mlt=0)['A_mean'].values > bm.isel(mlt=0)['P_mean'].values + 2*bm.isel(mlt=0)['P_std'].values
-    ind2 = bm.isel(mlt=0)['A_mean'].values > bm.isel(mlt=0)['S_mean'].values + 2*bm.isel(mlt=0)['S_std'].values
-    ind3 = bm.isel(mlt=0)['count'].values > 12
-
-    ind4 = bm['pb_err'].quantile(0.75,dim='mlt').values<1.5
-    ind5 = bm['eb_err'].quantile(0.75,dim='mlt').values<1.5
-
-    dates = bm.date[ind0&ind1&ind2&ind3&ind4&ind5]
-    
-    bb = bm[['pb','eb','pb_err','eb_err','dP','dA','dP_dt','dA_dt','ve_pb','vn_pb','ve_eb','vn_eb']].sel(date=dates)
-    
-    df = processOMNI(bb.date.values)
-    df.index.name = 'date'
-    bb = xr.merge((bb,df.to_xarray()))
-    return bb
-
-def load_bas():
-    # BAS WIC boundaries
-    bas = pd.read_csv('/Users/aohma/BCSS-DAG Dropbox/Anders Ohma/data/Wic_boundaries_V2.csv',index_col=0)
-
-    mlt = np.arange(0.5,24)
-
-    bas = bas.rename(columns={'Date_UTC_s':'date'})
-    bas['date'] = pd.to_datetime(bas['date'])
-    bas = bas.set_index('date')
-
-    bas_eb = bas.iloc[:,1:25]
-    bas_pb = bas.iloc[:,26:-1]
-
-    bas_eb.columns = mlt
-    bas_eb=bas_eb.stack()
-    bas_eb.index = bas_eb.index.set_names('mlt',level=1)
-    bas_eb.name='eb_bas'
-
-    bas_pb.columns = mlt
-    bas_pb=bas_pb.stack()
-    bas_pb.index = bas_pb.index.set_names('mlt',level=1)
-    bas_pb.name='pb_bas'
-
-    bas = pd.merge(bas_eb,bas_pb,left_index=True,right_index=True,how='outer')
-    bas = bas.to_xarray()
-    #bas['date'] = bas.date.dt.round('1min')
-    return bas
-
-def combine_datasets(bb,bas):
-    bf = bb[['eb','pb']].isel(mlt=slice(5,None,10))
-    mlt = np.arange(0.5,24)
-    bf['mlt'] = mlt
-    ds = xr.merge((bf[['eb','pb']],bas))
-
-    Cpb = [1.0298, -1.1249, -0.7380, 0.1838, -0.6171]
-    Lpb = Cpb[0] + Cpb[1]*np.cos(np.deg2rad(15*mlt))+Cpb[2]*np.sin(np.deg2rad(15*mlt))+Cpb[3]*np.cos(2*np.deg2rad(15*mlt))+Cpb[4]*np.sin(2*np.deg2rad(15*mlt))
-
-    ds['Lpb'] = (['mlt'],Lpb)
-
-    Cpb = [-0.4935,	-2.1186, 0.3188,0.5749, -0.3118]
-    Lpb = Cpb[0] + Cpb[1]*np.cos(np.deg2rad(15*mlt))+Cpb[2]*np.sin(np.deg2rad(15*mlt))+Cpb[3]*np.cos(2*np.deg2rad(15*mlt))+Cpb[4]*np.sin(2*np.deg2rad(15*mlt))
-
-    ds['Leb'] = (['mlt'],Lpb)
-
-    return ds
-
-def loadOMNI(fromDate='1981-01-01',toDate='2020-01-01'):
-    # Load and process omni data
-
-    # Columns to include from the unaltered omni data stored in omni_1min.h5.
-    # This file is generated by the omni_download_1min_data() function.
-    columns = ['BX_GSE','BY_GSM', 'BZ_GSM','flow_speed','Vx','Vy','Vz',
-   'proton_density','Pressure','AL_INDEX','AE_INDEX', 'SYM_H']
-
-    # Read the file
-    inputfile = '/Users/aohma/BCSS-DAG dropbox/Anders Ohma/data/omni_1min.h5'
-    omni = pd.read_hdf(inputfile,where='index>="{}"&index<"{}"'.format(fromDate,toDate),columns=columns)
-    omni = omni.rename(columns={"BX_GSE":"Bx","BY_GSM":"By","BZ_GSM":"Bz","flow_speed":"V"})
-    
-  
-    return omni
-
-def processOMNI(dates):
-    fromDate = '2000-05-01 00:00'
-    toDate = '2003-01-01 00:00'
-    
-    omni = loadOMNI(fromDate,toDate)
-    omni = omni.rolling(10,min_periods=0,center=True).mean()
-    
-    omni['dAE_dt'] = np.gradient(omni['AE_INDEX'])
-    omni['dSYMH_dt'] = np.gradient(omni['SYM_H'])
-    
-    allDates=np.concatenate((omni.index.values,dates))
-    omni = omni.reindex(allDates).sort_index()
-    omni = omni[~omni.index.duplicated(keep='first')]
-    omni = omni.interpolate(method='cubic',limit=1,limit_direction='both')
-    
-    omni['ca'] = np.arctan2(omni['By'],omni['Bz'])
-    
-    B_y,B_z,V_x = omni['By']*1e-9, omni['Bz']*1e-9, abs(omni['V'])*1e3
-    B_t = np.sqrt(B_y**2+B_z**2)
-    omni['PhiD'] = 3.3e2*V_x**(4./3)*B_t*np.sin(abs(omni['ca'])/2)**(9./2)
-    
-    
-    return omni.loc[dates]
-
-def plotplot(bb,outpath):
-    bb['P'] = 1e-6*np.deg2rad(15*0.1)*(bb['dP']).sum(dim='mlt')
-    bb['A'] = 1e-6*np.deg2rad(15*0.1)*(bb['dA']).sum(dim='mlt')
-    bb['P_dt'] = 1e-3*np.deg2rad(15*0.1)*(bb['dP_dt']).sum(dim='mlt')
-    bb['A_dt'] = 1e-3*np.deg2rad(15*0.1)*(bb['dA_dt']).sum(dim='mlt')
-    bb['PhiN'] = bb['PhiD'] - bb['P_dt']
-    bb['L'] = 1.63*bb['PhiN'] - bb['A_dt']
-    # bb['LM'] = 1e3*(1/(20*60)*np.maximum(bb['A']-700,0)+1/(10*60*60)*bb['A'])
-    bb['LM'] = 1.63*bb['PhiN'] - 1e3/(3.66*60*60)*np.maximum(bb['A'],0)
-    
-    #bb['LM'] = 1.63*bb['PhiN'] - bb['A']**4/6e9
-    
-    
-
-    # Linear fit with bounds
-    ind = np.isfinite(bb['L'])
-    
-    count,bin_edges,bin_number=binned_statistic(bb['A'][ind],bb['A'][ind],statistic='count',bins=np.arange(0,2001,100))
-    w=1/count[bin_number-1]
-    
-    def func(x,a,b):
-        return a*x**b
-
-    popt, pcov=curve_fit(func, bb['A'][ind], bb['L'][ind], bounds=(0,np.inf))
-    testFit = func(bb['A'],*popt)
-    bb['LM'] = 1.63*bb['PhiN'] - testFit  
-    
-    def func2(x,a):
-        return a*x
-
-    print(w)
-    popt2, pcov2=curve_fit(func2, bb['A'][ind], bb['L'][ind], bounds=(0,np.inf),sigma=1/w)
-    # testFit = func(bb['A'],*popt)
-    testFit = func2(bb['A'],*popt2)
-    # bb['LM'] = 1.4*bb['PhiN'] - testFit 
-    print(popt2)
-
-    ## MAGNETC FLUX AND dF/dt FIGURE
-
-    fig,axs = plt.subplots(2,2,figsize=(6,6))
-    
-    bb['P'].plot.hist(axs[0,0],bins=np.arange(0,2001,25),histtype='step',color='C1')
-    bb['A'].plot.hist(axs[0,0],bins=np.arange(0,2001,25),histtype='step',color='C2')
-    # (1e-6*np.deg2rad(15*0.1)*(bb['dA']+bb['dP']).sum(dim='mlt')).plot.hist(axs[0],bins=np.arange(0,2701,25),histtype='step')
-    
-    axs[0,0].set_ylabel('Counts')
-    axs[0,0].set_xlabel('Magnetic flux [MWb]')
-    axs[0,0].legend(['P', 'A'],frameon=False)
-    axs[0,0].set_xlim([0,2000])
-
-    bb['P_dt'].plot.hist(axs[0,1],bins=np.arange(-500,501,10),histtype='step',color='C1')
-    bb['A_dt'].plot.hist(axs[0,1],bins=np.arange(-500,501,10),histtype='step',color='C2')
-    # (1e-3*np.deg2rad(15*0.1)*(bb['dA_dt']+bb['dP_dt']).sum(dim='mlt')).plot.hist(axs[1],bins=np.arange(-1000,1001,25),histtype='step')
-    
-    axs[0,1].set_ylabel('Counts')
-    axs[0,1].set_xlabel('Change flux [kV]')
-    axs[0,1].legend(['dP/dt', 'dA/dt'],frameon=False)
-    axs[0,1].set_xlim([-500,500])
-
-    axs[1,0].scatter(bb['P'],bb['A'],s=0.1,alpha=0.1)
-    r = np.round(pearsonr(bb['P'],bb['A'])[0],3)
-    axs[1,0].text(0.8,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[1,0].transAxes)
-
-    axs[1,0].set_xlim([0,2000])
-    axs[1,0].set_ylim([0,2000])
-    axs[1,0].set_ylabel('A [MWb]')
-    axs[1,0].set_xlabel('P [MWb]')
-
-
-    axs[1,1].scatter(bb['P_dt'],bb['A_dt'],s=0.1,alpha=0.1)
-    r = np.round(pearsonr(bb['P_dt'],bb['A_dt'])[0],3)
-    axs[1,1].text(0.8,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[1,1].transAxes)
-
-    axs[1,1].set_xlim([-500,500])
-    axs[1,1].set_ylim([-500,500])
-    axs[1,1].set_ylabel('dA/dt [kV]')
-    axs[1,1].set_xlabel('dP/dt [kV]')
-
-    # Letters
-    axs[0,0].text(0.05,0.95,'a',horizontalalignment='center',verticalalignment='center', transform=axs[0,0].transAxes)
-    axs[1,0].text(0.05,0.95,'b',horizontalalignment='center',verticalalignment='center', transform=axs[1,0].transAxes)
-    axs[0,1].text(0.05,0.95,'c',horizontalalignment='center',verticalalignment='center', transform=axs[0,1].transAxes)
-    axs[1,1].text(0.05,0.95,'d',horizontalalignment='center',verticalalignment='center', transform=axs[1,1].transAxes)
-    
-    fig.tight_layout()
-    plt.savefig(outpath + 'fig01.png',bbox_inches='tight',dpi = 300)
-    plt.close()
-    
-    fig,axs = plt.subplots(1,3,figsize=(9,3))
-    
-    bb['ve_pb'].plot.hist(axs[0],bins=np.arange(-150,151,2),histtype='step',color='C3')
-    bb['ve_eb'].plot.hist(axs[0],bins=np.arange(-150,151,2),histtype='step',color='C0')
-    axs[0].set_xlim([-150,150])
-    axs[0].set_ylim([0,2e6])
-    
-    axs[0].set_xlabel('Eastward velocity [m/s]')
-    axs[0].legend(['pb','eb'],frameon=False)
-    
-    bb['vn_pb'].plot.hist(axs[1],bins=np.arange(-750,751,10),histtype='step',color='C3')
-    bb['vn_eb'].plot.hist(axs[1],bins=np.arange(-750,751,10),histtype='step',color='C0')
-    axs[1].set_xlim([-750,750])
-    axs[1].set_ylim([0,1.0e6])
-    
-    axs[1].set_xlabel('Northward velocity [m/s]')
-    axs[1].legend(['pb','eb'],frameon=False)
-    
-    np.sqrt(bb['ve_pb']**2+bb['vn_pb']**2).plot.hist(axs[2],bins=np.arange(0,751,10),histtype='step',color='C3')
-    np.sqrt(bb['ve_eb']**2+bb['vn_eb']**2).plot.hist(axs[2],bins=np.arange(0,751,10),histtype='step',color='C0')
-    axs[2].set_xlim([0,750])
-    axs[2].set_ylim([0,1.5e6])
-    axs[2].set_xlabel('Speed [m/s]')
-    axs[2].legend(['pb','eb'],frameon=False)
-    plt.tight_layout()
-    # (1e-3*np.deg2rad(15*0.1)*(bb['dA_dt']).sum(dim='mlt')).plot.hist(axs[1],bins=np.arange(-1000,1001,25),histtype='step')
-    # (1e-3*np.deg2rad(15*0.1)*(bb['dA_dt']+bb['dP_dt']).sum(dim='mlt')).plot.hist(axs[1],bins=np.arange(-1000,1001,25),histtype='step')
-    
-    plt.savefig(outpath + 'fig02.png',bbox_inches='tight',dpi = 300)
-    plt.close()
-    
-    fig,axs = plt.subplots(1,2,figsize=(6,3))
-    
-    axs[0].scatter(1e-3*np.deg2rad(15*0.1)*bb['dP_dt'].sum(dim='mlt'),1e-3*np.deg2rad(15*0.1)*bb['dA_dt'].sum(dim='mlt'),s=0.1,alpha=0.1)
-    r = np.round(pearsonr(bb['dP_dt'].sum(dim='mlt'),bb['dA_dt'].sum(dim='mlt'))[0],3)
-    axs[0].text(0.75,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[0].transAxes)
-
-    axs[0].set_xlim([-500,500])
-    axs[0].set_ylim([-500,500])
-    axs[0].set_ylabel('dA/dt [kV]')
-    axs[0].set_xlabel('dP/dt [kV]')
-    
-    x = 1e-3*np.deg2rad(15*0.1)*bb['dP_dt'].sum(dim='mlt').values
-    y = 1e-3*np.deg2rad(15*0.1)*bb['dA_dt'].sum(dim='mlt').values
-    
-    # ind = (x>-1000)&(x<1000)&(y>-1000)&(y<1000)
-    # x=x[ind]
-    # y=y[ind]
-    # count,bin_edges,bin_number=binned_statistic(y,y,statistic='count',bins=np.arange(-1000,1001,100))
-    # w=1/count[bin_number-1]
-    
-    # count,bin_edges,bin_number=binned_statistic(x,x,statistic='count',bins=np.arange(-1000,1001,100))
-    # w=w*1/count[bin_number-1]
-
-    # reg = LinearRegression().fit(x[:, None],y,w)
-    # b = reg.intercept_
-    # m = reg.coef_[0]
-    # axs[0].axline(xy1=(0, b), slope=m, color='C1')
-    
-    # reg = HuberRegressor().fit(x[:, None],y,w)
-    # b = reg.intercept_
-    # m = reg.coef_[0]
-    # axs[0].axline(xy1=(0, b), slope=m, color='C2')
-    
-    # reg = RANSACRegressor().fit(x[:, None],y,w)
-    # b = reg.estimator_.intercept_
-    # m = reg.estimator_.coef_[0]
-    # axs[0].axline(xy1=(0, b), slope=m, color='C3')
-    # label=f'$y = {m:.1f}x {b:+.1f}$'
-
-    m = np.linalg.eig(np.cov(x,y))[1][0][0]/np.linalg.eig(np.cov(x,y))[1][0][1]
-    b = np.mean(y) - m * np.mean(x)
-    axs[0].axline(xy1=(0, b), slope=m,color='C6',linestyle='--')
-    axs[0].text(0.3,0.1,'dA/dt $\\propto$ '+str(np.round(m,1))+' dP/dt',horizontalalignment='center',verticalalignment='center', transform=axs[0].transAxes)
-
-    
-
-    axs[1].scatter(bb['PhiD']-1e-3*np.deg2rad(15*0.1)*bb['dP_dt'].sum(dim='mlt'),1e-3*np.deg2rad(15*0.1)*bb['dA_dt'].sum(dim='mlt'),s=0.1,alpha=0.1)
-    ind = np.isfinite(bb['PhiD'])
-    r = np.round(pearsonr(bb['PhiD'][ind]-1e-3*np.deg2rad(15*0.1)*bb['dP_dt'].sum(dim='mlt')[ind],1e-3*np.deg2rad(15*0.1)*bb['dA_dt'].sum(dim='mlt')[ind])[0],3)
-    axs[1].text(0.25,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[1].transAxes)
-
-    axs[1].set_xlim([-500,500])
-    axs[1].set_ylim([-500,500])
-    axs[1].set_ylabel('dA/dt [kV]')
-    axs[1].set_xlabel('$\\Phi_N$ [kV]')
-    
-    x = bb['PhiD'].values-1e-3*np.deg2rad(15*0.1)*bb['dP_dt'].sum(dim='mlt').values
-    y = 1e-3*np.deg2rad(15*0.1)*bb['dA_dt'].sum(dim='mlt').values
-    ind = (x>-1000)&(x<1000)&(y>-1000)&(y<1000)
-    x=x[ind]
-    y=y[ind]
-    
-    m = np.linalg.eig(np.cov(x,y))[1][0][0]/np.linalg.eig(np.cov(x,y))[1][0][1]
-    b = np.mean(y) - m * np.mean(x)
-    axs[1].axline(xy1=(0, b), slope=m,color='C6',linestyle='--')
-    axs[1].text(0.7,0.1,'dA/dt $\\propto$ '+str(np.round(m,1))+' $\\Phi_N$',horizontalalignment='center',verticalalignment='center', transform=axs[1].transAxes)
-
-    
-    # axs[2].scatter(bb['PhiD'],1e-3*np.deg2rad(15*0.1)*bb['dA_dt'].sel(mlt=12),s=0.1,alpha=0.1)
-    # ind = np.isfinite(bb['PhiD'])
-    # r = np.round(pearsonr(bb['PhiD'][ind],1e-3*np.deg2rad(15*0.1)*bb['dA_dt'].sel(mlt=12)[ind])[0],3)
-    # axs[2].text(0.75,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[2].transAxes)
-
-    # axs[2].set_xlim([0,250])
-    # axs[2].set_ylim([-5,5])
-    # axs[2].set_ylabel('dA$_{12}$/dt [kV]')
-    # axs[2].set_xlabel('$\\Phi_D$ [kV]')
-    
-    plt.tight_layout()
-    plt.savefig(outpath + 'fig03.png',bbox_inches='tight',dpi = 300)
-    plt.close()
-    # dA/dt vs A
-    
-    fig,axs = plt.subplots(1,3,figsize=(9,3))
-    
-    ind = np.isfinite(bb['dP_dt'].sum(dim='mlt'))
-    # ind = bb['dP_dt'].sum(dim='mlt')>0
-    
-    axs[0].scatter(1e-6*np.deg2rad(15*0.1)*bb['dP'].sum(dim='mlt')[ind],abs(1e-3*np.deg2rad(15*0.1)*bb['dA_dt'].sum(dim='mlt')[ind]),s=0.1,alpha=0.1)
-    r = np.round(pearsonr(bb['dP'].sum(dim='mlt')[ind],abs(bb['dA_dt'].sum(dim='mlt')[ind]))[0],3)
-    axs[0].text(0.75,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[0].transAxes)
-
-    axs[0].set_xlim([0,2000])
-    axs[0].set_ylim([0,1000])
-    axs[0].set_ylabel('dA/dt [kV]')
-    axs[0].set_xlabel('P [MWb]')
-    
-    axs[1].scatter(1e-6*np.deg2rad(15*0.1)*bb['dA'].sum(dim='mlt')[ind],abs(1e-3*np.deg2rad(15*0.1)*bb['dA_dt'].sum(dim='mlt')[ind]),s=0.1,alpha=0.1)
-    r = np.round(pearsonr(bb['dA'].sum(dim='mlt')[ind],abs(bb['dA_dt'].sum(dim='mlt')[ind]))[0],3)
-    axs[1].text(0.75,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[1].transAxes)
-
-    axs[1].set_xlim([0,2000])
-    axs[1].set_ylim([0,1000])
-    axs[1].set_ylabel('dA/dt [kV]')
-    axs[1].set_xlabel('A [MWb]')
-    
-    axs[2].scatter(1e-6*np.deg2rad(15*0.1)*(bb['dP']+bb['dA']).sum(dim='mlt')[ind],abs(1e-3*np.deg2rad(15*0.1)*bb['dA_dt'].sum(dim='mlt')[ind]),s=0.1,alpha=0.1)
-    r = np.round(pearsonr(1e-6*np.deg2rad(15*0.1)*(bb['dP']+bb['dA']).sum(dim='mlt')[ind],abs(1e-3*np.deg2rad(15*0.1)*bb['dA_dt'].sum(dim='mlt')[ind]))[0],3)
-    axs[2].text(0.75,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[2].transAxes)
-
-    axs[2].set_xlim([700,2700])
-    axs[2].set_ylim([0,1000])
-    axs[2].set_ylabel('dA/dt (kV)')
-    axs[2].set_xlabel('T [MWb]')
-    
-    plt.tight_layout()
-    
-    plt.savefig(outpath + 'fig04.png',bbox_inches='tight',dpi = 300)
-    plt.close()
-    
-    ## GEOMAGNETIC FORCING AND INDICES
-    fig,axs = plt.subplots(2,3,figsize=(9,6))
-    
-    axs[0,0].scatter(bb['PhiD'],bb['A'],s=0.1,alpha=0.1)
-    ind = np.isfinite(bb['PhiD'])
-    r = np.round(pearsonr(bb['PhiD'][ind],bb['A'][ind])[0],3)
-    axs[0,0].text(0.8,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[0,0].transAxes)
-
-    axs[0,0].set_xlim([0,249.99])
-    axs[0,0].set_ylim([0,2000])
-    axs[0,0].set_ylabel('A [MWb]')
-    axs[0,0].set_xlabel('$\\Phi_D$ [kV]')
-    
-    axs[0,1].scatter(bb['AE_INDEX'],bb['A'],s=0.1,alpha=0.1)
-    ind = np.isfinite(bb['AE_INDEX'])
-    r = np.round(pearsonr(bb['AE_INDEX'][ind],bb['A'][ind])[0],3)
-    axs[0,1].text(0.8,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[0,1].transAxes)
-
-    axs[0,1].set_xlim([0,1499.9])
-    axs[0,1].set_ylim([0,2000])
-    axs[0,1].set_yticklabels('')
-    axs[0,1].set_xlabel('AE index [nT]')
-    
-    axs[0,2].scatter(bb['SYM_H'],bb['A'],s=0.1,alpha=0.1)
-    ind = np.isfinite(bb['SYM_H'])
-    r = np.round(pearsonr(bb['SYM_H'][ind],bb['A'][ind])[0],3)
-    axs[0,2].text(0.8,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[0,2].transAxes)
-
-    axs[0,2].set_xlim([-300,100])
-    axs[0,2].set_ylim([0,2000])
-    axs[0,2].set_yticklabels('')
-    axs[0,2].set_xlabel('SYM_H index [nT]')
-
-    axs[1,0].scatter(bb['PhiD'],bb['A_dt'],s=0.1,alpha=0.1)
-    ind = np.isfinite(bb['PhiD'])
-    r = np.round(pearsonr(bb['PhiD'][ind],bb['A_dt'][ind])[0],3)
-    axs[1,0].text(0.8,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[1,0].transAxes)
-
-    axs[1,0].set_xlim([0,249.9])
-    axs[1,0].set_ylim([-500,500])
-    axs[1,0].set_ylabel('dA/dt [kV]')
-    axs[1,0].set_xlabel('$\\Phi_D$ [kV]')
-    
-    axs[1,1].scatter(bb['dAE_dt'],bb['A_dt'],s=0.1,alpha=0.1)
-    ind = np.isfinite(bb['dAE_dt'])
-    r = np.round(pearsonr(bb['dAE_dt'][ind],bb['A_dt'][ind])[0],3)
-    axs[1,1].text(0.8,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[1,1].transAxes)
-
-    axs[1,1].set_xlim([-50,50])
-    axs[1,1].set_ylim([-500,500])
-    axs[1,1].set_yticklabels('')
-    axs[1,1].set_xlabel('d(AE)/dt [nT/min]')
-    
-    axs[1,2].scatter(bb['dSYMH_dt'],bb['A_dt'],s=0.1,alpha=0.1)
-    ind = np.isfinite(bb['dSYMH_dt'])
-    r = np.round(pearsonr(bb['dSYMH_dt'][ind],bb['A_dt'][ind])[0],3)
-    axs[1,2].text(0.8,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[1,2].transAxes)
-
-    axs[1,2].set_xlim([-5,5])
-    axs[1,2].set_ylim([-500,500])
-    axs[1,2].set_yticklabels('')
-    axs[1,2].set_xlabel('d(SYM_H)/dt [nT/min]')
-    
-    # Letters
-    axs[0,0].text(0.05,0.93,'a',horizontalalignment='center', verticalalignment='center', transform=axs[0,0].transAxes,fontsize=12)
-    axs[0,1].text(0.05,0.93,'c',horizontalalignment='center', verticalalignment='center', transform=axs[0,1].transAxes,fontsize=12)
-    axs[0,2].text(0.05,0.93,'e',horizontalalignment='center', verticalalignment='center', transform=axs[0,2].transAxes,fontsize=12)
-    axs[1,0].text(0.05,0.93,'b',horizontalalignment='center', verticalalignment='center', transform=axs[1,0].transAxes,fontsize=12)
-    axs[1,1].text(0.05,0.93,'d',horizontalalignment='center', verticalalignment='center', transform=axs[1,1].transAxes,fontsize=12)
-    axs[1,2].text(0.05,0.93,'f',horizontalalignment='center', verticalalignment='center', transform=axs[1,2].transAxes,fontsize=12)
-
-    plt.subplots_adjust(hspace=0.25,wspace=0.07)
-    
-    plt.savefig(outpath + 'fig05.png',bbox_inches='tight',dpi = 300)
-    plt.close()
-    
-    fig,axs = plt.subplots(1,2,figsize=(6,3))
-    
-    # axs[0].scatter(bb['PhiD'],bb['L'],s=0.1,alpha=0.1)
-    # ind = np.isfinite(bb['PhiD'])
-    # r = np.round(pearsonr(bb['PhiD'][ind],bb['L'][ind])[0],3)
-    # axs[0].text(0.75,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[0].transAxes)
-
-    # axs[0].set_xlim([0,200])
-    # axs[0].set_ylim([-399,399])
-    # axs[0].set_ylabel('L [kV]')
-    # axs[0].set_xlabel('$\\Phi_D$ [kV]')
-    
-    axs[1].scatter(bb['PhiD'],1e-3*np.deg2rad(15*0.1)*bb['dA_dt'].sel(mlt=12),s=0.1,alpha=0.1)
-    ind = np.isfinite(bb['PhiD'])
-    r = np.round(pearsonr(bb['PhiD'][ind],1e-3*np.deg2rad(15*0.1)*bb['dA_dt'].sel(mlt=12)[ind])[0],3)
-    axs[1].text(0.75,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[1].transAxes)
-    
-    axs[1].set_xlim([0,200])
-    axs[1].set_ylim([-2,2])
-    axs[1].set_ylabel('dA$_{12}$/dt [kV]')
-    axs[1].set_xlabel('$\\Phi_D$ [kV]')
-    
-
-    
-    # axs[1].scatter(bb['AE_INDEX'],1e-6*np.deg2rad(15*0.1)*(bb['dP']+bb['dA']).sum(dim='mlt'),s=0.1,alpha=0.1)
-    # ind = np.isfinite(bb['AE_INDEX'])
-    # r = np.round(pearsonr(bb['AE_INDEX'][ind],1e-6*np.deg2rad(15*0.1)*(bb['dP']+bb['dA']).sum(dim='mlt')[ind])[0],3)
-    # axs[1].text(0.75,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[1].transAxes)
-
-    # axs[1].set_xlim([0,1000])
-    # axs[1].set_ylim([700,2700])
-    # axs[1].set_ylabel('T [MWb]')
-    # axs[1].set_xlabel('AE index [nT]')
-    
-    # axs[2].scatter(bb['SYM_H'],1e-6*np.deg2rad(15*0.1)*(bb['dP']+bb['dA']).sum(dim='mlt'),s=0.1,alpha=0.1)
-    # ind = np.isfinite(bb['SYM_H'])
-    # r = np.round(pearsonr(bb['SYM_H'][ind],1e-6*np.deg2rad(15*0.1)*(bb['dP']+bb['dA']).sum(dim='mlt')[ind])[0],3)
-    # axs[2].text(0.75,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[2].transAxes)
-
-    # axs[2].set_xlim([-300,100])
-    # axs[2].set_ylim([700,2700])
-    # axs[2].set_ylabel('T [MWb]')
-    # axs[2].set_xlabel('SYM_H index [nT]')
-    
-    plt.tight_layout()
-    
-    plt.savefig(outpath + 'fig06.png',bbox_inches='tight',dpi = 300)
-    plt.close()
-    
-    fig,axs = plt.subplots(1,2,figsize=(6,3))
-    
-    axs[0].scatter(bb['A'],bb['L'],s=0.1,alpha=0.1)
-    ind = np.isfinite(bb['PhiD'])
-    r = np.round(pearsonr(bb['A'][ind],bb['L'][ind])[0],3)
-    axs[0].text(0.75,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[0].transAxes)
-
-    axs[0].set_xlim([0,2000])
-    axs[0].set_ylim([-399,399])
-    axs[0].set_ylabel('L [kV]')
-    axs[0].set_xlabel('$A$ [MWb]')
-    
-    x = bb['A'].values[ind]
-    y = bb['L'].values[ind]
-    # return x,y
-    m = np.linalg.eig(np.cov(x,y))[1][1][0]/np.linalg.eig(np.cov(x,y))[1][1][1]
-    b = np.mean(y) - m * np.mean(x)
-    axs[0].axline(xy1=(0, b), slope=m,color='C6',linestyle='--')
-    
-    tau = 1/(m*1e-3)/60/60
-    axs[0].text(0.3,0.1,'L $\\propto$ A/'+str(np.round(tau,1))+' hrs',horizontalalignment='center',verticalalignment='center', transform=axs[0].transAxes)
-
-    a = np.linspace(0,1500,101)
-    axs[0].plot(a,a**4/6e9,color='C7',linestyle=':')
-    
-    axs[0].plot(a,func(a,*popt),color='C8',linestyle=':')
-    axs[0].plot(a,func2(a,*popt2),color='C9',linestyle=':')
-
-    
-    axs[1].scatter(bb['LM'],bb['A_dt'],s=0.1,alpha=0.1)
-    ind = np.isfinite(bb['PhiD'])
-    r = np.round(pearsonr(bb['LM'][ind],bb['A_dt'][ind])[0],3)
-    axs[1].text(0.75,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[1].transAxes)
-    
-    axs[1].set_xlim([-500,500])
-    axs[1].set_ylim([-500,500])
-    axs[1].set_ylabel('dA/dt [kV]')
-    axs[1].set_xlabel('1.4$\\Phi_N$ - A/1.8 [kV]')
-    
-    # x = bb['LM'].values[ind]
-    # y = bb['A_dt'].values[ind]
-    # # return x,y
-    # m = np.linalg.eig(np.cov(x,y))[1][1][0]/np.linalg.eig(np.cov(x,y))[1][1][1]
-    # b = np.mean(y) - m * np.mean(x)
-    # axs[1].axline(xy1=(0, b), slope=m,color='C1')
-    
-    # axs[1].text(0.3,0.1,'dA/dt $\\propto$ '+str(np.round(m,1)),horizontalalignment='center',verticalalignment='center', transform=axs[1].transAxes)
-
-    
-    plt.tight_layout()
-    
-    plt.savefig(outpath + 'fig06b.png',bbox_inches='tight',dpi = 300)
-    plt.close()
-    
-    fig,axs = plt.subplots(1,2,figsize=(6,3))
-    pax = fuv.pp(axs[0])
-    cmap = plt.get_cmap('plasma',5).colors
-    
-    dates = bb.date[(bb['PhiD']>=0)&(bb['PhiD']<5)]
-    pax.plot(bb['pb'].sel(date=dates).mean(dim='date'),bb.mlt,color=cmap[0],linewidth=0.8)
-    pax.plot(bb['eb'].sel(date=dates).mean(dim='date'),bb.mlt,color=cmap[0],linewidth=0.8)
-    dates = bb.date[(bb['PhiD']>=5)&(bb['PhiD']<15)]
-    pax.plot(bb['pb'].sel(date=dates).mean(dim='date'),bb.mlt,color=cmap[1],linewidth=0.8)
-    pax.plot(bb['eb'].sel(date=dates).mean(dim='date'),bb.mlt,color=cmap[1],linewidth=0.8)
-    dates = bb.date[(bb['PhiD']>=15)&(bb['PhiD']<30)]
-    pax.plot(bb['pb'].sel(date=dates).mean(dim='date'),bb.mlt,color=cmap[2],linewidth=0.8)
-    pax.plot(bb['eb'].sel(date=dates).mean(dim='date'),bb.mlt,color=cmap[2],linewidth=0.8)
-    dates = bb.date[(bb['PhiD']>=30)&(bb['PhiD']<50)]
-    pax.plot(bb['pb'].sel(date=dates).mean(dim='date'),bb.mlt,color=cmap[3],linewidth=0.8)
-    pax.plot(bb['eb'].sel(date=dates).mean(dim='date'),bb.mlt,color=cmap[3],linewidth=0.8)
-    axs[0].set_title('Mean boundary vs $\\Phi_D$')
-    pax = fuv.pp(axs[1])
-    dates = bb.date[(bb['By']<-3)]
-    pax.plot(bb['pb'].sel(date=dates).mean(dim='date'),bb.mlt,color='b',linewidth=0.8)
-    pax.plot(bb['eb'].sel(date=dates).mean(dim='date'),bb.mlt,color='b',linewidth=0.8)
-    dates = bb.date[(bb['By']>=-3)&(bb['By']<=3)]
-    pax.plot(bb['pb'].sel(date=dates).mean(dim='date'),bb.mlt,color='k',linewidth=0.8)
-    pax.plot(bb['eb'].sel(date=dates).mean(dim='date'),bb.mlt,color='k',linewidth=0.8)
-    dates = bb.date[(bb['By']>3)]
-    pax.plot(bb['pb'].sel(date=dates).mean(dim='date'),bb.mlt,color='r',linewidth=0.8)
-    pax.plot(bb['eb'].sel(date=dates).mean(dim='date'),bb.mlt,color='r',linewidth=0.8)
-    axs[1].set_title('Mean boundary vs IMF $B_y$')
-    
-    plt.savefig(outpath + 'fig07.png',bbox_inches='tight',dpi = 300)
-    plt.close()
-    
-    fig,axs = plt.subplots(1,2,figsize=(6,3))
-    pax = fuv.pp(axs[0],minlat=85)
-    cmap = plt.get_cmap('plasma',5).colors
-    
-    dates = bb.date[(bb['PhiD']>=0)&(bb['PhiD']<5)]
-    pax.plot(90-bb['pb_err'].sel(date=dates).mean(dim='date'),bb.mlt,color=cmap[0],linewidth=0.8)
-    dates = bb.date[(bb['PhiD']>=5)&(bb['PhiD']<15)]
-    pax.plot(90-bb['pb_err'].sel(date=dates).mean(dim='date'),bb.mlt,color=cmap[1],linewidth=0.8)
-    dates = bb.date[(bb['PhiD']>=15)&(bb['PhiD']<30)]
-    pax.plot(90-bb['pb_err'].sel(date=dates).mean(dim='date'),bb.mlt,color=cmap[2],linewidth=0.8)
-    dates = bb.date[(bb['PhiD']>=30)&(bb['PhiD']<50)]
-    pax.plot(90-bb['pb_err'].sel(date=dates).mean(dim='date'),bb.mlt,color=cmap[3],linewidth=0.8)
-    axs[0].set_title('Mean error pb')
-    
-    pax = fuv.pp(axs[1],minlat=85)
-    
-    dates = bb.date[(bb['PhiD']>=0)&(bb['PhiD']<5)]
-    pax.plot(90-bb['eb_err'].sel(date=dates).mean(dim='date'),bb.mlt,color=cmap[0],linewidth=0.8)
-    dates = bb.date[(bb['PhiD']>=5)&(bb['PhiD']<15)]
-    pax.plot(90-bb['eb_err'].sel(date=dates).mean(dim='date'),bb.mlt,color=cmap[1],linewidth=0.8)
-    dates = bb.date[(bb['PhiD']>=15)&(bb['PhiD']<30)]
-    pax.plot(90-bb['eb_err'].sel(date=dates).mean(dim='date'),bb.mlt,color=cmap[2],linewidth=0.8)
-    dates = bb.date[(bb['PhiD']>=30)&(bb['PhiD']<50)]
-    pax.plot(90-bb['eb_err'].sel(date=dates).mean(dim='date'),bb.mlt,color=cmap[3],linewidth=0.8)
-    axs[1].set_title('Mean error eb')
-    
-    plt.savefig(outpath + 'fig08.png',bbox_inches='tight',dpi = 300)
-    plt.close()
-    
-    fig,axs = plt.subplots(1,2,figsize=(6,3))
-    pax = fuv.pp(axs[0],minlat=85)
-    cmap = plt.get_cmap('plasma',5).colors
-    
-    dates = bb.date[(bb['PhiD']>=0)&(bb['PhiD']<5)]
-    pax.plot(90-bb['pb'].sel(date=dates).std(dim='date'),bb.mlt,color=cmap[0],linewidth=0.8)
-    pax.plot(90-bb['pb'].sel(date=dates).std(dim='date')/np.sqrt(len(dates)),bb.mlt,color=cmap[0],linewidth=0.8)
-    dates = bb.date[(bb['PhiD']>=5)&(bb['PhiD']<15)]
-    pax.plot(90-bb['pb'].sel(date=dates).std(dim='date'),bb.mlt,color=cmap[1],linewidth=0.8)
-    pax.plot(90-bb['pb'].sel(date=dates).std(dim='date')/np.sqrt(len(dates)),bb.mlt,color=cmap[1],linewidth=0.8)
-    dates = bb.date[(bb['PhiD']>=15)&(bb['PhiD']<30)]
-    pax.plot(90-bb['pb'].sel(date=dates).std(dim='date'),bb.mlt,color=cmap[2],linewidth=0.8)
-    pax.plot(90-bb['pb'].sel(date=dates).std(dim='date')/np.sqrt(len(dates)),bb.mlt,color=cmap[2],linewidth=0.8)
-    dates = bb.date[(bb['PhiD']>=30)&(bb['PhiD']<50)]
-    pax.plot(90-bb['pb'].sel(date=dates).std(dim='date'),bb.mlt,color=cmap[3],linewidth=0.8)
-    pax.plot(90-bb['pb'].sel(date=dates).std(dim='date')/np.sqrt(len(dates)),bb.mlt,color=cmap[3],linewidth=0.8)
-    axs[0].set_title('std and sem for pb')
-    
-    pax = fuv.pp(axs[1],minlat=85)
-    
-    dates = bb.date[(bb['PhiD']>=0)&(bb['PhiD']<5)]
-    pax.plot(90-bb['eb'].sel(date=dates).std(dim='date'),bb.mlt,color=cmap[0],linewidth=0.8)
-    pax.plot(90-bb['eb'].sel(date=dates).std(dim='date')/np.sqrt(len(dates)),bb.mlt,color=cmap[0],linewidth=0.8)
-    dates = bb.date[(bb['PhiD']>=5)&(bb['PhiD']<15)]
-    pax.plot(90-bb['eb'].sel(date=dates).std(dim='date'),bb.mlt,color=cmap[1],linewidth=0.8)
-    pax.plot(90-bb['eb'].sel(date=dates).std(dim='date')/np.sqrt(len(dates)),bb.mlt,color=cmap[1],linewidth=0.8)
-    dates = bb.date[(bb['PhiD']>=15)&(bb['PhiD']<30)]
-    pax.plot(90-bb['eb'].sel(date=dates).std(dim='date'),bb.mlt,color=cmap[2],linewidth=0.8)
-    pax.plot(90-bb['eb'].sel(date=dates).std(dim='date')/np.sqrt(len(dates)),bb.mlt,color=cmap[2],linewidth=0.8)
-    dates = bb.date[(bb['PhiD']>=30)&(bb['PhiD']<50)]
-    pax.plot(90-bb['eb'].sel(date=dates).std(dim='date'),bb.mlt,color=cmap[3],linewidth=0.8)
-    pax.plot(90-bb['eb'].sel(date=dates).std(dim='date')/np.sqrt(len(dates)),bb.mlt,color=cmap[3],linewidth=0.8)
-    axs[1].set_title('std and sem for eb')
-    
-    plt.savefig(outpath + 'fig09.png',bbox_inches='tight',dpi = 300)
-    plt.close()
-    
-    fig,ax = plt.subplots(1,1,figsize=(3,3))
-    pax = fuv.pp(ax)
-
-    pax.plot(bb['pb'].mean(dim='date'),bb.mlt,linewidth=0.8,color='C0')
-    pax.plot(bb['eb'].mean(dim='date'),bb.mlt,linewidth=0.8,color='C0')
-    
-    # BAS WIC boundaries
-    bas = pd.read_csv('/Users/aohma/BCSS-DAG Dropbox/Anders Ohma/data/Wic_boundaries_V2.csv',index_col=0)
-
-    mlt = np.arange(0.5,24)
-    eb = bas.iloc[:,2:26].mean(axis=0).values
-    pb = bas.iloc[:,27:-1].mean(axis=0).values
-    
-    mlt = np.append(mlt,mlt[0])
-    eb = np.append(eb,eb[0])
-    pb = np.append(pb,pb[0])
-    
-    pax.plot(pb,mlt,linewidth=0.8,color='C1')
-    pax.plot(eb,mlt,linewidth=0.8,color='C1')
-    
-    ax.set_title('BCSS vs BAS all data')
-
-    plt.savefig(outpath + 'fig10.png',bbox_inches='tight',dpi = 300)
-    plt.close()   
-
-    fig,axs = plt.subplots(1,3,figsize=(10,3))
-    
-    axs[0].scatter(bb['PhiD']-bb['P_dt'],bb['A_dt'],s=0.1,alpha=0.1)
-    ind = np.isfinite(bb['PhiD'])
-    r = np.round(pearsonr(bb['PhiD'][ind]-bb['P_dt'][ind],bb['A_dt'][ind])[0],3)
-    axs[0].text(0.25,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[0].transAxes)
-
-    axs[0].set_xlim([-500,500])
-    axs[0].set_ylim([-500,500])
-    axs[0].set_ylabel('dA/dt [kV]')
-    axs[0].set_xlabel('$\\Phi_N$ [kV]')
-    
-    x = bb['PhiD'].values-bb['P_dt'].values
-    y = bb['A_dt'].values
-    ind = (x>-1000)&(x<1000)&(y>-1000)&(y<1000)
-    x=x[ind]
-    y=y[ind]
-    
-    m = np.linalg.eig(np.cov(x,y))[1][0][0]/np.linalg.eig(np.cov(x,y))[1][0][1]
-    b = np.mean(y) - m * np.mean(x)
-    axs[0].axline(xy1=(0, b), slope=m,color='C6',linestyle='--')
-    axs[0].text(0.7,0.1,'dA/dt $\\propto$ '+str(np.round(m,2))+' $\\Phi_N$',horizontalalignment='center',verticalalignment='center', transform=axs[0].transAxes)
-
-    axs[1].scatter(bb['PhiD'],1e-3*np.deg2rad(15*0.1)*bb['dA_dt'].sel(mlt=12),s=0.1,alpha=0.1)
-    ind = np.isfinite(bb['PhiD'])
-    r = np.round(pearsonr(bb['PhiD'][ind],1e-3*np.deg2rad(15*0.1)*bb['dA_dt'].sel(mlt=12)[ind])[0],3)
-    axs[1].text(0.75,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[1].transAxes)
-    
-    axs[1].set_xlim([0,200])
-    axs[1].set_ylim([-2,2])
-    axs[1].set_ylabel('dA$_{12}$/dt [kV]')
-    axs[1].set_xlabel('$\\Phi_D$ [kV]')
-    
-    # axs[2].scatter(bb['PhiD'],1e-3*np.deg2rad(15*0.1)*bb['dA_dt'].sel(mlt=12),s=0.1,alpha=0.1)
-    # ind = np.isfinite(bb['PhiD'])
-    # r = np.round(pearsonr(bb['PhiD'][ind],1e-3*np.deg2rad(15*0.1)*bb['dA_dt'].sel(mlt=12)[ind])[0],3)
-    # axs[2].text(0.75,0.9,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[2].transAxes)
-
-    # axs[2].set_xlim([0,250])
-    # axs[2].set_ylim([-5,5])
-    # axs[2].set_ylabel('dA$_{12}$/dt [kV]')
-    # axs[2].set_xlabel('$\\Phi_D$ [kV]')
-
-    axs[2].scatter(bb['A'],bb['L'],s=0.1,alpha=0.1)
-    ind = np.isfinite(bb['PhiD'])
-    r = np.round(pearsonr(bb['A'][ind],bb['L'][ind])[0],3)
-    axs[2].text(0.8,0.1,'r = '+str(r),horizontalalignment='center',verticalalignment='center', transform=axs[2].transAxes)
-
-    axs[2].set_xlim([0,2000])
-    axs[2].set_ylim([-399,399])
-    axs[2].set_ylabel('L [kV]')
-    axs[2].set_xlabel('$A$ [MWb]')
-    
-    x = bb['A'].values[ind]
-    y = bb['L'].values[ind]
-    # return x,y
-    #m = np.linalg.eig(np.cov(x,y))[1][1][0]/np.linalg.eig(np.cov(x,y))[1][1][1]
-    #b = np.mean(y) - m * np.mean(x)
-    #axs[0].axline(xy1=(0, b), slope=m,color='C6',linestyle='--')
-    
-    #tau = 1/(m*1e-3)/60/60
-    #axs[0].text(0.3,0.1,'L $\\propto$ A/'+str(np.round(tau,1))+' hrs',horizontalalignment='center',verticalalignment='center', transform=axs[0].transAxes)
-
-    a = np.linspace(0,1500,101)
-    #axs[0].plot(a,a**4/6e9,color='C7',linestyle=':')
-    
-    axs[2].plot(a,func(a,*popt),color='C7',linestyle=':')
-    axs[2].plot(a,func2(a,*popt2),color='C9',linestyle=':')
-    
-    plt.subplots_adjust(wspace=0.3)
-    plt.savefig(outpath + 'fig11.png',bbox_inches='tight',dpi = 300)
-    plt.close()
-
-    
-def plot_ex(orbits,outpath):
+def fig11(orbits,path,outpath):
+    ''' Plot boundary evolution
+    orbits (list) : list of orbit numbers to plot
+    path (str) : path to boundary h5 file
+    outpath (str) : path to save the image
+    '''
     n=len(orbits)
-    path = '/Users/aohma/BCSS-DAG Dropbox/Anders Ohma/data/fuvAuroralFlux/'
-    
-    fig,axs = plt.subplots(n,figsize=(4,3))
-    
-    for i in range(n):
-        bm = pd.read_hdf(path+'hdf/final_boundaries.h5',where='orbit=="{}"'.format(orbits[i])).to_xarray()
-    
-        df = processOMNI(bm.date.values)
-        df.index.name = 'date'
-        bm = xr.merge((bm,df.to_xarray()))
-        
-        bm['A_dt'] = 1e-3*np.deg2rad(15*0.1)*(bm['dA_dt']).sum(dim='mlt')
-        bm['P_dt'] = 1e-3*np.deg2rad(15*0.1)*(bm['dP_dt']).sum(dim='mlt')
-        bm['PhiN'] = bm['PhiD']-bm['P_dt']
-        bm['L'] = 1.4*bm['PhiN'] - bm['A_dt']
-        bm['A12'] = 1e-3*np.deg2rad(15*0.1)*(bm['dP_dt']).sel(mlt=12)
-        
-        time=(bm.date-bm.date[0]).values/ np.timedelta64(1, 'h')
-    
-        axs[i].plot(time,100*bm['A12'].values,color='C2')
-        axs[i].plot(time,bm['PhiD'].values,color='C1')
-        
-        # axs[0].legend(['100 dA$_{12}$/dt [kV]','$\\Phi_D$ [kV]'],frameon=False,ncol=2)
-        axs[0].text(0.25,0.88,'100 dA$_{12}$/dt [kV]',color='C2',horizontalalignment='center',verticalalignment='center', transform=axs[0].transAxes)
-        axs[0].text(0.75,0.88,'$\\Phi_D$ [kV]',color='C1',horizontalalignment='center',verticalalignment='center', transform=axs[0].transAxes)
-
-
-        axs[i].set_xlim([1,8])
-        axs[i].set_ylim([-99,199])
-        axs[i].set_ylabel('Orbit '+str(orbits[i]))
-        if i != n-1:
-            axs[i].xaxis.set_tick_params(labelbottom=False)
-        else:
-            axs[i].set_xlabel('time [hrs]')
-    
-    plt.subplots_adjust(wspace=0.0,hspace=0.0)
-    plt.savefig(outpath + 'fig11.png',bbox_inches='tight',dpi = 300)
-    plt.close() 
-    
-    fig,axs = plt.subplots(n,figsize=(4,3))
-    
-    for i in range(n):
-        bm = pd.read_hdf(path+'hdf/final_boundaries.h5',where='orbit=="{}"'.format(orbits[i])).to_xarray()
-    
-        df = processOMNI(bm.date.values)
-        df.index.name = 'date'
-        bm = xr.merge((bm,df.to_xarray()))
-        
-        bm['A_dt'] = 1e-3*np.deg2rad(15*0.1)*(bm['dA_dt']).sum(dim='mlt')
-        bm['P_dt'] = 1e-3*np.deg2rad(15*0.1)*(bm['dP_dt']).sum(dim='mlt')
-        bm['PhiN'] = bm['PhiD']-bm['P_dt']
-        bm['L'] = 1.4*bm['PhiN'] - bm['A_dt']
-        
-        time=(bm.date-bm.date[0]).values/ np.timedelta64(1, 'h')
-    
-        
-        axs[i].plot(time,bm['A_dt'].values,color='C2')
-        axs[i].plot(time,bm['PhiN'].values,color='C1')
-        
-        # axs[0].legend(['dA/dt [kV]','$\\Phi_N$ [kV]'],frameon=False,ncol=2)
-        axs[0].text(0.25,0.88,'dA/dt [kV]',color='C2',horizontalalignment='center',verticalalignment='center', transform=axs[0].transAxes)
-        axs[0].text(0.75,0.88,'$\\Phi_N$ [kV]',color='C1',horizontalalignment='center',verticalalignment='center', transform=axs[0].transAxes)
-
-        axs[i].set_xlim([1,8])
-        axs[i].set_ylim([-299,599])
-        axs[i].set_ylabel('Orbit '+str(orbits[i]))
-        if i != n-1:
-            axs[i].xaxis.set_tick_params(labelbottom=False)
-        else:
-            axs[i].set_xlabel('time [hrs]')
-    
-    plt.subplots_adjust(wspace=0.0,hspace=0.0)
-    plt.savefig(outpath + 'fig12.png',bbox_inches='tight',dpi = 300)
-    plt.close() 
-    
-    
-    fig,axs = plt.subplots(n,figsize=(4,3))
-    
-    for i in range(n):
-        bm = pd.read_hdf(path+'hdf/final_boundaries.h5',where='orbit=="{}"'.format(orbits[i])).to_xarray()
-    
-        df = processOMNI(bm.date.values)
-        df.index.name = 'date'
-        bm = xr.merge((bm,df.to_xarray()))
-        
-        bm['A_dt'] = 1e-3*np.deg2rad(15*0.1)*(bm['dA_dt']).sum(dim='mlt')
-        bm['P_dt'] = 1e-3*np.deg2rad(15*0.1)*(bm['dP_dt']).sum(dim='mlt')
-        bm['PhiN'] = bm['PhiD']-bm['P_dt']
-        bm['L'] = 1.4*bm['PhiN'] - bm['A_dt']
-        bm['A'] = 1e-3*np.deg2rad(15*0.1)*(bm['dA']).sum(dim='mlt')
-        bm['t1'] = 1/(1.8*60*60)*np.maximum(bm['A']-200e3,0)#+1/(5*60*60)*bm['A']
-        bm['t1'] = bm['A']**4/6e21
-        bm['t1'] = 2.54589386e-06 * (1e-3*bm['A'])**(2.51008498e+00)
-        bm['t2'] = 1/(1.8*60*60)*bm['A']
-        
-        time=(bm.date-bm.date[0]).values/ np.timedelta64(1, 'h')
-    
-        axs[i].plot(time,bm['L'].values,color='C2')
-        axs[i].plot(time,bm['t1'].values,color='C4',linestyle=':')
-        axs[i].plot(time,bm['t2'].values,color='C4')
-        
-        axs[0].text(0.25,0.88,'L [kV]',color='C2',horizontalalignment='center',verticalalignment='center', transform=axs[0].transAxes)
-        axs[0].text(0.75,0.88,'A/1.8 hrs [kV]',color='C4',horizontalalignment='center',verticalalignment='center', transform=axs[0].transAxes)
-
-        axs[i].set_xlim([1,8])
-        axs[i].set_ylim([-199,299])
-        axs[i].set_ylabel('Orbit '+str(orbits[i]))
-        if i != n-1:
-            axs[i].xaxis.set_tick_params(labelbottom=False)
-        else:
-            axs[i].set_xlabel('time [hrs]')
-
-    plt.subplots_adjust(wspace=0.0,hspace=0.0)
-    plt.savefig(outpath + 'fig13.png',bbox_inches='tight',dpi = 300)
-    plt.close() 
-
-        
-        
-        
-def plot_ex2(orbits,outpath):
-    n=len(orbits)
-    path = '/Users/aohma/BCSS-DAG Dropbox/Anders Ohma/data/fuvAuroralFlux/'
     
     fig,axs = plt.subplots(n,2,figsize=(8,3))
     
     for i in range(n):
         
-        bm = pd.read_hdf(path+'hdf/final_boundaries_final.h5',where='orbit=="{}"'.format(orbits[i])).to_xarray()
+        bm = pd.read_hdf(path,where='orbit=="{}"'.format(orbits[i])).to_xarray()
         print(bm.date[[0,-1]])
 
         df = processOMNI(bm.date.values)
@@ -1807,7 +901,171 @@ def plot_ex2(orbits,outpath):
     
     plt.subplots_adjust(wspace=0.0,hspace=0.0)
     plt.savefig(outpath + 'fig12.png',bbox_inches='tight',dpi = 300)
-    plt.close()         
+    plt.close()      
+
+def load_bb(path,omnipath):
+    '''Load the reduced boundary model dataset
+    path (str) : path to the boundary model h5 file
+    omnipath (str) : path to the omni dataset h5 file'''
+
+    bm = pd.read_hdf(path).to_xarray()
+    print(len(bm.date))
+
+    ind0 = bm.isel(mlt=0)['isglobal'].values
+    ind1 = bm.isel(mlt=0)['A_mean'].values > bm.isel(mlt=0)['P_mean'].values + 2*bm.isel(mlt=0)['P_std'].values
+    ind2 = bm.isel(mlt=0)['A_mean'].values > bm.isel(mlt=0)['S_mean'].values + 2*bm.isel(mlt=0)['S_std'].values
+    ind3 = bm.isel(mlt=0)['count'].values > 12
+
+    ind4 = bm['pb_err'].quantile(0.75,dim='mlt').values<1.5
+    ind5 = bm['eb_err'].quantile(0.75,dim='mlt').values<1.5
+
+    dates = bm.date[ind0&ind1&ind2&ind3&ind4&ind5]
+    
+    bb = bm[['pb','eb','pb_err','eb_err','dP','dA','dP_dt','dA_dt','ve_pb','vn_pb','ve_eb','vn_eb']].sel(date=dates)
+    
+    df = processOMNI(bb.date.values,omnipath)
+    df.index.name = 'date'
+    bb = xr.merge((bb,df.to_xarray()))
+    return bb
+
+def load_bas(path):
+    ''' Load BAS boundaries into xarray.Dataset
+    path (str) : path to the BAS WIC boundary file'''
+    # BAS WIC boundaries
+    bas = pd.read_csv(path,index_col=0)
+
+    mlt = np.arange(0.5,24)
+
+    bas = bas.rename(columns={'Date_UTC_s':'date'})
+    bas['date'] = pd.to_datetime(bas['date'])
+    bas = bas.set_index('date')
+
+    bas_eb = bas.iloc[:,1:25]
+    bas_pb = bas.iloc[:,26:-1]
+
+    bas_eb.columns = mlt
+    bas_eb=bas_eb.stack()
+    bas_eb.index = bas_eb.index.set_names('mlt',level=1)
+    bas_eb.name='eb_bas'
+
+    bas_pb.columns = mlt
+    bas_pb=bas_pb.stack()
+    bas_pb.index = bas_pb.index.set_names('mlt',level=1)
+    bas_pb.name='pb_bas'
+
+    bas = pd.merge(bas_eb,bas_pb,left_index=True,right_index=True,how='outer')
+    bas = bas.to_xarray()
+    #bas['date'] = bas.date.dt.round('1min')
+    return bas
+
+def combine_datasets(bb,bas):
+    bf = bb[['eb','pb']].isel(mlt=slice(5,None,10))
+    mlt = np.arange(0.5,24)
+    bf['mlt'] = mlt
+    ds = xr.merge((bf[['eb','pb']],bas))
+
+    Cpb = [1.0298, -1.1249, -0.7380, 0.1838, -0.6171]
+    Lpb = Cpb[0] + Cpb[1]*np.cos(np.deg2rad(15*mlt))+Cpb[2]*np.sin(np.deg2rad(15*mlt))+Cpb[3]*np.cos(2*np.deg2rad(15*mlt))+Cpb[4]*np.sin(2*np.deg2rad(15*mlt))
+
+    ds['Lpb'] = (['mlt'],Lpb)
+
+    Cpb = [-0.4935,	-2.1186, 0.3188,0.5749, -0.3118]
+    Lpb = Cpb[0] + Cpb[1]*np.cos(np.deg2rad(15*mlt))+Cpb[2]*np.sin(np.deg2rad(15*mlt))+Cpb[3]*np.cos(2*np.deg2rad(15*mlt))+Cpb[4]*np.sin(2*np.deg2rad(15*mlt))
+
+    ds['Leb'] = (['mlt'],Lpb)
+
+    return ds
+
+def loadOMNI(inputfile,fromDate='1981-01-01',toDate='2020-01-01'):
+    # Load and process omni data
+
+    # Columns to include from the unaltered omni data stored in omni_1min.h5.
+    # This file is generated by the omni_download_1min_data() function.
+    columns = ['BX_GSE','BY_GSM', 'BZ_GSM','flow_speed','Vx','Vy','Vz',
+   'proton_density','Pressure','AL_INDEX','AE_INDEX', 'SYM_H']
+
+    # Read the file
+    omni = pd.read_hdf(inputfile,where='index>="{}"&index<"{}"'.format(fromDate,toDate),columns=columns)
+    omni = omni.rename(columns={"BX_GSE":"Bx","BY_GSM":"By","BZ_GSM":"Bz","flow_speed":"V"})
+    
+  
+    return omni
+
+def processOMNI(dates,omnipath):
+    fromDate = '2000-05-01 00:00'
+    toDate = '2003-01-01 00:00'
+    
+    omni = loadOMNI(omnipath,fromDate,toDate)
+    omni = omni.rolling(10,min_periods=0,center=True).mean()
+    
+    omni['dAE_dt'] = np.gradient(omni['AE_INDEX'])
+    omni['dSYMH_dt'] = np.gradient(omni['SYM_H'])
+    
+    allDates=np.concatenate((omni.index.values,dates))
+    omni = omni.reindex(allDates).sort_index()
+    omni = omni[~omni.index.duplicated(keep='first')]
+    omni = omni.interpolate(method='cubic',limit=1,limit_direction='both')
+    
+    omni['ca'] = np.arctan2(omni['By'],omni['Bz'])
+    
+    B_y,B_z,V_x = omni['By']*1e-9, omni['Bz']*1e-9, abs(omni['V'])*1e3
+    B_t = np.sqrt(B_y**2+B_z**2)
+    omni['PhiD'] = 3.3e2*V_x**(4./3)*B_t*np.sin(abs(omni['ca'])/2)**(9./2)
+    
+    
+    return omni.loc[dates]
+
+
+def validinput(inputstr, positive_answer, negative_answer):
+    answer= input(inputstr+'\n').lower()
+    if answer==positive_answer:
+        return True
+    elif answer== negative_answer:
+        return False
+    else:
+        print('Invalid response should be either '+ str(positive_answer)+ ' or ' +str(negative_answer))
+        return validinput(inputstr, positive_answer, negative_answer)
+def download_omni_1min(fromYear,toYear,monthFirstYear=1,monthLastYear=12, path='./', file='omni_1min.h5'):
+    '''
+    The function downloads omni 1min data and stores it in a hdf file. 
+    
+    Parameters
+    ==========
+    fromYear : int
+        Download from and including fromYear
+    toYear : int,
+        Download to and including toYear
+    monthFirstYear : int, default 1
+        First month to include from the first year.
+    monthLastYear : int, default 12
+        Last month to include from the last year.
+    '''
+    
+    if fromYear < 1981:
+        raise ValueError('fromYear must be >=1981')
+    if os.path.isfile(path+file):
+        if not validinput('file already exists and more omni will be added which can lead to duplication of data continue? (y/n)', 'y', 'n'):
+            raise ValueError('User Cancelled Download, Alter file name or path or remove or move the existing file and retry')
+    years = np.arange(fromYear,toYear+1,1)
+    months= []
+    for i in np.arange(1,13,1): months.append('%02i' % i)
         
-        
-        
+    for y in years:
+        for m in months:
+            if not ((y==years[0])& (int(m)<monthFirstYear)) | ((y==years[-1]) & (int(m)>monthLastYear)):
+                command = 'wget https://cdaweb.gsfc.nasa.gov/sp_phys/data/omni/hro_1min/' + str(y) + \
+                    '/omni_hro_1min_' + str(y) + str(m) + '01_v01.cdf'
+                os.system(command)
+                
+                omni = pd.DataFrame()
+                cdf_file = cdflib.CDF('omni_hro_1min_' + str(y) + str(m) + '01_v01.cdf')
+                varlist = cdf_file.cdf_info()['zVariables']
+                for v in varlist:
+                    omni[v] = cdf_file.varget(v)
+                    fillval = cdf_file.varattsget(v)['FILLVAL']
+                    omni[v] = omni[v].replace(fillval,np.nan)
+                omni.index = pd.to_datetime(cdflib.cdfepoch.unixtime(cdf_file.varget('Epoch')),unit='s')
+                omni[['AE_INDEX','AL_INDEX','AU_INDEX', 'PC_N_INDEX']] = omni[['AE_INDEX','AL_INDEX','AU_INDEX', 'PC_N_INDEX']].astype('float64')
+                omni.to_hdf(path+file,'omni',mode='a',append=True,format='t', data_columns=True)
+                cdf_file.close()
+                os.remove('omni_hro_1min_' + str(y) + str(m) + '01_v01.cdf')

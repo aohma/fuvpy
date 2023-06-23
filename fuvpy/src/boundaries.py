@@ -594,7 +594,7 @@ def boundarymodel_BS(ds,**kwargs):
     
     for key in kwargs: print(f'Warning: {key} is not a valid keyword argument')
     
-    1# Constants
+    # Constants
     mu0 = 4e-7*np.pi # Vacuum magnetic permeability
     M_E = 8.05e22 # Earth's magnetic dipole moment
     R_E = 6371e3 # Earth radii
