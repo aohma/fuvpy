@@ -389,8 +389,8 @@ def makeGIFs2(corenumber):
             wic = xr.load_dataset(wicpath+'wic_or'+str(orbit).zfill(4)+'.nc')
             wic['shimg'].attrs = {'long_name': 'Counts', 'units': ''}
 
-            bi = pd.read_hdf(bpath+'initial_boundaries.h5',key='initial',where='orbit=="{}"'.format(orbit))
-            bf = pd.read_hdf(bpath+'final_boundaries_final.h5',key='final',where='orbit=="{}"'.format(orbit))
+            bi = pd.read_hdf(bpath+'detected_boundaries.h5',key='initial',where='orbit=="{}"'.format(orbit))
+            bf = pd.read_hdf(bpath+'modeled_boundaries.h5',key='final',where='orbit=="{}"'.format(orbit))
             bi = bi.reset_index().set_index('date')
             bf = bf.reset_index().set_index('date')
 
