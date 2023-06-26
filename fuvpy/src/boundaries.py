@@ -552,7 +552,7 @@ def boundarymodel_BS(ds,**kwargs):
 
     Parameters
     ----------
-    ds : xarray.Dataset
+    ds : xarray.Dataset or pandas.DataFrame
         Dataset with initial boundaries.
     stop : float, optional
         When to stop the iterations. Default is 0.001
@@ -601,11 +601,16 @@ def boundarymodel_BS(ds,**kwargs):
     height = 130e3
     R_I = R_E + height # Radius of ionosphere  
 
-    # Make pandas dataframe
-    if resample:
-        df = ds.to_dataframe().reset_index().sample(frac=1,replace=True)
-    else:
+    # Change Dataset to DataFrame
+    if isinstance(ds,xr.Dataset):
         df = ds.to_dataframe().reset_index()
+    elif isinstance(ds,pd.DataFrame):
+        df = ds.reset_index()
+    else:
+        raise ValueError('ds must be xr.Dataset or pd.DataFrame')
+
+    # Resample if resample is True
+    if resample: df = df.sample(frac=1,replace=True)
 
     # Start date and duration
     dateS = df['date'].min().floor(str(tKnotSep)+'min')
