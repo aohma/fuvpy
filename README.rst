@@ -2,7 +2,7 @@ Overview
 ========
 
 The fuvpy package contains code to work with global Far-Ultraviolet (FUV) images of aurora.
-At present, the package includes functions to remove background emissions and to visualize images.
+At present, the package includes functions to remove background emissions and to detect and model auroral boundaries.
 
 The code uses xarray.Dataset objects to store the images.
 Functions to read .idl and .sav files produced by fuview3 and xvis (IMAGE and Polar mission software) into this format are provided.
