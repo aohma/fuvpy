@@ -108,9 +108,9 @@ def detect_boundaries(imgs,**kwargs):
         # Identify poleward boundaries
         ind = ds['firstAbove'].stack(z=('mlt','lim'))[np.isfinite(ds['firstAbove'].stack(z=('mlt','lim')))].astype(int)
         
-        df = ind.to_dataframe().reset_index()
-        df['clatBelow'] = ds.isel(clat=ind-1)['clat'].values
-        df['clatAbove'] = ds.isel(clat=ind)['clat'].values
+        df = ind.to_dataframe().drop(columns=['mlt','lim']).reset_index()
+        df['clatBelow'] = ds.isel(clat=ind.values-1)['clat'].values
+        df['clatAbove'] = ds.isel(clat=ind.values)['clat'].values
         
         df = pd.merge(df,ds['d'].to_dataframe().reset_index(),left_on=['clatBelow','mlt'],right_on=['clat','mlt'])
         df = df.drop(columns=('clat')).rename(columns={'d':'dBelow'})
@@ -124,9 +124,9 @@ def detect_boundaries(imgs,**kwargs):
         # Identify equatorward boundaries
         ind = ds['lastAbove'].stack(z=('mlt','lim'))[np.isfinite(ds['lastAbove'].stack(z=('mlt','lim')))].astype(int)
         
-        df = ind.to_dataframe().reset_index()
-        df['clatAbove'] = ds.isel(clat=ind)['clat'].values
-        df['clatBelow'] = ds.isel(clat=ind+1)['clat'].values
+        df = ind.to_dataframe().drop(columns=['mlt','lim']).reset_index()
+        df['clatAbove'] = ds.isel(clat=ind.values)['clat'].values
+        df['clatBelow'] = ds.isel(clat=ind.values+1)['clat'].values
         
         df = pd.merge(df,ds['d'].to_dataframe().reset_index(),left_on=['clatAbove','mlt'],right_on=['clat','mlt'])
         df = df.drop(columns=('clat')).rename(columns={'d':'dAbove'})
