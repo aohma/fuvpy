@@ -86,48 +86,52 @@ def radians2mlt(radians):
 # For showing the image file on the specified axis
 
 # What happens when an axis is clicked
-def clicked(image_axis, lt_axis, lat_axis, lt, lat):
-    global marker
+def clicked(vis, image_axis, lt_axis, lat_axis, lt, lat, window_lt=1, window_lat=4):
     marker= image_axis.scatter(lat, lt, marker='+', color='black', zorder=100, s=500)
+    vis.plotted.update({'marker': {'plot_object':[marker], 
+                                        'clear_on_show_image':True}})
     if lt_axis and lat_axis:
-        global profile1, profile2, lines, window
         cmap=image_axis.image.get_cmap()
-        lt_lims= (lt-lt_size/2, lt+lt_size/2)
+        lt_lims= (lt-window_lt/2, lt+window_lt/2)
         image= image_axis.image_dat
         if lt_lims[0]>=0 and lt_lims[1]<24:
-            image= image.where((image.lat>=lat-lat_size/2)\
-                                                           &(image.lat<=lat+lat_size/2)\
-                                                           &(image.lt>=lt-lt_size/2)\
-                                                           &(image.lt<=lt+lt_size/2))
+            image= image.where((image.lat>=lat-window_lat/2)\
+                                                           &(image.lat<=lat+window_lat/2)\
+                                                           &(image.lt>=lt-window_lt/2)\
+                                                           &(image.lt<=lt+window_lt/2))
         elif lt_lims[0]<0:
-            image= image.where((image.lat>=lat-lat_size/2)\
-                                                           &(image.lat<=lat+lat_size/2)\
-                                                           &((image.lt>=24+(lt-lt_size/2))\
-                                                           |(image.lt<=lt+lt_size/2)))
+            image= image.where((image.lat>=lat-window_lat/2)\
+                                                           &(image.lat<=lat+window_lat/2)\
+                                                           &((image.lt>=24+(lt-window_lt/2))\
+                                                           |(image.lt<=lt+window_lt/2)))
         elif lt_lims[1]>24:
-            image= image.where((image.lat>=lat-lat_size/2)\
-                                                           &(image.lat<=lat+lat_size/2)\
-                                                           &((image.lt>=(lt-lt_size/2))\
-                                                           |(image.lt<=(lt+lt_size/2)-24)))
-        window= image_axis.plot([lat+lat_size/2]*2 + [lat-lat_size/2]*2+ [lat+lat_size/2],
-                                    [lt-lt_size/2, lt+lt_size/2, lt+lt_size/2, lt-lt_size/2, lt-lt_size/2],
+            image= image.where((image.lat>=lat-window_lat/2)\
+                                                           &(image.lat<=lat+window_lat/2)\
+                                                           &((image.lt>=(lt-window_lt/2))\
+                                                           |(image.lt<=(lt+window_lt/2)-24)))
+        window= image_axis.plot([lat+window_lat/2]*2 + [lat-window_lat/2]*2+ [lat+window_lat/2],
+                                    [lt-window_lt/2, lt+window_lt/2, lt+window_lt/2, lt-window_lt/2, lt-window_lt/2],
                                     color='orange')
+        vis.plotted.update({f'window_{image_axis.axis_number}': {'plot_object':window, 
+                                                                 'clear_on_show_image':True}})
         image= image.where(image.data!=0)
         ind= image.data== np.nanmax(image.data)
         lt_= np.nanmax(image.where(ind).lt.values)
         lat_= np.nanmax(image.where(ind).lat.values)
 
         crange= image_axis.image.get_clim()
-        profile1= [lat_axis.scatter(image.lat.values, image.data.values, c=image.data.values, cmap=cmap, vmin= crange[0], vmax=crange[1])]+\
+        profile= [lat_axis.scatter(image.lat.values, image.data.values, c=image.data.values, cmap=cmap, vmin= crange[0], vmax=crange[1])]+\
                    lat_axis.plot([lat]*2, [np.nanmin(image.data), np.nanmax(image.data)], color='black')
-        profile1.extend(lat_axis.plot([np.round(lat_, 2)]*2, [np.nanmin(image.data), np.nanmax(image.data)],
+        profile.extend(lat_axis.plot([np.round(lat_, 2)]*2, [np.nanmin(image.data), np.nanmax(image.data)],
                                        color='black', linestyle='--'))
+        vis.plotted.update({'profile_lat': {'plot_object':profile, 
+                                            'clear_on_show_image':True}})
         try:
             lat_axis.set_ylim(np.nanmin(image.data)-abs(np.nanmin(image.data))*.1,
                                np.nanmax(image.data)+ abs(np.nanmax(image.data))*.1)
         except:
             pass
-        lat_axis.set_xlim((lat-lat_size/2)-abs(lat-lat_size/2)*.01, (lat+lat_size/2)+abs(lat+lat_size/2)*.01)
+        lat_axis.set_xlim((lat-window_lat/2)-abs(lat-window_lat/2)*.01, (lat+window_lat/2)+abs(lat+window_lat/2)*.01)
         radians= mlt2radians(image.lt.values)
         xlims= radians2mlt(np.array([np.nanmin(radians), np.nanmax(radians)]))
         xlims[0]= np.floor(xlims[0]*10)/10
@@ -138,29 +142,31 @@ def clicked(image_axis, lt_axis, lat_axis, lt, lat):
         except:
             pass
 
-        profile2= [lt_axis.scatter(radians, image.data.values, c=image.data.values, cmap=cmap, vmin=crange[0], vmax=crange[1])]+\
+        profile= [lt_axis.scatter(radians, image.data.values, c=image.data.values, cmap=cmap, vmin=crange[0], vmax=crange[1])]+\
                    lt_axis.plot([mlt2radians(lt)]*2, [np.nanmin(image.data), np.nanmax(image.data)], color='black')
 
-        profile2.extend(lt_axis.plot([mlt2radians(np.round(lt_, 2))]*2, [np.nanmin(image.data), np.nanmax(image.data)],
+        profile.extend(lt_axis.plot([mlt2radians(np.round(lt_, 2))]*2, [np.nanmin(image.data), np.nanmax(image.data)],
                                   color='black', linestyle='--'))
+        vis.plotted.update({'profile_lt': {'plot_object':profile, 
+                                                                 'clear_on_show_image':True}})
         if lt_lims[0]<0:
-            labels= np.append(np.arange(24-lt_size/4, np.round(lt_lims[0]+24, 1)-lt_size/4, -lt_size/4)[::-1], np.arange(0, np.round(lt_lims[1], 1)+lt_size/4, lt_size/4))
+            labels= np.append(np.arange(24-window_lt/4, np.round(lt_lims[0]+24, 1)-window_lt/4, -window_lt/4)[::-1], np.arange(0, np.round(lt_lims[1], 1)+window_lt/4, window_lt/4))
         elif lt_lims[1]>24:
-            labels= np.append(np.arange(24-lt_size/4, np.round(lt_lims[0], 1)-lt_size/4, -lt_size/4)[::-1], np.arange(0, np.round(lt_lims[1]-24, 1)+lt_size/4, lt_size/4))
+            labels= np.append(np.arange(24-window_lt/4, np.round(lt_lims[0], 1)-window_lt/4, -window_lt/4)[::-1], np.arange(0, np.round(lt_lims[1]-24, 1)+window_lt/4, window_lt/4))
         else:
-            labels= np.round(np.arange(np.round(lt_lims[0], 1), np.round(lt_lims[1], 1)+lt_size/4, lt_size/4), 2)
+            labels= np.round(np.arange(np.round(lt_lims[0], 1), np.round(lt_lims[1], 1)+window_lt/4, window_lt/4), 2)
         rads=mlt2radians(labels)
         lt_axis.set_xticks(rads, labels)
 
-        lines= image_axis.plot([lat]*100, np.append(np.linspace(0, 6, 50)[::-1], np.linspace(18, 24, 50)[::-1]), zorder=100, color='orange', alpha=.7) + \
-               image_axis.plot(np.linspace(50, 90, 100), [lt]*100, zorder=100, color='orange', alpha=.7)
+        # image_axis.lines= image_axis.plot([lat]*100, np.append(np.linspace(0, 6, 50)[::-1], np.linspace(18, 24, 50)[::-1]), zorder=100, color='orange', alpha=.7) + \
+        #        image_axis.plot(np.linspace(50, 90, 100), [lt]*100, zorder=100, color='orange', alpha=.7)
 
 
 
     plt.draw()
 
 class Visualise():
-    def __init__(self, fig, axes, caxes, MLTax=False, MLATax=False, cax_association=False):
+    def __init__(self, fig, axes, caxes, MLTax=False, MLATax=False, cax_association=False, hemispheres=False):
         """
         For initialising and setting up the visualisation tool. A tool for interacting, analysing
         and visualising data that can be displayed in polar co-ordinates with ease.
@@ -199,7 +205,12 @@ class Visualise():
         cid = fig.canvas.mpl_connect('button_press_event', onclick_wrapper)
         if not cax_association:
             cax_association= [0]*len(axes)
-        for ax, i in zip(axes, cax_association): ax.cax_number=i
+        if not hemispheres:
+            hemispheres= [1]*len(axes)
+        for ax, i, hemisphere, j in zip(axes, cax_association, hemispheres, range(len(axes))): 
+            ax.cax_number=i
+            ax.hemisphere= hemisphere
+            ax.axis_number= j
         for ax in axes:
             ax.image= False
             ax.image_dat= False
@@ -210,6 +221,7 @@ class Visualise():
         self.MLATax=MLATax
         self.cbars= [False]*len(np.unique(cax_association))
         self.figure= fig
+        self.plotted= {}
     def show_image(self, file, axis, crange=False, cmap=False, cbar_orientation=False, 
                    in_put='img', lt_val='mlt', lat_val='mlat', date=0, title_y=-0.1):
         """
@@ -259,7 +271,7 @@ class Visualise():
             The colorbar object associated with the data plotted.
 
         """
-        axis.ax.format_coord= axis.make_format(lt_val, lat_val)
+        axis.ax.format_coord= axis._create_coordinate_formatter(lt_val, lat_val)
         if isinstance(file, (str, np.str_)):
             if file.endswith('.idl') or file.endswith('.sav'):
                 if isinstance(date, int):
@@ -274,16 +286,23 @@ class Visualise():
                                                                          lt_val:'lt', lat_val:'lat'})
         else:
             axis.image_dat= file.rename({in_put:'data', lt_val:'lt', lat_val:'lat'})
+        axis.image_dat['lat']*=axis.hemisphere
         if axis.image:
             axis.image.remove()
             axis.image=False
-            try:
-                marker.remove()
-                for p in profile1+ profile2+ lines+window: p.remove()
-            except NameError:
-                pass
-            except ValueError:
-                pass
+            # try:
+            #     axis.marker.remove()
+            #     for p in self.MLTax.profile+ self.MLATax.profile+ axis.lines+axis.window: p.remove()
+            # except AttributeError:
+            #     pass
+            # except NameError:
+            #     pass
+            # except ValueError:
+            #     pass
+            for key in list(self.plotted.keys()):
+                if self.plotted[key]['clear_on_show_image']:
+                    self.plotted.pop(key)['plot_object'].remove()
+
         lt= axis.image_dat.lt
         image= axis.image_dat.where(eval(axis.ltlims)&(axis.image_dat.lat>=(axis.minlat)))
         maxi= np.nanmax(axis.image_dat.data)
@@ -304,14 +323,20 @@ class Visualise():
                     if ax.image and cmap!= ax.image.get_cmap().name:
                         ax.image.set_cmap(cmap)
             im= axis.plotimg(image.lat.values, image.lt.values, image.data.values, crange=crange, cmap=cmap, zorder=1)
+            tick_positions= self.caxes[axis.cax_number].xaxis.get_ticks_position(), self.caxes[axis.cax_number].yaxis.get_ticks_position()
+            label_positions= self.caxes[axis.cax_number].xaxis.get_label_position(), self.caxes[axis.cax_number].yaxis.get_label_position() 
             cbar=self.figure.colorbar(im, cax=cax, orientation= cbar_orientation)
+            self.caxes[axis.cax_number].xaxis.set_ticks_position(tick_positions[0])
+            self.caxes[axis.cax_number].yaxis.set_ticks_position(tick_positions[1])
+            self.caxes[axis.cax_number].xaxis.set_label_position(label_positions[0])
+            self.caxes[axis.cax_number].yaxis.set_label_position(label_positions[1])
             self.cbars[axis.cax_number]=cbar
         else:
             new_cbar=False
             if not crange:
                 clims=[]
                 for ax in self.axes:
-                    if ax.image:
+                    if ax.image and ax.cax_number==axis.cax_number:
                         clims+=[*ax.image.get_clim()]
                 if cbar.orientation=='horizontal':
                     crange=self.caxes[axis.cax_number].get_xlim()
@@ -330,7 +355,7 @@ class Visualise():
             elif cbar_orientation!=cbar.orientation:
                 new_cbar=True
             for ax in self.axes:
-                if ax.cax_number==axis.cax_number and ax!=axis:
+                if ax.cax_number==axis.cax_number and ax!=axis and ax.image:
                     if crange!= ax.image.get_clim():
                         ax.image.set_clim(crange)
                     if cmap!= ax.image.get_cmap().name:
@@ -341,12 +366,18 @@ class Visualise():
                     label= cbar.ax.get_xlabel()
                 elif cbar.orientation=='vertical':
                     label= cbar.ax.get_ylabel()
+                tick_positions= self.caxes[axis.cax_number].xaxis.get_ticks_position(), self.caxes[axis.cax_number].yaxis.get_ticks_position()
+                label_positions= self.caxes[axis.cax_number].xaxis.get_label_position(), self.caxes[axis.cax_number].yaxis.get_label_position() 
                 self.caxes[axis.cax_number].clear()
                 self.caxes[axis.cax_number].get_xaxis().set_visible(True)
                 self.caxes[axis.cax_number].get_yaxis().set_visible(True)
                 cbar= self.figure.colorbar(im, orientation=cbar_orientation, cax=cax)
                 self.cbars[axis.cax_number]=cbar
                 cbar.set_label(label)
+                self.caxes[axis.cax_number].xaxis.set_ticks_position(tick_positions[0])
+                self.caxes[axis.cax_number].yaxis.set_ticks_position(tick_positions[1])
+                self.caxes[axis.cax_number].xaxis.set_label_position(label_positions[0])
+                self.caxes[axis.cax_number].yaxis.set_label_position(label_positions[1])
                 for ax in self.axes:
                     if ax.cax_number== axis.cax_number and ax.image:
                         ax.image.set_clim(crange)
@@ -364,13 +395,16 @@ class Visualise():
         if any(bools_ax):
             global lt, lat
             ix, iy= event.xdata, event.ydata
-            try:
-                marker.remove()
-                for p in profile1+ profile2+ lines+window: p.remove()
-            except:
-                pass
+            # try:
+            #     marker.remove()
+                # for p in profile1+ profile2+ lines+window: p.remove()
+            # except:
+            #     pass
+            for key in list(self.plotted.keys()):
+                if self.plotted[key]['clear_on_show_image']:
+                    for p in self.plotted.pop(key)['plot_object']: p.remove()
             lat, lt= np.array(axes)[bools_ax][0]._xy2latlt(ix, iy)
-            clicked(np.array(axes)[bools_ax][0], prof_axis1, prof_axis2, lt, lat)
+            clicked(self, np.array(axes)[bools_ax][0], prof_axis1, prof_axis2, lt, lat)
         elif any(bools_cax):
             ix, iy= event.xdata, event.ydata
             cax_number= np.argmax(bools_cax)
@@ -378,9 +412,13 @@ class Visualise():
             if cbar.orientation=='horizontal':
                 crange=caxes[bools_cax][0].get_xlim()
                 coord= ix
+                label= cbar.ax.get_xlabel()
             elif cbar.orientation=='vertical':
                 crange=caxes[bools_cax][0].get_ylim()
                 coord= iy
+                label= cbar.ax.get_ylabel()
+            tick_positions= caxes[bools_cax][0].xaxis.get_ticks_position(), caxes[bools_cax][0].yaxis.get_ticks_position()
+            label_positions= caxes[bools_cax][0].xaxis.get_label_position(), caxes[bools_cax][0].yaxis.get_label_position()             
             caxes[bools_cax][0].clear()
             if coord<sum(crange)/2:
                 for ax in axes:
@@ -391,11 +429,17 @@ class Visualise():
                     if ax.cax_number== cax_number:
                         ax.image.set_clim(crange[0], round(coord, 0))
             try:
-                if marker.axes is not None and np.array(axes)[np.array([marker.axes==ax.ax for ax in axes])][0].cax_number== cax_number:
-                    profile1[0].set_clim(crange)
+                if self.plotted['marker'].axes is not None and np.array(axes)[np.array([marker.axes==ax.ax for ax in axes])][0].cax_number== cax_number:
+                    self.plottedprofile1[0].set_clim(crange)
                     profile2[0].set_clim(crange)
-            except NameError:
+            except KeyError:
                 pass
+            cbar.set_label(label)
+            caxes[bools_cax][0].xaxis.set_ticks_position(tick_positions[0])
+            caxes[bools_cax][0].yaxis.set_ticks_position(tick_positions[1])
+            caxes[bools_cax][0].xaxis.set_label_position(label_positions[0])
+            caxes[bools_cax][0].yaxis.set_label_position(label_positions[1])
+
         plt.draw()
         return
 
