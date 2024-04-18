@@ -86,10 +86,12 @@ def radians2mlt(radians):
 # For showing the image file on the specified axis
 
 # What happens when an axis is clicked
-def clicked(vis, image_axis, lt_axis, lat_axis, lt, lat, window_lt=1, window_lat=4):
+def clicked(vis, image_axis, lt, lat, lt_axis=False, lat_axis=False, window_lt=1, window_lat=4):
     marker= image_axis.scatter(lat, lt, marker='+', color='black', zorder=100, s=500)
     vis.plotted.update({'marker': {'plot_object':[marker], 
-                                        'clear_on_show_image':True}})
+                                        'clear_on_show_image':True,
+                                        'clear_on_click': True,
+                                        'Linked_to_colorbar':False}})
     if lt_axis and lat_axis:
         cmap=image_axis.image.get_cmap()
         lt_lims= (lt-window_lt/2, lt+window_lt/2)
@@ -113,19 +115,28 @@ def clicked(vis, image_axis, lt_axis, lat_axis, lt, lat, window_lt=1, window_lat
                                     [lt-window_lt/2, lt+window_lt/2, lt+window_lt/2, lt-window_lt/2, lt-window_lt/2],
                                     color='orange')
         vis.plotted.update({f'window_{image_axis.axis_number}': {'plot_object':window, 
-                                                                 'clear_on_show_image':True}})
+                                                                 'clear_on_show_image':True,
+                                                                 'clear_on_click': True,
+                                                                 'linked_to_colorbar':False}})
         image= image.where(image.data!=0)
         ind= image.data== np.nanmax(image.data)
         lt_= np.nanmax(image.where(ind).lt.values)
         lat_= np.nanmax(image.where(ind).lat.values)
 
         crange= image_axis.image.get_clim()
-        profile= [lat_axis.scatter(image.lat.values, image.data.values, c=image.data.values, cmap=cmap, vmin= crange[0], vmax=crange[1])]+\
-                   lat_axis.plot([lat]*2, [np.nanmin(image.data), np.nanmax(image.data)], color='black')
+        scatter= lat_axis.scatter(image.lat.values, image.data.values, 
+                                  c=image.data.values, cmap=cmap, vmin= crange[0], vmax=crange[1])
+        vis.plotted.update({'scatter_lat': {'plot_object':[scatter], 
+                                                                 'clear_on_show_image':True,
+                                                                 'clear_on_click': True,
+                                                                 'linked_to_colorbar':True}})
+        profile= lat_axis.plot([lat]*2, [np.nanmin(image.data), np.nanmax(image.data)], color='black')
         profile.extend(lat_axis.plot([np.round(lat_, 2)]*2, [np.nanmin(image.data), np.nanmax(image.data)],
                                        color='black', linestyle='--'))
         vis.plotted.update({'profile_lat': {'plot_object':profile, 
-                                            'clear_on_show_image':True}})
+                                            'clear_on_show_image':True,
+                                            'clear_on_click':True,
+                                            'linked_to_colorbar':False}})
         try:
             lat_axis.set_ylim(np.nanmin(image.data)-abs(np.nanmin(image.data))*.1,
                                np.nanmax(image.data)+ abs(np.nanmax(image.data))*.1)
@@ -141,14 +152,20 @@ def clicked(vis, image_axis, lt_axis, lat_axis, lt, lat, window_lt=1, window_lat
             lt_axis.set_ylim(np.nanmin(image.data)-abs(np.nanmin(image.data))*0.1, np.nanmax(image.data)+abs(np.nanmax(image.data))*.1)
         except:
             pass
-
-        profile= [lt_axis.scatter(radians, image.data.values, c=image.data.values, cmap=cmap, vmin=crange[0], vmax=crange[1])]+\
-                   lt_axis.plot([mlt2radians(lt)]*2, [np.nanmin(image.data), np.nanmax(image.data)], color='black')
+        scatter= lt_axis.scatter(radians, image.data.values, c=image.data.values, 
+                        cmap=cmap, vmin=crange[0], vmax=crange[1])
+        vis.plotted.update({'scatter_lt': {'plot_object':[scatter], 
+                                            'clear_on_show_image':True,
+                                            'clear_on_click': True,
+                                            'linked_to_colorbar':True}})
+        profile= lt_axis.plot([mlt2radians(lt)]*2, [np.nanmin(image.data), np.nanmax(image.data)], color='black')
 
         profile.extend(lt_axis.plot([mlt2radians(np.round(lt_, 2))]*2, [np.nanmin(image.data), np.nanmax(image.data)],
                                   color='black', linestyle='--'))
-        vis.plotted.update({'profile_lt': {'plot_object':profile, 
-                                                                 'clear_on_show_image':True}})
+        vis.plotted.update({'profile_lt': {'plot_object':profile,
+                                           'clear_on_click': True,
+                                           'clear_on_show_image':True,
+                                           'linked_to_colorbar':False}})
         if lt_lims[0]<0:
             labels= np.append(np.arange(24-window_lt/4, np.round(lt_lims[0]+24, 1)-window_lt/4, -window_lt/4)[::-1], np.arange(0, np.round(lt_lims[1], 1)+window_lt/4, window_lt/4))
         elif lt_lims[1]>24:
@@ -166,7 +183,7 @@ def clicked(vis, image_axis, lt_axis, lat_axis, lt, lat, window_lt=1, window_lat
     plt.draw()
 
 class Visualise():
-    def __init__(self, fig, axes, caxes, MLTax=False, MLATax=False, cax_association=False, hemispheres=False):
+    def __init__(self, fig, axes, caxes, cax_association=False, hemispheres=False, click_function=clicked, **click_kwargs):
         """
         For initialising and setting up the visualisation tool. A tool for interacting, analysing
         and visualising data that can be displayed in polar co-ordinates with ease.
@@ -201,7 +218,7 @@ class Visualise():
             caxes= [caxes]
         axes= np.asarray(axes)
         caxes= np.asarray(caxes)
-        onclick_wrapper=functools.partial(self.onclick, axes, MLTax, MLATax, caxes)
+        onclick_wrapper=functools.partial(self.onclick, axes, caxes)
         cid = fig.canvas.mpl_connect('button_press_event', onclick_wrapper)
         if not cax_association:
             cax_association= [0]*len(axes)
@@ -222,6 +239,8 @@ class Visualise():
         self.cbars= [False]*len(np.unique(cax_association))
         self.figure= fig
         self.plotted= {}
+        self.click_function= click_function
+        self.click_kwargs= click_kwargs
     def show_image(self, file, axis, crange=False, cmap=False, cbar_orientation=False, 
                    in_put='img', lt_val='mlt', lat_val='mlat', date=0, title_y=-0.1):
         """
@@ -389,7 +408,7 @@ class Visualise():
         plt.draw()
         return im, cbar
     # Handles which axis was clicked, where it was clicked and preparation for the clicked function
-    def onclick(self, axes, prof_axis1, prof_axis2, caxes, event):
+    def onclick(self, axes, caxes, event):
         bools_ax= np.array([axis.ax.in_axes(event) for axis in axes])
         bools_cax= np.array([axis.in_axes(event) for axis in caxes])
         if any(bools_ax):
@@ -401,10 +420,10 @@ class Visualise():
             # except:
             #     pass
             for key in list(self.plotted.keys()):
-                if self.plotted[key]['clear_on_show_image']:
+                if self.plotted[key]['clear_on_click']:
                     for p in self.plotted.pop(key)['plot_object']: p.remove()
             lat, lt= np.array(axes)[bools_ax][0]._xy2latlt(ix, iy)
-            clicked(self, np.array(axes)[bools_ax][0], prof_axis1, prof_axis2, lt, lat)
+            self.click_function(self, np.array(axes)[bools_ax][0], lt, lat, **self.click_kwargs)
         elif any(bools_cax):
             ix, iy= event.xdata, event.ydata
             cax_number= np.argmax(bools_cax)
@@ -429,9 +448,9 @@ class Visualise():
                     if ax.cax_number== cax_number:
                         ax.image.set_clim(crange[0], round(coord, 0))
             try:
-                if self.plotted['marker'].axes is not None and np.array(axes)[np.array([marker.axes==ax.ax for ax in axes])][0].cax_number== cax_number:
-                    self.plottedprofile1[0].set_clim(crange)
-                    profile2[0].set_clim(crange)
+                if 'marker' in self.plotted and np.array(axes)[np.array([self.plotted['marker']['plot_object'][0].axes==ax.ax for ax in axes])][0].cax_number== cax_number:
+                    self.plotted['scatter_lat']['plot_object'][0].set_clim(crange)
+                    self.plotted['scatter_lt']['plot_object'][0].set_clim(crange)
             except KeyError:
                 pass
             cbar.set_label(label)
@@ -457,7 +476,7 @@ if __name__=='__main__':
     MLATax= fig.add_subplot(gs[0, 3])
     cax= fig.add_subplot(gs[1, 1])
     cax2= fig.add_subplot(gs[1,0])
-    vis=Visualise(fig, np.asarray([ax, ax2]), np.asarray([cax, cax2]), MLTax, MLATax, cax_association=[0, 1])
+    vis=Visualise(fig, np.asarray([ax, ax2]), np.asarray([cax, cax2]), cax_association=[0, 1], lt_axis=MLTax, lat_axis= MLATax)
     vis.show_image(file, ax, cmap='viridis_r', in_put='sza')
     xarray= fuv.read_idl(file2).isel(date=0)
     vis.show_image(xarray, ax2)
