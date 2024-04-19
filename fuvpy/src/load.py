@@ -13,8 +13,8 @@ import xarray as xr
 
 from datetime import datetime
 
-from scipy.io import idl
-
+# from scipy.io import idl
+from scipy.io import readsav
 
 def read_idl(filenames, dzalim = 80, hemisphere = None, reflat=True, remove_bad=True):
     '''
@@ -59,7 +59,7 @@ def read_idl(filenames, dzalim = 80, hemisphere = None, reflat=True, remove_bad=
     filenames.sort()
     imgs = []
     for i in range(len(filenames)):
-        imageinfo = idl.readsav(filenames[i])['imageinfo']
+        imageinfo = readsav(filenames[i])['imageinfo']
 
         inst_id = imageinfo['inst_id'][0].strip().decode('utf8')
 
@@ -204,7 +204,7 @@ def _reflatWIC(wic,inImg='img',outImg='img'):
         Copy(?) of the FUV dataset with a new field containing the reflattened images.
     '''
     basepath = os.path.dirname(__file__)
-    flatfields = idl.readsav(basepath+'/../utils/wic_flatfield_dbase.idl')['flatfields']
+    flatfields = readsav(basepath+'/../utils/wic_flatfield_dbase.idl')['flatfields']
     if pd.to_datetime(wic['date'][0].values)<pd.to_datetime('2000-10-03 23:30'):
         flat = flatfields[:,0]
     else:
