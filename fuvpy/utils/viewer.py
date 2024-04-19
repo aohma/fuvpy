@@ -10,16 +10,9 @@ Created on Wed May  4 10:22:03 2022
 import matplotlib.pyplot as plt
 from polplot import Polarplot as polar
 import fuvpy as fuv
-from glob import glob
 import numpy as np
 import functools
-import pandas as pd
-import os
 
-"""Adjustment Box"""
-lat_size= 4 # goes from clicked mlat -2 to clicked mlat +2
-lt_size= 1 # goes from clicked mlt -0.5 to clicked mlt +0.5
-""" Functions that shouldn't be touched """
 # For making the mlt axis showing pixel intensity at the mlat that has been chosen
 class Make_MLT_ax():
     def __init__(self, ax):
@@ -41,21 +34,62 @@ class Make_MLT_ax():
             return (string)
         return format_coord
 def datetime_to_vistime(datetime):
-    year= int(str(datetime.astype('datetime64[Y]')))
-    DOY= (np.datetime64(datetime)-np.datetime64(f'{year}-01-01T00:00')).astype('timedelta64[D]').astype(int)+1
-    time=str(datetime).split('T')[-1]
-    hour= int(time[:2])
-    minute= int(time[3:5])
-    seconds= int(time[6:])
+    """
+    Convert datetime to a string for a file name for the vis camera.
+
+    Parameters
+    ----------
+    datetime : numpy.datetime64
+        Input datetime.
+
+    Returns
+    -------
+    str
+        Formatted string vis filename.
+    """
+    year = int(str(datetime.astype('datetime64[Y]')))
+    DOY = (np.datetime64(datetime) - np.datetime64(f'{year}-01-01T00:00')).astype('timedelta64[D]').astype(int) + 1
+    time = str(datetime).split('T')[-1]
+    hour = int(time[:2])
+    minute = int(time[3:5])
+    seconds = int(time[6:])
     return f'vis{year}{DOY:03d}{hour:02d}{minute:02d}{seconds:02d}.idl'
+
 def datetime_to_wictime(datetime):
-    year= int(str(datetime.astype('datetime64[Y]')))
-    DOY= (np.datetime64(datetime)-np.datetime64(f'{year}-01-01T00:00')).astype('timedelta64[D]').astype(int)+1
-    time=str(datetime).split('T')[-1]
-    hour= int(time[:2])
-    minute= int(time[3:5])
+    """
+    Convert datetime to a string for a file name for the WIC camera.
+
+    Parameters
+    ----------
+    datetime : numpy.datetime64
+        Input datetime.
+
+    Returns
+    -------
+    str
+        Formatted string WIC filename.
+    """
+    year = int(str(datetime.astype('datetime64[Y]')))
+    DOY = (np.datetime64(datetime) - np.datetime64(f'{year}-01-01T00:00')).astype('timedelta64[D]').astype(int) + 1
+    time = str(datetime).split('T')[-1]
+    hour = int(time[:2])
+    minute = int(time[3:5])
     return f'wic{year}{DOY:03d}{hour:02d}{minute:02d}.idl'
+
 def wictime_to_datetime(wic):
+    """
+    Convert datetime to a string for a file name for the WIC camera.
+
+    Parameters
+    ----------
+    wic : str
+        wic filename.
+
+    Returns
+    -------
+    numpy.datetime64
+        The datetime corresponding to the WIC filename.
+    """
     if wic.endswith('.idl'):
         end= '.idl'
         wic= wic.split('wic')[-1].split(end)[0]
@@ -66,6 +100,19 @@ def wictime_to_datetime(wic):
     minute= wic[9:11]
     return np.datetime64(f'{year}-01-01T{hour}:{minute}')+ np.timedelta64(int(DOY)-1, 'D')
 def vistime_to_datetime(vis):
+    """
+    Convert datetime to a string for a file name for the vis camera.
+
+    Parameters
+    ----------
+    vis : str
+        vis filename.
+
+    Returns
+    -------
+    numpy.datetime64
+        The datetime corresponding to the vis filename.
+    """
     vis= vis.split('vis')[-1].split('.idl')[0]
     year=vis[:4]
     DOY= vis[4:7]
@@ -73,6 +120,8 @@ def vistime_to_datetime(vis):
     minute= vis[9:11]
     seconds= vis[11:13]
     return np.datetime64(f'{year}-01-01T{hour}:{minute}:{seconds}')+ np.timedelta64(int(DOY)-1, 'D')
+#Following two functions are for show the mlt distrubtion, 
+#local time is converted into such a way as to display the distribution across discontinuities such as 24 to 1
 def mlt2radians(mlt):
     if not isinstance(mlt, np.ndarray):
         mlt=np.array([mlt])
@@ -83,7 +132,6 @@ def radians2mlt(radians):
     mlt= radians *(24/(2*np.pi))
     mlt[mlt<0]+=24
     return mlt
-# For showing the image file on the specified axis
 
 # What happens when an axis is clicked
 def clicked(vis, image_axis, lt, lat, lt_axis=False, lat_axis=False, window_lt=1, window_lat=4):
@@ -91,7 +139,7 @@ def clicked(vis, image_axis, lt, lat, lt_axis=False, lat_axis=False, window_lt=1
     vis.plotted.update({'marker': {'plot_object':[marker], 
                                         'clear_on_show_image':True,
                                         'clear_on_click': True,
-                                        'Linked_to_colorbar':False}})
+                                        'linked_to_colorbar':False}})
     if lt_axis and lat_axis:
         cmap=image_axis.image.get_cmap()
         lt_lims= (lt-window_lt/2, lt+window_lt/2)
@@ -175,42 +223,84 @@ def clicked(vis, image_axis, lt, lat, lt_axis=False, lat_axis=False, window_lt=1
         rads=mlt2radians(labels)
         lt_axis.set_xticks(rads, labels)
 
-        # image_axis.lines= image_axis.plot([lat]*100, np.append(np.linspace(0, 6, 50)[::-1], np.linspace(18, 24, 50)[::-1]), zorder=100, color='orange', alpha=.7) + \
-        #        image_axis.plot(np.linspace(50, 90, 100), [lt]*100, zorder=100, color='orange', alpha=.7)
-
-
 
     plt.draw()
 
 class Visualise():
+    """
+    Class for visualizing polar coordinate data.
+
+    Attributes
+    ----------
+    axes : list
+        List of Polarplot axis objects.
+    caxes : list
+        List of AxesSubplot objects where the colorbar(s) go.
+    MLTax : matplotlib AxesSubplot
+        AxesSubplot object where MLT distributions can go when polar plots are clicked on for more detail.
+    MLATax : matplotlib AxesSubplot
+        AxesSubplot object where MLT distributions can go when polar plots are clicked on for more detail.
+    cbars : list
+        List to store colorbar objects associated with the data plotted.
+    figure : matplotlib.figure.Figure
+        Figure object.
+    plotted : dict
+        Dictionary to store plotted objects and their properties.
+    click_function : function
+        Function to handle click events. Function must accept the following argument at minimum.
+        def click_function(Visualise, axis, lt, lat)
+            -Visualise (Visualise object)
+            -axis (polarsubplot where click was made)
+            -lt (local time of click)
+            -lat (latitude of click)
+        if anything is plotted in the function it must be included following the style of this template:
+        marker= image_axis.scatter(lt, lat)
+        vis.plotted.update({'marker': {'plot_object':[marker],
+                                    'clear_on_click': True,
+                                    'clear_on_show_image':True,
+                                    'linked_to_colorbar':False}})
+                        
+        addtional keys can be used if needed but 'plot_object', 'clear_on_click', 'clear_on_show_image' and 'linked_to_colorbar' must be included
+        the first key 'marker' should be different for each new plot object and the 'plot_object' must iterable so that for p in plot_object: p.remove() functions correctly
+
+        key explanations:
+            'plot_object': object added to the subplot (must be iterable)
+            'clear_on_click': boolean, if True when a click is made in a polar subplot this will be removed before the click function is run
+            'clear_on_show_image': boolean, if True will be removed when show_image is run
+            'linked_to_colorbar': boolean, if True is colour scale with be rescaled when the colourbar is altered through the click interactions
+    click_kwargs : dict
+        Additional keyword arguments for the click function.
+    """
     def __init__(self, fig, axes, caxes, cax_association=False, hemispheres=False, click_function=clicked, **click_kwargs):
         """
-        For initialising and setting up the visualisation tool. A tool for interacting, analysing
-        and visualising data that can be displayed in polar co-ordinates with ease.
+        Initialise and configure the visualisation tool for interacting, analysing,
+        and visualising data displayed in polar coordinates.
         
         Parameters
         ----------
-        fig : matplotlib figure
-            Figure object.
-        axes : Polarplot axis or list
-            Polarplot object made by the polplot package or list of Polarplot objects.
-        caxes : matplotlib AxesSubplot
-            AxesSubplot object or list of AxesSubplot objects where the colorbar(s) go.
-        MLTax : matplotlib AxesSubplot, optional
-            AxesSubplot object where MLT distributions can go when polar plots are 
-            clicked on for more detail. The default is False.
-        MLATax : matplotlib AxesSubplot, optional
-            AxesSubplot object where MLT distributions can go when polar plots are 
-            clicked on for more detail. The default is False.
+        fig : matplotlib.figure.Figure
+            The figure object where the visualisation will be displayed.
+        axes : Polarplot axis or list of Polarplot axes
+            A Polarplot object created by the polplot package or a list of Polarplot objects.
+        caxes : matplotlib.axes.AxesSubplot or list of AxesSubplots
+            The AxesSubplot object or a list of AxesSubplot objects where the colorbars are located.
         cax_association : list, optional
-            List of indices that associate the colorbar subplot to the polar plot.
+            A list of indices that associate the colorbar subplot with the polar plot.
             The same index can be used more than once when the colorbar is shared.
             The default is False.
+        hemispheres : list, optional
+            A list specifying the hemispheres for each polar plot.
+            The default is False which becomes [1]*len(axes). -1 is used for the southern hemisphere
+        click_function : function, optional
+            The function to be executed when a polar plot is clicked.
+            The default is `clicked`: clicked(vis, image_axis, lt, lat, lt_axis=False, lat_axis=False, window_lt=1, window_lat=4).
+            For user defined functions vis (Visualise object), image_axis(polar subplot where click is made), lt (lt of click) and lat (lat of click) are required and will be provided automatically.
+        **click_kwargs : dict, optional
+            Additional keyword arguments passed to the click function.
 
         Returns
         -------
-        None.
-
+        None
         """
         if not isinstance(axes, (list, np.ndarray)):
             axes= [axes]
@@ -231,64 +321,54 @@ class Visualise():
         for ax in axes:
             ax.image= False
             ax.image_dat= False
-            # ax.cax= caxes[ax.cax_number]
         self.axes= axes
         self.caxes= caxes
-        self.MLTax= MLTax
-        self.MLATax=MLATax
         self.cbars= [False]*len(np.unique(cax_association))
         self.figure= fig
         self.plotted= {}
         self.click_function= click_function
         self.click_kwargs= click_kwargs
     def show_image(self, file, axis, crange=False, cmap=False, cbar_orientation=False, 
-                   in_put='img', lt_val='mlt', lat_val='mlat', date=0, title_y=-0.1):
+                in_put='img', lt_val='mlt', lat_val='mlat', date=0, title_y=-0.1):
         """
-        For plotting the data onto the polar plots and enabling the interactive features
-        of the visualisation tool. Can be used continually each time data wants to be plotted
-        as it will remove the old data and update colorbars etc.
+        Plot data onto polar plots and enable interactive features of the visualisation tool.
+        Can be used iteratively to update plots, removing old data and updating colour bars as needed.
 
         Parameters
         ----------
-        file : string or xarray
-            Must provide the path and file name of an idl or xarray file or provide an xarray object.
+        file : str or xarray.Dataset
+            Path and filename of an IDL or xarray file, or an xarray object.
         axis : Polarplot axis
-            Polarplot axis on which the data will be plotted.
+            The Polarplot axis on which the data will be plotted.
         crange : tuple, optional
-            Colorbar range for the data. The default is False in which case
-            the colorbar range will be automatic based on the range of the data or if show image
-            has been previously run it will reuse the previous range.
-        cmap : string, optional
-            Name of matplotlib colormap to be used. The default is False in which case
-            the defualt matplotlib colormap is used.
-        cbar_orientation : string, optional
-            Orientation of the colorbar. The default is False in which case
-            the orientation is horizontal or the orientation of the previous set up if show image
-            has been run previously.
-        in_put : string, optional
-            String that is used in the file for the data that is to be plotted. 
-            The default is 'img'.
-        lt_val : string, optional
-            String that is used in the file for the coordinate to be used as the local time. 
-            The default is 'mlt'.
-        lat_val : string, optional
-            String that is used in the file for the coordinate to be used as the latitude. 
-            The default is 'mlat'.
-        date: string or datetime or integer
-            Only used when input is an idl file. When using string or datetime will 
-            select where the date in the file matches the date argument. Using
-            an integer will select the date at that index.
-            ie date=0 will pick the first date in the file. The default is 0.
-        title_y: float, optional
-            y coordinate for title of subplot, which is the date of the file.
-            The default is -0.1.
+            Colour bar range for the data. Default is False, which results in an automatic
+            range based on the data or a previously set range.
+        cmap : str, optional
+            Name of the matplotlib colormap to use. Default is False, which uses the
+            default matplotlib colormap.
+        cbar_orientation : str, optional
+            Orientation of the colour bar. Default is False, resulting in horizontal
+            orientation or the previous setup if `show_image` was run before.
+        in_put : str, optional
+            Data identifier in the file. Default is 'img'.
+        lt_val : str, optional
+            Local time coordinate identifier in the file. Default is 'mlt'.
+        lat_val : str, optional
+            Latitude coordinate identifier in the file. Default is 'mlat'.
+        date : str or datetime or int, optional
+            Used when input is an IDL file. A string or datetime will select a matching
+            date in the file, while an integer will select the date at that index (e.g., date=0
+            selects the first date). Default is 0.
+        title_y : float, optional
+            Y-coordinate for the subplot title, which displays the date of the file.
+            Default is -0.1.
+
         Returns
         -------
-        Image: matplotlib Polycollection
-            The polycollection object corresponding to the data plotted.
-        Colorbar: matplotlib Colorbar
-            The colorbar object associated with the data plotted.
-
+        Image : matplotlib.collections.PolyCollection
+            The PolyCollection object corresponding to the plotted data.
+        Colorbar : matplotlib.colorbar.Colorbar
+            The colour bar object associated with the plotted data.
         """
         axis.ax.format_coord= axis._create_coordinate_formatter(lt_val, lat_val)
         if isinstance(file, (str, np.str_)):
@@ -309,18 +389,9 @@ class Visualise():
         if axis.image:
             axis.image.remove()
             axis.image=False
-            # try:
-            #     axis.marker.remove()
-            #     for p in self.MLTax.profile+ self.MLATax.profile+ axis.lines+axis.window: p.remove()
-            # except AttributeError:
-            #     pass
-            # except NameError:
-            #     pass
-            # except ValueError:
-            #     pass
             for key in list(self.plotted.keys()):
                 if self.plotted[key]['clear_on_show_image']:
-                    self.plotted.pop(key)['plot_object'].remove()
+                    for p in self.plotted.pop(key)['plot_object']: p.remove()
 
         lt= axis.image_dat.lt
         image= axis.image_dat.where(eval(axis.ltlims)&(axis.image_dat.lat>=(axis.minlat)))
@@ -409,10 +480,28 @@ class Visualise():
         return im, cbar
     # Handles which axis was clicked, where it was clicked and preparation for the clicked function
     def onclick(self, axes, caxes, event):
+        """
+        Handles interactions with axes and colour axes upon mouse clicks.
+        Prepares data and triggers associated click functions.
+
+        Parameters
+        ----------
+        axes : list
+            List of Polarplot axes.
+        caxes : list
+            List of AxesSubplot objects where colour bars are placed.
+        event : MouseEvent
+            The mouse event triggering the function.
+
+        Returns
+        -------
+        None
+        """
+
         bools_ax= np.array([axis.ax.in_axes(event) for axis in axes])
         bools_cax= np.array([axis.in_axes(event) for axis in caxes])
         if any(bools_ax):
-            global lt, lat
+            # global lt, lat
             ix, iy= event.xdata, event.ydata
             # try:
             #     marker.remove()
@@ -465,6 +554,7 @@ class Visualise():
 if __name__=='__main__':
     import inspect
     folder= '/'.join(inspect.getfile(fuv).split('/')[:-2])+'/examples/sample_wicfiles/'
+    default_functionality= True
     file=folder+'wic20002410928.idl'
     np.datetime64('2001-12-06T10:17:26')
     file2=folder+'wic20002410930.idl'
@@ -476,7 +566,56 @@ if __name__=='__main__':
     MLATax= fig.add_subplot(gs[0, 3])
     cax= fig.add_subplot(gs[1, 1])
     cax2= fig.add_subplot(gs[1,0])
-    vis=Visualise(fig, np.asarray([ax, ax2]), np.asarray([cax, cax2]), cax_association=[0, 1], lt_axis=MLTax, lat_axis= MLATax)
+    def new_click_function(vis, image_axis, lt, lat, cax_y=.5, cax_color='black', **cax_scatter_kwargs):
+        """
+        Executes a new click function for interactive visualisation.
+        Calculates the closest data point to the clicked position and plots markers on the image and colour bar axes.
+
+        Parameters
+        ----------
+        vis : Visualisation object
+            The main visualisation object containing plotting methods and data.
+        image_axis : Polarplot axis
+            Axis where the image data is plotted.
+        lt : float
+            Local time coordinate of the clicked position.
+        lat : float
+            Latitude coordinate of the clicked position.
+        cax_y : float, optional
+            Y-coordinate for the colour bar marker. Default is 0.5.
+        cax_color : str, optional
+            Colour of the colour bar marker. Default is 'black'.
+        **cax_scatter_kwargs : dict
+            Additional keyword arguments for the colour bar scatter plot.
+
+        Returns
+        -------
+        None
+        """
+        print('Doing new click function')
+        dist = ((image_axis.image_dat.lt.values.flatten() - lt) ** 2 + 
+                (image_axis.image_dat.lat.values.flatten() - lat) ** 2) ** .5
+        ind = np.nanargmin(dist)
+        cax_x = image_axis.image_dat.data.values.flatten()[ind]
+        print(image_axis.image_dat.lat.values.flatten()[ind], image_axis.image_dat.lt.values.flatten()[ind])
+        marker = image_axis.scatter(image_axis.image_dat.lat.values.flatten()[ind], 
+                                image_axis.image_dat.lt.values.flatten()[ind], 
+                                marker='+', color='black', zorder=100, s=500)
+        vis.plotted.update({'marker': {'plot_object':[marker], 
+                                        'clear_on_show_image':True,
+                                        'clear_on_click': True,
+                                        'linked_to_colorbar':False}})
+        marker = vis.caxes[image_axis.cax_number].scatter(cax_x, cax_y, color=cax_color, **cax_scatter_kwargs)
+        vis.plotted.update({'cax_marker': {'plot_object':[marker],
+                                            'clear_on_show_image':True,
+                                            'clear_on_click':True,
+                                            'linked_to_colorbar':False}})
+        plt.draw()
+
+    if default_functionality:
+        vis=Visualise(fig, np.asarray([ax, ax2]), np.asarray([cax, cax2]), cax_association=[0, 1], lt_axis=MLTax, lat_axis= MLATax)
+    else:
+        vis= Visualise(fig, axes=[ax, ax2], caxes=[cax, cax2], cax_association=[0, 1], click_function=new_click_function, cax_color='red', zorder=1000, marker='d')
     vis.show_image(file, ax, cmap='viridis_r', in_put='sza')
     xarray= fuv.read_idl(file2).isel(date=0)
     vis.show_image(xarray, ax2)
