@@ -12,6 +12,7 @@ from polplot import Polarplot as polar
 import fuvpy as fuv
 import numpy as np
 import functools
+import matplotlib as mpl
 
 # For making the mlt axis showing pixel intensity at the mlat that has been chosen
 class Make_MLT_ax():
@@ -177,7 +178,7 @@ def clicked(vis, image_axis, lt, lat, lt_axis=False, lat_axis=False, window_lt=1
         vis.plotted.update({'scatter_lat': {'plot_object':[scatter], 
                                                                  'clear_on_show_image':True,
                                                                  'clear_on_click': True,
-                                                                 'linked_to_colorbar':True}})
+                                                                 'linked_to_colorbar':image_axis.cax_number+1}})
         profile= lat_axis.plot([lat]*2, [np.nanmin(image.data), np.nanmax(image.data)], color='black')
         profile.extend(lat_axis.plot([np.round(lat_, 2)]*2, [np.nanmin(image.data), np.nanmax(image.data)],
                                        color='black', linestyle='--'))
@@ -205,7 +206,7 @@ def clicked(vis, image_axis, lt, lat, lt_axis=False, lat_axis=False, window_lt=1
         vis.plotted.update({'scatter_lt': {'plot_object':[scatter], 
                                             'clear_on_show_image':True,
                                             'clear_on_click': True,
-                                            'linked_to_colorbar':True}})
+                                            'linked_to_colorbar':image_axis.cax_number+1}})
         profile= lt_axis.plot([mlt2radians(lt)]*2, [np.nanmin(image.data), np.nanmax(image.data)], color='black')
 
         profile.extend(lt_axis.plot([mlt2radians(np.round(lt_, 2))]*2, [np.nanmin(image.data), np.nanmax(image.data)],
@@ -267,7 +268,7 @@ class Visualise():
             'plot_object': object added to the subplot (must be iterable)
             'clear_on_click': boolean, if True when a click is made in a polar subplot this will be removed before the click function is run
             'clear_on_show_image': boolean, if True will be removed when show_image is run
-            'linked_to_colorbar': boolean, if True is colour scale with be rescaled when the colourbar is altered through the click interactions
+            'linked_to_colorbar': boolean/int , if int colour scale with be rescaled when the colourbar is altered through the click interactions if linked to the corresponding colour bar
     click_kwargs : dict
         Additional keyword arguments for the click function.
     """
@@ -413,9 +414,10 @@ class Visualise():
                     if ax.image and cmap!= ax.image.get_cmap().name:
                         ax.image.set_cmap(cmap)
             im= axis.plotimg(image.lat.values, image.lt.values, image.data.values, crange=crange, cmap=cmap, zorder=1)
+            mappable= mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(vmin=crange[0], vmax=crange[1]), cmap=cmap)
             tick_positions= self.caxes[axis.cax_number].xaxis.get_ticks_position(), self.caxes[axis.cax_number].yaxis.get_ticks_position()
             label_positions= self.caxes[axis.cax_number].xaxis.get_label_position(), self.caxes[axis.cax_number].yaxis.get_label_position() 
-            cbar=self.figure.colorbar(im, cax=cax, orientation= cbar_orientation)
+            cbar=self.figure.colorbar(mappable, cax=cax, orientation= cbar_orientation)
             self.caxes[axis.cax_number].xaxis.set_ticks_position(tick_positions[0])
             self.caxes[axis.cax_number].yaxis.set_ticks_position(tick_positions[1])
             self.caxes[axis.cax_number].xaxis.set_label_position(label_positions[0])
@@ -461,7 +463,8 @@ class Visualise():
                 self.caxes[axis.cax_number].clear()
                 self.caxes[axis.cax_number].get_xaxis().set_visible(True)
                 self.caxes[axis.cax_number].get_yaxis().set_visible(True)
-                cbar= self.figure.colorbar(im, orientation=cbar_orientation, cax=cax)
+                mappable= mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(vmin=crange[0], vmax=crange[1]), cmap=cmap)
+                cbar= self.figure.colorbar(mappable, orientation=cbar_orientation, cax=cax)
                 self.cbars[axis.cax_number]=cbar
                 cbar.set_label(label)
                 self.caxes[axis.cax_number].xaxis.set_ticks_position(tick_positions[0])
@@ -528,20 +531,22 @@ class Visualise():
             tick_positions= caxes[bools_cax][0].xaxis.get_ticks_position(), caxes[bools_cax][0].yaxis.get_ticks_position()
             label_positions= caxes[bools_cax][0].xaxis.get_label_position(), caxes[bools_cax][0].yaxis.get_label_position()             
             caxes[bools_cax][0].clear()
+
             if coord<sum(crange)/2:
-                for ax in axes:
-                    if ax.cax_number==cax_number:
-                        ax.image.set_clim(round(coord, 0), crange[-1])
-            if coord>=sum(crange)/2:
-                for ax in axes:
-                    if ax.cax_number== cax_number:
-                        ax.image.set_clim(crange[0], round(coord, 0))
-            try:
-                if 'marker' in self.plotted and np.array(axes)[np.array([self.plotted['marker']['plot_object'][0].axes==ax.ax for ax in axes])][0].cax_number== cax_number:
-                    self.plotted['scatter_lat']['plot_object'][0].set_clim(crange)
-                    self.plotted['scatter_lt']['plot_object'][0].set_clim(crange)
-            except KeyError:
-                pass
+                new_crange= round(coord, 0), crange[-1]
+            elif coord>=sum(crange)/2:
+                new_crange= crange[0], round(coord, 0)
+            for ax in axes:
+                if ax.cax_number== cax_number:
+                    if new_crange== ax.image.get_clim():
+                        continue
+                    ax.image.set_clim(new_crange)
+            for key in list(self.plotted.keys()):
+                if self.plotted[key]['linked_to_colorbar'] and self.plotted[key]['linked_to_colorbar']==cax_number+1:
+                    for p in self.plotted[key]['plot_object']: p.set_clim(new_crange)
+
+            mappable= mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(vmin=new_crange[0], vmax=new_crange[1]), cmap=cbar.cmap)
+            self.cbars[cax_number]= self.figure.colorbar(mappable, orientation=cbar.orientation, cax=caxes[bools_cax][0])
             cbar.set_label(label)
             caxes[bools_cax][0].xaxis.set_ticks_position(tick_positions[0])
             caxes[bools_cax][0].yaxis.set_ticks_position(tick_positions[1])
